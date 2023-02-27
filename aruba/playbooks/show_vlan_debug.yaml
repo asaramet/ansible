@@ -1,0 +1,19 @@
+---
+- name: Run 'show vlan' on all Aruba switches
+  hosts: aruba
+  gather_facts: false
+  collections:
+    - arubanetworks.aoscx
+  vars:
+    ansible_connection: network_cli
+  tasks:
+    - name: Execute 'show vlan' on the switch and register output
+      aoscx_command:
+        commands: 
+          - show vlan
+      register: show_vlan_output
+
+    - name: Display registered ouput
+      debug:
+        var: show_vlan_output.stdout
+...

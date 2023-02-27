@@ -1,0 +1,23 @@
+# Every YAML file should start with this
+---
+
+key1: this is a key 1
+key2: "this will take into account the newline simbol\n"
+
+multiline: |
+  this is a string
+  that goes over
+  multiple lines
+
+singleline: >
+  this is a string
+  that goes over
+  multiple lines
+
+singleline_no_n: >-
+  this is a string
+  that goes over
+  multiple lines
+
+# Every YAML file should end with this
+...

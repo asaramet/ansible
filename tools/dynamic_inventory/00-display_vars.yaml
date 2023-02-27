@@ -1,0 +1,11 @@
+---
+- name: Printing out hosts variables
+  hosts: iosxe
+  # connection: network_cli
+  gather_facts: no
+  
+  tasks: 
+    - name: Print variables for hosts
+      debug: 
+        var: hostvars[inventory_hostname]
+...

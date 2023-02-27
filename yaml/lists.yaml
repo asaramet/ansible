@@ -1,0 +1,10 @@
+# Every YAML file should start with this
+---
+# List
+- item 1
+- item 2
+- item 3
+- item 4
+
+# Every YAML file should end with this
+...

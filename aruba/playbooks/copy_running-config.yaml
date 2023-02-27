@@ -1,0 +1,25 @@
+---
+- name: Copy config files to rmang01 
+  hosts: rmang01
+  gather_facts: false
+  vars:
+    ansible_become: true # elevate privileges on the remote machine, if necessary
+    ansible_become_method: sudo
+    ansible_become_pass: "{{ vault_ansible_become_pass }}"
+  tasks:
+    - name: Get the sub groups/folders in the "aruba" hosts group
+      set_fact:
+        subgroups: "{{ subgroups|default([]) | union([hostvars[item].group_names[1]]) }}"
+      loop: "{{ groups.aruba }}"
+      run_once: true
+
+    - name: Copy sub folders config files to rmang01:/tftpboot/
+      copy:
+        src: "../{{ item }}"
+        dest: "/tftpboot/"
+        owner: root
+        group: rz
+        mode: 0666
+      loop: "{{ subgroups }}"
+      run_once: true
+...

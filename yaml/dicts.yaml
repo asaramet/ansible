@@ -1,0 +1,24 @@
+# Every YAML file should start with this
+---
+# List
+
+dictionay0:
+  dictionary1: 
+    - item 1
+    - item 2
+    - item 3
+    - item 4
+
+  dictionary2: 
+    - item 1
+    - item 2
+    - item 3
+    - item 4
+
+  dictionary3: 
+    - item 1
+    - item 2
+    - item 3
+
+# Every YAML file should end with this
+...
