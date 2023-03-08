@@ -1,0 +1,60 @@
+---
+- name: Save 'show running-config' into a local folder
+  hosts: aruba
+  gather_facts: false
+  tags: get_runs
+  collections:
+    - arubanetworks.aoscx
+  vars:
+    ansible_connection: network_cli
+  tasks:
+    - name: Execute 'show running-config' on the switch and register output
+      aoscx_command:
+        commands: 
+          - show running-config
+      register: running_config
+
+    - name: "Create group subfolder (ex: {{ group_names[1] }}) if it doesn't exits"
+      when: 
+        - running_config.stdout_lines[0] | length > 4 # only if it is not a single line error output
+      file:
+        path: "/opt/ansible/inventories/aruba/data/{{ group_names[1] }}"
+        state: directory
+        mode: 0775
+        group: rz
+      #run_once: true
+
+    - name: Save 'running-config' to 'group_subfolder/inventory_hostname'
+      when: 
+        - running_config.stdout_lines[0] | length > 4 # only when it is not a single line error output
+        - running_config.stdout_lines[0][0] == 'Current configuration:' # and only when output is legit
+      copy:
+        content: "{{ running_config.stdout[0] }}"
+        dest: "/opt/ansible/inventories/aruba/data/{{ group_names[1] }}/{{ inventory_hostname }}"
+        group: rz
+
+- name: Copy config files to rhlx99 
+  hosts: rhlx99
+  gather_facts: false
+  tags: copy_remote
+  vars:
+    ansible_become: true # elevate privileges on the remote machine, if necessary
+    ansible_become_method: sudo
+    ansible_become_pass: "{{ vault_ansible_become_pass }}"
+  tasks:
+    - name: Get the sub groups/folders in the "aruba" hosts group
+      set_fact:
+        subgroups: "{{ subgroups|default([]) | union([hostvars[item].group_names[1]]) }}"
+      loop: "{{ groups.aruba }}"
+      run_once: true
+
+    - name: Copy sub folders config files to rhlx99:/tftpboot/
+      copy:
+        src: "/opt/ansible/inventories/aruba/data/{{ item }}"
+        dest: "/tftpboot/"
+        owner: root
+        group: rz
+        mode: 0666
+      loop: "{{ subgroups }}"
+      run_once: true
+...
