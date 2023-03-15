@@ -1,0 +1,71 @@
+---
+- name: Set global variables
+  hosts: localhost
+  gather_facts: false
+  vars: 
+    work_dir: &work_dir "/home/asaramet/Ansible/aruba" 
+    tftp_server: &tftp_server_ip "134.108.49.9"
+    tftp_switch_folder: &switch_folder aruba_6100
+
+
+- name: Generate config file for Aruba 6100 switches from Jinja template 
+  hosts: new_6100
+  gather_facts: false
+  tags: create_config
+  vars: 
+    work_dir: *work_dir
+  tasks:
+    - name: Generate file from template and save it locally
+      tags: create_config
+      template: 
+        src: "{{ work_dir }}/playbooks/templates/new_6100.j2"
+        dest: "{{ work_dir }}/data/aruba_6100/{{ inventory_hostname }}"
+        mode: 0775
+        group: rz
+
+
+- name: Copy generated config files to tftp server
+  hosts: rhlx99
+  gather_facts: false
+  tags: to_tftp 
+  vars: 
+    work_dir: *work_dir
+    ansible_become: true # elevate privileges on the remote machine, if necessary
+    ansible_become_method: sudo
+    ansible_become_pass: "{{ vault_ansible_become_pass }}"
+  tasks:
+    - name: Get the sub groups/folders in the "aruba" hosts group
+      set_fact:
+        subgroups: "{{ subgroups|default([]) | union([hostvars[item].group_names[1]]) }}"
+      loop: "{{ groups.aruba }}"
+      run_once: true
+
+    - name: Copy sub folders config files to rhlx99:/tftpboot/
+      copy:
+        src: "{{ work_dir }}/data/{{ item }}"
+        dest: "/tftpboot/"
+        owner: root
+        group: rz
+        mode: 0666
+      loop: "{{ subgroups }}"
+      run_once: true
+
+- name: Copy running-config from tftp server
+  hosts: new_6100
+  gather_facts: false
+  tags: copy_config
+  collections:
+    - arubanetworks.aoscx
+  vars: 
+    work_dir: *work_dir
+    tftp_server: *tftp_server_ip
+    switch_folder: *switch_folder
+  tasks:
+    - name: Copy generated cli file to 'running-config' and 'startup-config' on Aruba 6100 switches
+      tags: copy_run
+      aoscx_command:
+        commands:
+          - configure
+          - "copy tftp://{{ tftp_server }}/{{ switch_folder }}/{{ inventory_hostname}} running-config"
+          - copy running-config startup-config
+...

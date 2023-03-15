@@ -6,7 +6,7 @@ Ansible inventory and playbooks designed specifically for network administration
 
 The Ansible inventory contains switches grouped into `sm_6100` and `hze_6100` -> `aruba_6100` -> `aruba groups`. Linux manager servers are in the `linux` group. Sensitive data such as passwords are stored with `ansible-vault` in `host_vars/host/vault`.
 
-To view the inventroy, use the following command:
+To view the inventory, use the following command:
 
 ```bash
 ansible-inventory --graph
@@ -22,9 +22,9 @@ ansible-inventory --graph --vars
 
 The following playbooks are included in this collection:
 
-- `copy_running-config.yaml` - copies `runing-config` files generated with `get_running-config.yaml` playbook to the Linux manager server
-- `get_running-config.yaml` - get the `running-config` from all Aruba switches and save them to their respective subgroup folders
-- `show_vlan_debug.yaml` - shows configured VLANs on Aruba switches
+- `collect_run-config.yaml` - collects `runing-config` files from Aruba 6100 switches and copies them to a Linux server.
+- `day_0_config.yaml` - generates a standart switch configuration CLI file from the template in `templates/new_6100.j2` file and copies it to running and startup config on the switches.
+- `show.yaml` - run different show commands on Aruba switches
 
 ## License
 

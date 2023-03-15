@@ -1,0 +1,94 @@
+hostname {{ hostname }}
+domain-name hs-esslingen.de
+user admin group administrators password ciphertext AQBapT26kxDafiNw2bPUJD9wHfYEMURou3gA9qhWQdspd0Bsv
+clock timezone europe/berlin
+loop-protect re-enable-timer 30
+loop-protect trap loop-detected
+no usb
+ntp server 134.108.34.114 burst
+ntp server 134.108.34.66 burst prefer
+ntp enable
+cli-session
+    timeout 10
+!
+!
+tacacs-server key ciphertext AQBapTthvvzrRCS5s3tHR/Mm0
+!
+!
+tacacs-server host 134.108.49.9
+!
+aaa group server tacacs sg1
+    server 134.108.49.9
+!
+!
+aaa authentication login default group sg1 tacacs local
+aaa authentication login console group local
+!
+logging 134.108.49.1
+logging 134.108.49.9
+logging facility local4
+user admin authorized-key ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAsqP9FNjx== admin@rhlx99
+ssh server vrf default
+access-list ip SWITCH-ACCESS
+    10 permit tcp 134.108.62.217 any eq 22
+    20 permit tcp 134.108.62.200 any eq 22
+    30 permit tcp 134.108.62.196 any eq 22
+    40 permit tcp 134.108.49.9 any eq 22
+    50 permit tcp 134.108.49.1 any eq 22
+    60 permit tcp 134.108.46.1 any eq 22
+    70 permit udp 134.108.49.3 any eq 161
+    80 permit udp 134.108.49.3 any eq 162
+    90 permit udp 134.108.34.114 any eq 161
+    100 permit udp 134.108.34.114 any eq 162
+    110 permit icmp 134.108.34.114 any
+    120 permit icmp 134.108.49.1 any
+    130 permit icmp 134.108.49.3 any
+    140 permit icmp 134.108.49.9 any
+apply access-list ip SWITCH-ACCESS control-plane vrf default
+vlan 1
+vlan 50
+    name MOBP
+    description MOBP
+vlan {{ native_vlan }}
+    name {{ native_vlan_name }}
+no spanning-tree
+spanning-tree trap errant-bpdu
+spanning-tree bpdu-guard timeout 30
+qos dscp-map 0 cos 0 name default 
+qos dscp-map 26 cos 4 name VOIP 
+port-access port-security enable
+interface 1/1/1-1/1/12,1/1/14,1/1/16
+    shutdown
+    description free
+    no lldp transmit
+    no cdp
+    vlan access 50
+    loop-protect
+interface 1/1/13,1/1/15
+    no shutdown
+    description Uplink
+    vlan trunk native {{ native_vlan }}
+    vlan trunk allowed all
+interface vlan 1
+    ip dhcp
+interface vlan {{ native_vlan }}
+    description {{ native_vlan_name }}
+    ip address {{ ip_address }}/{{ ip_slash }}
+snmp-server vrf default
+snmp-server system-description {{ hostname }}
+snmp-server system-location {{ system_location }}
+snmp-server system-contact "Netzteam"
+snmp-server community nixpriv
+snmp-server community pubno
+ip route 0.0.0.0/0 {{ ip_gateway }}
+ip dns domain-name hs-esslingen.de
+ip dns server-address 134.108.34.5
+ip dns server-address 134.108.34.6
+!
+!
+!
+!
+!
+ip source-interface all {{ ip_address }}
+https-server rest access-mode read-only
+https-server vrf default
