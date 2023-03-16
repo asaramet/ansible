@@ -163,42 +163,39 @@ On `server_no_net` there is a link to pip repos, so ansible can be installed wit
     pip install -i http://127.0.0.1:8000/mirror ansible
     ```
 
-7. Install AOSCX Ansible Collection
-    Official Webpage: <https://developer.arubanetworks.com/aruba-aoscx/docs/getting-started-with-ansible-and-aos-cx>
-    GitHub repository: <https://github.com/aruba/aoscx-ansible-collection>
+## Install AOS-CX Ansible Collection with internet connection
 
-    Check the right path to `collections` folder
+Check the right path to `collections` folder
 
-    ```bash
-    ansible-galaxy collection list
+  ```bash
+  ansible-galaxy collection list
 
-    # /opt/ansible/lib/python3.9/site-packages/ansible_collections
-    Collection                    Version
-    ----------------------------- -------
-    ....
-    ```
+  # /opt/ansible/lib/python3.9/site-packages/ansible_collections
+  Collection                    Version
+  ----------------------------- -------
+  ....
+  ```
 
-    Install the collection
+  Install the collection
 
-    ```bash
-    ansible-galaxy collection install arubanetworks.aoscx -p /opt/ansible/lib/python3.9/site-packages/ansible_collections 
-    ```
+  ```bash
+  ansible-galaxy collection install arubanetworks.aoscx -p /opt/ansible/lib/python3.9/site-packages/ansible_collections 
+  ```
 
-8. Update packages with pip
+### Update packages with pip
   
-    ```bash
-    pip install --upgrade pip
-    pip list --outdated # to view the outdated packages
-    pip install -U `pip list --outdated | awk 'NR>2 {print $1}'` # starting with the second line add first column (package name)
-    ansible-galaxy collection install -U arubanetworks.aoscx -p /opt/ansible/lib/python3.9/site-packages/ansible_collections 
-    ```
+  ```bash
+  pip install --upgrade pip
+  pip list --outdated # to view the outdated packages
+  pip install -U `pip list --outdated | awk 'NR>2 {print $1}'` # starting with the second line add first column (package name)
+  ansible-galaxy collection install -U arubanetworks.aoscx -p /opt/ansible/lib/python3.9/site-packages/ansible_collections 
+  ```
 
-9. Install AOSCX Ansible Role
+## Install AOS-CX Ansible Role
 
-    ```bash
-    ansible-galaxy install arubanetworks.aoscx_role # -p /opt/ansible/lib/python3.9/site-packages/ansible_roles
-    cd $HOME/.ansible/roles/arubanetworks.aoscx_role
-    ansible-galaxy install -r requirements.yml
-    pip install requests pyaoscx
-    ```
-  
+  ```bash
+  ansible-galaxy install arubanetworks.aoscx_role # -p /opt/ansible/lib/python3.9/site-packages/ansible_roles
+  cd $HOME/.ansible/roles/arubanetworks.aoscx_role
+  ansible-galaxy install -r requirements.yml
+  pip install requests pyaoscx
+  ```

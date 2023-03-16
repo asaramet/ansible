@@ -1,10 +1,38 @@
 # Ansible inventory and playbooks specifically designed for network administration of Aruba switches
 
-Ansible inventory and playbooks designed specifically for network administration of Aruba switches. The inventory contains switches grouped into sm_6100 and hze_6100 -> aruba_6100 -> aruba groups, and Linux manager servers in the linux group. Sensitive data such as passwords is stored using ansible-vault in host_vars/host/vault.
+Ansible inventory and playbooks designed specifically for network administration of Aruba switches, based on [AOS-CX Ansible Collection](https://developer.arubanetworks.com/aruba-aoscx/docs/getting-started-with-ansible-and-aos-cx)
+
+## AOS-CX Ansible Collection
+
+In Ansible, collections are designed to build up and distribute content that can include playbooks, roles, modules, and plugins. Standard and user collections can be installed through a distribution server such as Ansible Galaxy.
+
+Official Aruba Ansible AOS-CX modules are packed in [AOS-CX Ansible Collection](https://developer.arubanetworks.com/aruba-aoscx/docs/using-the-aos-cx-ansible-collection) and hosted on a [GitHub public repository](https://github.com/aruba/aoscx-ansible-collection)
+
+Ansible Galaxy distribution server will be a nice tool to install an maintain the collection.
+
+### Install the AOS-CX Collection
+
+   Check the right path to `collections` folder
+
+    ```bash
+    ansible-galaxy collection list
+
+    # /opt/ansible/lib/python3.9/site-packages/ansible_collections
+    Collection                    Version
+    ----------------------------- -------
+    ....
+    ```
+
+    Install the collection
+
+    ```bash
+    ansible-galaxy collection install arubanetworks.aoscx -p /opt/ansible/lib/python3.9/site-packages/ansible_collections 
+    ```
+
 
 ## Inventory
 
-The Ansible inventory contains switches grouped into `sm_6100` and `hze_6100` -> `aruba_6100` -> `aruba groups`. Linux manager servers are in the `linux` group. Sensitive data such as passwords are stored with `ansible-vault` in `host_vars/host/vault`.
+This Ansible inventory contains switches grouped into `sm_6100` and `hze_6100` -> `aruba_6100` -> `aruba groups`. Linux manager servers are in the `linux` group. Sensitive data such as passwords are stored with `ansible-vault` in `host_vars/host/vault`.
 
 To view the inventory, use the following command:
 
@@ -20,11 +48,20 @@ ansible-inventory --graph --vars
 
 ## Playbooks
 
-The following playbooks are included in this collection:
+Ansible Playbooks allows repeatable execution of predefined Ansible commands over multiple hosts, therefore offering a simple-configuration multi-machine management, maintenance and deployment system.
 
+To execute a playbook use the following command:
+
+```bash
+ansible-playbook [OPTIONS] playbook-name.yaml
+```
+
+The following playbooks are included in this repository:
+
+- `6100_upload_firmware.yaml` - uploads new firmware to Aruba 6100 switches from a TFTP server.
 - `collect_run-config.yaml` - collects `runing-config` files from Aruba 6100 switches and copies them to a Linux server.
-- `day_0_config.yaml` - generates a standart switch configuration CLI file from the template in `templates/new_6100.j2` file and copies it to running and startup config on the switches.
-- `show.yaml` - run different show commands on Aruba switches
+- `day_0_config.yaml` - generates a standart switch configuration CLI file from a Jinja 2 template and copies it to running and startup config on the switches.
+- `show.yaml` - run a list of show commands on Aruba switches
 
 ## License
 
