@@ -5,12 +5,15 @@
   vars: 
     work_dir: &work_dir "/opt/ansible/inventories/aruba/"
 
-- name: Generate config file for Aruba 6100 switches from Jinja template 
-  hosts: new_6100
+- name: Backup 'running-config' into a local folder
+  hosts: aruba
   gather_facts: false
-  tags: create_config
-  vars: 
+  tags: get_runs
+  vars:
     work_dir: *work_dir
+    ansible_connection: network_cli
+  collections:
+    - arubanetworks.aoscx
   tasks:
     - name: "Create group subfolder (ex: {{ group_names[1] }}) if it doesn't exits"
       file:
@@ -19,19 +22,19 @@
         mode: 0775
         group: rz
 
-    - name: Generate file from template and save it locally
-      tags: create_config
-      template: 
-        src: "{{ work_dir }}/playbooks/templates/new_6100.j2"
-        dest: "{{ work_dir }}/data/{{ group_names[1] }}/{{ inventory_hostname }}"
-        mode: 0664
-        group: rz
+    - name: Backup 'running-config' to 'group_subfolder/inventory_hostname'
+      aoscx_config:
+        backup: True 
+        backup_options:
+          filename: "{{ inventory_hostname }}"
+          dir_path: "{{ work_dir }}/data/{{ group_names[1] }}"
+        save_when: modified # copy to startup-config if it's different
 
-- name: Copy generated config files to a Linux server
+- name: Copy config files to rhlx99 
   hosts: rhlx99
   gather_facts: false
-  tags: to_linux
-  vars: 
+  tags: copy_remote
+  vars:
     work_dir: *work_dir
     ansible_become: true # elevate privileges on the remote machine, if necessary
     ansible_become_method: sudo
@@ -49,20 +52,7 @@
         dest: "/tftpboot/"
         owner: root
         group: rz
-        mode: 0664
+        mode: 0666
       loop: "{{ subgroups }}"
       run_once: true
-
-- name: Upload configuration to switches 
-  hosts: new_6100
-  gather_facts: false
-  tags: upload_config
-  collections:
-    - arubanetworks.aoscx
-  vars: 
-    work_dir: *work_dir
-  tasks:
-    - name: Upload configuration from local system file
-      aoscx_config:
-        src: "{{ work_dir }}/data/{{ group_names[1] }}/{{ inventory_hostname }}"
 ...

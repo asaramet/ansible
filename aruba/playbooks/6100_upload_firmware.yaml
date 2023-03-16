@@ -1,0 +1,44 @@
+---
+# As Aruba 6100 Switches do not support REST API modules, we'll have to update the firmware through CLI commands
+- name: Update firmware on Aruba 6100 switches
+  hosts: new_6100
+  gather_facts: false
+  collections:
+    - arubanetworks.aoscx
+  vars: 
+    work_dir: "/home/asaramet/Ansible/aruba"
+    tftp_server: "134.108.49.9"
+    firmware: "ArubaOS-CX_6100-6000_10_11_0001.swi"
+  tasks:
+    - name: "Create group subfolder (ex: {{ group_names[1] }}) if it doesn't exits"
+      file:
+        path: "{{ work_dir }}/data/{{ group_names[1] }}"
+        state: directory
+        mode: 0775
+        group: rz
+
+    - name: Backup and save current running configs to startup-config
+      tags: save_cfg
+      aoscx_config:
+        backup: True
+        backup_options: 
+          filename: "{{ inventory_hostname }}"
+          dir_path: "{{ work_dir }}/data/{{ group_names[1] }}"
+        save_when: modified # copy to startup-config if it's different
+
+    - name: Upload firmware to primary partition
+      tags: save_cfg
+      vars: 
+        - ansible_command_timeout: 120
+      aoscx_config:
+        before:
+          - copy primary secondary # backup the primary partition to secondary
+        lines:
+          - "copy tftp://{{ tftp_server }}/software/{{ firmware }} primary"
+
+    - name: Boot into primary partition
+      tags: boot_primary
+      aosx_boot_firmware:
+        aoscx_boot_firmware:
+          partition_name: primary
+...
