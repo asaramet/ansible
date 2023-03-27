@@ -5,6 +5,7 @@ This project provides Ansible inventory and playbooks specifically designed for 
 ## Table of Contents
 
 - [AOS-CX Ansible Collection](#aos-cx-ansible-collection)
+- [Control node](#control-node)
 - [Inventory](#inventory)
 - [Playbooks](#playbooks)
   - [Backup switch configuration](#backup-switch-configuration)
@@ -46,6 +47,18 @@ The Ansible Galaxy distribution server will be a nice tool to install an maintai
     ```bash
     ansible-galaxy collection install -U arubanetworks.aoscx -p /opt/ansible/lib/python3.9/site-packages/ansible_collections 
     ```
+
+## Control node
+
+The control node is the machine where Ansible CLI tools such as `ansible`, `ansible-playbook`, `ansible-inventory`, etc. are executed from. In our environment, we use a virtual Linux machine with the hostname `rhlx0023` as our control node.
+
+To use Ansible on this machine, we have configured a Python sandbox with the Ansible package and all necessary requirements installed at `/opt/ansible`. To make use of this setup, you should source the environment variables defined in the `envs` file in your Bash shell. You can do this by running the following command:
+
+```bash
+rhlx0023 $ source /opt/ansible/envs
+```
+
+This will ensure that Ansible commands are executed using the correct environment variables, allowing you to manage your infrastructure efficiently.
 
 ## Inventory
 
@@ -136,5 +149,5 @@ This project is licensed under the MIT License. See the LICENSE.md file for more
 
 This project uses the following third-party resources:
 
-- [Ansible](https://www.ansible.com/) - for configuration management and automation of Aruba switches
-- [GitHub](https://github.com/) - for source code hosting and collaboration tools
+- [Ansible](https://www.ansible.com) - for configuration management and automation of Aruba switches
+- [GitHub](https://github.com) - for source code hosting and collaboration tools

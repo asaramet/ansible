@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+# User defined environments, bins and libs
+
+variables() {
+	local base_dir='/opt/ansible'
+	PATH="${base_dir}/bin:${PATH}"
+	if [[ -z ${LD_LIBRARY_PATH} ]]; then
+		LD_LIBRARY_PATH="${base_dir}/lib"
+	else
+		LD_LIBRARY_PATH="${base_dir}/lib:${LD_LIBRARY_PATH}"
+	fi
+
+	if [[ -z ${INCLUDE} ]]; then
+		INCLUDE="${base_dir}/include"
+	else
+		INCLUDE="${base_dir}/include:${INCLUDE}"
+	fi
+
+	if [[ -z ${MANPATH} ]]; then
+		MANPATH="${base_dir}/share/man"
+	else
+		MANPATH="${base_dir}/share/man:${MANPATH}"
+	fi
+
+	# PYTHON
+	p_version='3.9'
+	if [[ -z ${PYTHONPATH} ]]; then
+		PYTHONPATH="${base_dir}/lib/python${p_version}/site-packages"
+	else
+		PYTHONPATH="${base_dir}/lib/python${p_version}/site-packages:${PYTHONPATH}"
+	fi
+
+	INCLUDE="${base_dir}/include/python${p_version}:${INCLUDE}"
+
+	# Include the ansible.cfg file as env variable making it the top level choise
+	#export ANSIBLE_CONFIG=${base_dir}/inventory/ansible.cfg
+}
+
+variables

@@ -29,7 +29,7 @@
     - name: Upload firmware to primary partition
       tags: save_cfg
       vars: 
-        - ansible_command_timeout: 120
+        ansible_command_timeout: 120
       aoscx_config:
         before:
           - copy primary secondary # backup the primary partition to secondary
