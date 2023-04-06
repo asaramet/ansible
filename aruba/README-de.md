@@ -21,14 +21,14 @@ In Ansible sind Collections dazu gedacht, Inhalte aufzubauen und zu verteilen, d
 
 Die offiziellen Aruba Ansible AOS-CX-Module sind in der [AOS-CX Ansible Collection](https://developer.arubanetworks.com/aruba-aoscx/docs/using-the-aos-cx-ansible-collection) gepackt und werden auf einem öffentlichen [GitHub-Repository](https://github.com/aruba/aoscx-ansible-collection) gehostet.
 
-Der Ansible Galaxy-Verteilungsserver ist ein nützliches Tool zum Installieren und Verwalten der Sammlung.
+Der Ansible Galaxy-Verteilungsserver ist ein nützliches Tool zum Installieren und Verwalten von Collections.
 
-### Installieren der AOS-CX-Sammlung mit dem Ansible Galaxy-Verteilungstool
+### Installation mit dem Ansible Galaxy Distribution Tool
 
-1. Überprüfen Sie den richtigen Pfad zum `collections`-Ordner:
+1. Pfad zum richtigen `collections` Ordner ermitteln:
 
     ```bash
-    ansible-galaxy collection list
+    $ ansible-galaxy collection list
 
     # /opt/ansible/lib/python3.9/site-packages/ansible_collections
     Collection                    Version
@@ -36,21 +36,21 @@ Der Ansible Galaxy-Verteilungsserver ist ein nützliches Tool zum Installieren u
     ....
     ```
 
-2. Installieren Sie die Sammlung:
+2. Installation der Collection:
 
     ```bash
     ansible-galaxy collection install arubanetworks.aoscx -p /opt/ansible/lib/python3.9/site-packages/ansible_collections 
     ```
 
-3. Aktualisieren Sie die Sammlung:
+3. Aktualisierung der Collektion
 
     ```bash
     ansible-galaxy collection install -U arubanetworks.aoscx -p /opt/ansible/lib/python3.9/site-packages/ansible_collections 
     ```
 
-## Kontrollknoten
+## Managementknoten
 
-Der Kontrollknoten ist der Computer, von dem aus die Ansible CLI-Tools wie `ansible`, `ansible-playbook`, `ansible-inventory` usw. ausgeführt werden. In unserer Umgebung verwenden wir eine virtuelle Linux-Maschine mit dem Hostnamen `rhlx0023` als unseren Kontrollknoten.
+Der Managementknoten ist der Rechner, von dem aus die Ansible CLI-Tools wie `ansible`, `ansible-playbook`, `ansible-inventory` usw. ausgeführt werden. In unserer Umgebung verwenden wir eine virtuelle Linux-Maschine mit dem Hostnamen `rhlx0023` als Managementknoten.
 
 Um Ansible auf diesem Computer zu verwenden, haben wir eine Python-Sandbox mit dem Ansible-Paket und allen notwendigen Anforderungen unter `/opt/ansible` konfiguriert. Um diese Einrichtung zu nutzen, sollten Sie die in der `envs`-Datei definierten Umgebungsvariablen in Ihrer Bash-Shell aktivieren. Sie können dies tun, indem Sie den folgenden Befehl ausführen:
 
@@ -62,46 +62,40 @@ Dies stellt sicher, dass Ansible-Befehle mit den richtigen Umgebungsvariablen au
 
 ## Inventar
 
-Dieses Ansible-Inventar enthält Switches, die in `sm_6100` und `hze_6100` wieder gruppiert sind in -> `aruba_6100` -> `aruba` groups. Linux-Manager-Server befinden sich in der Gruppe `linux`. Empfindliche Daten wie Passwörter werden mit `ansible-vault` in `host_vars/host/vault` gespeichert.
+Das Ansible-Inventar enthält Switches, die in Gruppen wie `sm_6100` und `hze_6100` gruppiert sind. Diese Gruppen sind wiederum in der Gruppe `aruba_6100` und `aruba` enthalten. Linux-Manager-Server werden in der Gruppe `linux` aufgeführt. Empfindliche Daten wie Passwörter werden mit `ansible-vault` verschlüsselt und in `host_vars/host/vault` gespeichert.
 
-Verwenden Sie den folgenden Befehl, um das Inventar anzuzeigen:
+Folgende Befehle können verwendet werden, um die Inventarstruktur anzuzeigen:
 
-```bash
-ansible-inventory --graph
-```
-
-Für eine detailliertere Ausgabe mit Variablen verwenden Sie:
-
-```bash
-ansible-inventory --graph --vars
-```
+- `ansible-inventory --graph`: Zeigt die Inventarstruktur an.
+- `ansible-inventory --graph --vars`: Zeigt die Inventarstruktur sowie die Variablen und deren Werte an.
 
 ## Playbooks
 
-Ansible Playbooks ermöglichen die wiederholbare Ausführung von vordefinierten Ansible-Befehlen über mehrere Hosts, was ein einfaches Konfigurations-, Multi-Maschinen-Management-, Wartungs- und Bereitstellungssystem bietet.
+Ansible Playbooks bieten eine Möglichkeit zur wiederholbaren Ausführung von Ansible-Befehlen auf mehreren Hosts, was ein einfaches Konfigurations-, Multi-Maschinen-Management-, Wartungs- und Bereitstellungssystem ermöglicht.
 
-Folgende Playbooks sind in diesem Repository enthalten:
-
-Um ein Playbook auszuführen, verwenden Sie den folgenden Befehl:
+Um ein Playbook auszuführen, kann man den folgenden Befehl verwenden:
 
 ```bash
 ansible-playbook [OPTIONS] playbook-name.yaml
+```
 
-# Zum Beispiel, um das show.yaml-Playbook in diesem Inventar auszuführen:
+Zum Beispiel, um das show.yaml-Playbook in diesem Inventar auszuführen:
+
+```bash
 ansible-playbook playbooks/show.yaml
 ```
 
-### Sicherung der Switch-Konfiguration
+### Switch-Konfiguration sichern
 
 Datei: `playbooks/backup_config.yaml`
 
-Diese Ansible-Playbook-Datei ist darauf ausgelegt, zwei Hauptaufgaben auszuführen: die Sicherung der Laufkonfiguration von Aruba-Switches, die unter der Hostgruppe `aruba` angegeben sind, und das Kopieren der resultierenden Konfigurationsdateien auf eine Remote-Maschine, die unter der Hostgruppe `rhlx99` angegeben ist.
+Dieses Ansible-Playbook wurde entwickelt, um zwei Hauptaufgaben zu erfüllen: das Sichern der Laufkonfiguration von Aruba-Switches, die unter der Hostgruppe `aruba` angegeben sind, sowie das Kopieren der resultierenden Konfigurationsdateien auf eine Remote-Maschine, die unter der Hostgruppe `rhlx99` angegeben ist.
 
-Die erste Aufgabe mit dem Titel "Sichern der 'running-config' in einem lokalen Ordner" wird auf den `aruba`-Hosts ausgeführt und nutzt die Aruba Networks AOS-CX Collection. Das Playbook erstellt einen neuen Unterordner innerhalb eines angegebenen Arbeitsverzeichnisses, benannt nach der Gruppe, zu der jeder Switch gehört. Anschließend sichert es die Laufkonfiguration jedes Switches in den entsprechenden Gruppenunterordner.
+Die erste Aufgabe "Sichern der 'running-config' in einem lokalen Ordner" wird auf den `aruba`-Hosts ausgeführt und nutzt die Aruba Networks AOS-CX Collection. Das Playbook erstellt einen neuen Unterordner innerhalb eines angegebenen Arbeitsverzeichnisses, der nach der Gruppe benannt ist, zu der jeder Switch gehört. Anschließend sichert es die Laufkonfiguration jedes Switches in den entsprechenden Gruppenunterordner.
 
-Die zweite Aufgabe mit dem Titel "Kopieren von Konfigurationsdateien auf rhlx99" wird auf dem `rhlx99`-Host ausgeführt und beinhaltet das Kopieren der zuvor gesicherten Konfigurationsdateien aus dem lokalen Verzeichnis in das `tftpboot/`-Verzeichnis der Remote-Maschine. Das Playbook nutzt das `copy`-Modul, um dies zu erreichen, und setzt die notwendigen Dateiberechtigungen und Eigentümerschaften.
+Die zweite Aufgabe "Kopieren von Konfigurationsdateien auf rhlx99" wird auf dem `rhlx99`-Host ausgeführt und beinhaltet das Kopieren der zuvor gesicherten Konfigurationsdateien aus dem lokalen Verzeichnis in das `/tftpboot`-Verzeichnis der Remote-Maschine. Das Playbook nutzt das `copy`-Modul, um dies zu erreichen, und setzt die notwendigen Dateiberechtigungen und Eigentümerschaften.
 
-Insgesamt kann dieses Playbook genutzt werden, um Netzwerkkonfigurationsmanagement-Aufgaben zu vereinfachen, indem die Sicherung und Übertragung von Konfigurationsdateien über mehrere Aruba-Switches und eine Remote-Maschine automatisiert wird.
+Insgesamt kann dieses Playbook genutzt werden, um Netzwerkkonfigurationsmanagement-Aufgaben zu vereinfachen, indem die Sicherung und Übertragung von Konfigurationsdateien über mehrere Aruba-Switches und eine Remote-Maschine automatisiert wird
 
 ### Day 0 Switch-Konfiguration
 
