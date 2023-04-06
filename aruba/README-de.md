@@ -5,10 +5,10 @@ Dieses Projekt bietet Ansible Inventory und Playbooks, die speziell für die Net
 ## Inhaltsverzeichnis
 
 - [AOS-CX Ansible Collection](#aos-cx-ansible-collection)
-- [Kontrolknotten](#kontrollknoten)
+- [Managementknoten](#managementknoten)
 - [Inventar](#inventar)
 - [Playbooks](#playbooks)
-  - [Sicherung der Switch-Konfiguration](#sicherung-der-switch-konfiguration)
+  - [Sicherung der Switch-Konfiguration](#switch-konfiguration-sichern)
   - [Day 0 Switch-Konfiguration](#day-0-switch-konfiguration)
   - [Show-Befehle auf Switch ausführen](#show-befehle)
   - [Switch-Firmware hochladen](#switch-firmware-hochladen)
