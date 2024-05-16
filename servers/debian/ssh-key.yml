@@ -1,5 +1,5 @@
 ---
-- name: Install and configure initial firewall
+- name: Set root login through ssh key only
   hosts: local
   gather_facts: false
   become: true # run as root
