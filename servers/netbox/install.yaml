@@ -1,0 +1,58 @@
+---
+- name: Define global variables
+  hosts: localhost
+  gather_facts: false
+  vars: 
+    server: &server debian12-temp
+    sql_user_pass: &sql_user_pass test12345
+
+- name: Install packages and dependencies for NetBox
+  hosts: *server
+  gather_facts: false
+  become: true # run as root
+  tasks: 
+    - name: apt install
+      apt: 
+        pkg: "{{ item }}"
+        state: latest
+        update_cache: true
+      loop:
+        - postgresql
+        - python3-psycopg2
+        - redis-server
+        - python3-dev 
+        - python3-venv 
+        - build-essential 
+        - libxml2-dev 
+        - libxslt1-dev 
+        - libffi-dev 
+        - libpq-dev 
+        - libssl-dev 
+        - zlib1g-dev
+
+- name: Configure PostgreSQL on Debian
+  hosts: *server
+  gather_facts: false
+  become: true # run as root
+  become_method: su
+  become_user: postgres # change to postgres user
+  vars:
+    sql_user_pass: *sql_user_pass
+  tasks: 
+    - name: Create a new PostgreSQL database with the name 'netbox'
+      community.postgresql.postgresql_db:
+        name: netbox
+        comment: NetBox database
+      
+    - name: Create a new user 'netbox' in the netbox database
+      community.postgresql.postgresql_user:
+        db: netbox
+        name: netbox
+        password: "{{ sql_user_pass }}"
+        role_attr_flags: SUPERUSER
+        comment: NetBox as a user
+
+- name: Install and configure NetBox
+  hosts: *server
+  gather_facts: false
+  become: true # run as root

@@ -1,6 +1,6 @@
 ---
 - name: Set root login through ssh key only
-  hosts: local
+  hosts: debian12-temp
   gather_facts: false
   become: true # run as root
   vars:
