@@ -1,0 +1,21 @@
+---
+- name: Install and configure initial firewall
+  hosts: local
+  gather_facts: false
+  become: true # run as root
+  vars:
+    ansible_password: 
+  tasks: 
+    - name: Set authorized ssh key for root, removing all the authorized keys already set
+      ansible.posix.authorized_key:
+        user: root
+        state: present
+        key: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_ed25519_sk.pub') }}"
+        exclusive: true
+
+    - name: Disable password authentication for root
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        state: present
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin prohibit-password'

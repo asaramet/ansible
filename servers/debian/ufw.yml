@@ -1,0 +1,68 @@
+---
+- name: Install and configure initial firewall
+  hosts: local
+  gather_facts: false
+  become: true # run as root
+  vars:
+    ip_range: 192.168.122.0/24
+  tasks: 
+    - name: Install ufw package
+      apt: 
+        pkg: ufw
+        state: latest
+        update_cache: true
+
+    - name: Deny all incoming connections
+      community.general.ufw:
+        default: deny
+        direction: incoming
+
+    - name: Allow all outgoing traffic
+      community.general.ufw:
+        default: allow
+        direction: outgoing
+
+    - name: Allow SSH connections on port 22 from "{{ ip_range }}"
+      community.general.ufw:
+        rule: allow
+        port: ssh
+        src: "{{ ip_range }}"
+
+    - name: Delete general SSH connections, if any
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        delete: true
+      loop:
+        - ssh
+        - 22
+      
+    - name: Delete general OpenSSH policy, if any
+      community.general.ufw:
+        rule: allow
+        name: OpenSSH
+        delete: true
+
+    - name: Allow HTTP and HTTPS connections from "{{ ip_range }}"
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        src: "{{ ip_range }}"
+      loop: 
+        - http
+        - https
+
+    - name: Delete general HTTP and HTTPS connections, if any
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        delete: true
+      loop:
+        - http
+        - https
+        - 80
+        - 443
+    
+    - name: Enable ufw firewall if it's disabled
+      community.general.ufw:
+        state: enabled
