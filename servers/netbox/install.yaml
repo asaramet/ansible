@@ -56,3 +56,41 @@
   hosts: *server
   gather_facts: false
   become: true # run as root
+  vars:
+    netbox_version: 3.7.6
+  tasks:
+    - name: Unpack the netbox package version "{{ netbox_version }}" from local folder to '/opt'
+      unarchive:
+        src: "src/v{{ netbox_version }}.tar.gz" # the source is in the folder the playbook is run from
+        dest: /opt
+
+    - name: Create a relative symlink to the 'netbox' folder
+      file:
+        src: "/opt/netbox-{{ netbox_version }}"
+        dest: /opt/netbox
+        state: link
+
+    - name: Create the 'netbox' system group
+      group:
+        name: netbox
+        state: present
+        system: true
+
+    - name: Create the 'netbox' system user that belongs to 'netbox' group
+      user:
+        name: netbox
+        group: netbox
+        system: true
+      
+    - name: Give some folders 'rw' permissions to the 'netbox' user and group
+      file:
+        path: "{{ item }}"
+        owner: netbox
+        group: netbox
+        state: directory
+        recurse: true
+        mode: 0644
+      loop:
+        - /opt/netbox/netbox/media
+        - /opt/netbox/netbox/reports
+        - /opt/netbox/netbox/scripts
