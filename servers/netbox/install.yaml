@@ -94,3 +94,17 @@
         - /opt/netbox/netbox/media
         - /opt/netbox/netbox/reports
         - /opt/netbox/netbox/scripts
+
+    - name: Copy local 'configuration.py' to remote 'netbox' directory
+      copy:
+        src: src/configuration.py
+        dest: /opt/netbox/netbox/netbox
+        owner: netbox
+        group: netbox
+
+#    - name: Run 'upgrade.sh' script
+#      command:
+#        cmd: bash /opt/netbox/upgrade.sh
+#      register: upgrade_out
+#    - debug:
+#        msg: "{{ upgrade_out.stdout_lines }}"
