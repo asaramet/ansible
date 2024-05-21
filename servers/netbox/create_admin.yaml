@@ -1,0 +1,24 @@
+---
+- name: Create `admin` super-user with Django `auth` module
+  hosts: debian12-temp
+  gather_facts: false
+  vars: 
+    admin_username: admin
+    admin_email: "{{ vault_admin_email }}" # have to be specified in the vault for every `server` group/host
+  environment: 
+    DJANGO_SUPERUSER_PASSWORD: "{{ vault_admin_pass }}" 
+
+  tasks:
+    - name: Install extra packages and dependencies
+      apt: 
+        pkg: "{{ item }}"
+        state: latest
+        update_cache: true
+      loop:
+        - python3-virtualenv # will be depricated and not needed in later Django module versions
+
+    - name: Create a Djsngo `admin` super-user to administer NetBox
+      community.general.django_manage:
+        command: "createsuperuser --settings netbox.settings --no-input --username {{ admin_username }} --email {{ admin_email }}"
+        project_path: /opt/netbox/netbox
+        virtual_env: /opt/netbox/venv/

@@ -4,7 +4,7 @@
   gather_facts: false
   vars: 
     server: &server debian12-temp
-    sql_user_pass: &sql_user_pass test12345
+    sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
 
 - name: Install packages and dependencies for NetBox
   hosts: *server
@@ -102,9 +102,15 @@
         owner: netbox
         group: netbox
 
-#    - name: Run 'upgrade.sh' script
-#      command:
-#        cmd: bash /opt/netbox/upgrade.sh
-#      register: upgrade_out
-#    - debug:
-#        msg: "{{ upgrade_out.stdout_lines }}"
+    - name: Run 'upgrade.sh' script to install NetBox
+      command:
+        cmd: bash /opt/netbox/upgrade.sh
+      register: upgrade_out
+    - debug:
+        msg: "{{ upgrade_out.stdout_lines }}"
+
+    - name: Create a relative symlink to schedule NetBox housekeeping task
+      file:
+        src: /opt/netbox/contrib/netbox-housekeeping.sh 
+        dest: /etc/cron.daily/netbox-housekeeping
+        state: link
