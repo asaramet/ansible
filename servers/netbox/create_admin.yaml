@@ -17,8 +17,8 @@
       loop:
         - python3-virtualenv # will be depricated and not needed in later Django module versions
 
-    - name: Create a Djsngo `admin` super-user to administer NetBox
+    - name: Create a Django `admin` super-user to administer NetBox
       community.general.django_manage:
         command: "createsuperuser --settings netbox.settings --no-input --username {{ admin_username }} --email {{ admin_email }}"
         project_path: /opt/netbox/netbox
-        virtual_env: /opt/netbox/venv/
+        virtualenv: /opt/netbox/venv/

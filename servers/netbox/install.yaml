@@ -102,15 +102,92 @@
         owner: netbox
         group: netbox
 
-    - name: Run 'upgrade.sh' script to install NetBox
-      command:
-        cmd: bash /opt/netbox/upgrade.sh
-      register: upgrade_out
-    - debug:
-        msg: "{{ upgrade_out.stdout_lines }}"
+#    - name: Run 'upgrade.sh' script to install NetBox
+#      command:
+#        cmd: bash /opt/netbox/upgrade.sh
+#      register: upgrade_out
+#    - debug:
+#        msg: "{{ upgrade_out.stdout_lines }}"
 
     - name: Create a relative symlink to schedule NetBox housekeeping task
       file:
         src: /opt/netbox/contrib/netbox-housekeeping.sh 
         dest: /etc/cron.daily/netbox-housekeeping
         state: link
+
+    - name: Copy gunicorn configs 
+      copy:
+        src: src/gunicorn.py 
+        dest: /opt/netbox/gunicorn.py 
+        owner: netbox
+        group: netbox
+        mode: 0660
+        backup: yes
+
+    - name: Copy provided netbox service files
+      copy:
+        remote_src: true
+        src: "/opt/netbox/contrib/{{ item }}"
+        dest: "/etc/systemd/system/{{ item }}"
+      loop:
+        - netbox.service
+        - netbox-rq.service
+
+    - name: Enable and start netbox services
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - netbox
+        - netbox-rq
+
+- name: Install and configure the HTTP server
+  hosts: *server
+  gather_facts: false
+  become: true # run as root
+  tasks:
+    - name: apt install nginx
+      apt: 
+        pkg: nginx
+        state: latest
+        update_cache: true
+
+    - name: Copy the SSL certificate
+      copy:
+        src: src/netbox.key
+        dest:  /etc/ssl/private/netbox.key 
+        owner: root
+        mode: 0600
+
+    - name: Copy the SSL key
+      copy:
+        src: src/netbox.crt
+        dest: /etc/ssl/certs/netbox.crt
+        owner: root
+        mode: 0600
+
+    - name: Copy nginx config file
+      copy: 
+        src: src/nginx.conf 
+        dest: /etc/nginx/sites-available/netbox
+        backup: yes
+        owner: root
+        mode: 0644
+
+    - name: Remove default nginx configs
+      file: 
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+    
+    - name: Link netbox configs to nginx
+      file: 
+        src: /etc/nginx/sites-available/netbox 
+        dest: /etc/nginx/sites-enabled/default
+        state: link
+
+    - name: Restart the nginx service
+      service: 
+        name: nginx
+        state: restarted
+        enabled: yes
