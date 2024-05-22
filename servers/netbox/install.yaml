@@ -4,6 +4,7 @@
   gather_facts: false
   vars: 
     server: &server debian12-temp
+    local_src_folder: &local_src_folder src/local
     sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
 
 - name: Install packages and dependencies for NetBox
@@ -58,6 +59,7 @@
   become: true # run as root
   vars:
     netbox_version: 3.7.6
+    local_src_folder: *local_src_folder
   tasks:
     - name: Unpack the netbox package version "{{ netbox_version }}" from local folder to '/opt'
       unarchive:
@@ -97,17 +99,17 @@
 
     - name: Copy local 'configuration.py' to remote 'netbox' directory
       copy:
-        src: src/configuration.py
+        src: "{{ local_src_folder }}/configuration.py"
         dest: /opt/netbox/netbox/netbox
         owner: netbox
         group: netbox
 
-#    - name: Run 'upgrade.sh' script to install NetBox
-#      command:
-#        cmd: bash /opt/netbox/upgrade.sh
-#      register: upgrade_out
-#    - debug:
-#        msg: "{{ upgrade_out.stdout_lines }}"
+    - name: Run 'upgrade.sh' script to install NetBox
+      command:
+        cmd: bash /opt/netbox/upgrade.sh
+      register: upgrade_out
+    - debug:
+        msg: "{{ upgrade_out.stdout_lines }}"
 
     - name: Create a relative symlink to schedule NetBox housekeeping task
       file:
@@ -117,7 +119,7 @@
 
     - name: Copy gunicorn configs 
       copy:
-        src: src/gunicorn.py 
+        src: "{{ local_src_folder }}/gunicorn.py"
         dest: /opt/netbox/gunicorn.py 
         owner: netbox
         group: netbox
@@ -146,6 +148,8 @@
   hosts: *server
   gather_facts: false
   become: true # run as root
+  vars:
+    local_src_folder: *local_src_folder
   tasks:
     - name: apt install nginx
       apt: 
@@ -155,21 +159,21 @@
 
     - name: Copy the SSL certificate
       copy:
-        src: src/netbox.key
+        src: "{{ local_src_folder }}/netbox.key"
         dest:  /etc/ssl/private/netbox.key 
         owner: root
         mode: 0600
 
     - name: Copy the SSL key
       copy:
-        src: src/netbox.crt
+        src: "{{ local_src_folder }}/netbox.crt"
         dest: /etc/ssl/certs/netbox.crt
         owner: root
         mode: 0600
 
     - name: Copy nginx config file
       copy: 
-        src: src/nginx.conf 
+        src: "{{ local_src_folder }}/nginx.conf" 
         dest: /etc/nginx/sites-available/netbox
         backup: yes
         owner: root
