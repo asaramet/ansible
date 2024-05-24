@@ -1,6 +1,6 @@
 ---
 - name: Create `admin` super-user with Django `auth` module
-  hosts: debian12-temp
+  hosts: hs_netbox
   gather_facts: false
   vars: 
     admin_username: admin

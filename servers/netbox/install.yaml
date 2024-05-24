@@ -3,8 +3,8 @@
   hosts: localhost
   gather_facts: false
   vars: 
-    server: &server debian12-temp #hs_netbox 
-    local_src_folder: &local_src_folder src/local # src/hs_netbox
+    server: &server hs_netbox #debian12-temp #hs_netbox 
+    local_src_folder: &local_src_folder src/hs_netbox #src/local # src/hs_netbox
     sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
 
 - name: Install packages and dependencies for NetBox
@@ -124,7 +124,7 @@
   gather_facts: false
   become: true # run as root
   tasks:
-    - name: Copy local requirements.txt to remote 'netbox' virtual environment
+    - name: Copy local requirements.txt to the remote 'netbox' virtual environment
       copy:
         src: requirements.txt
         dest: /opt/netbox/requirements.txt
@@ -146,13 +146,45 @@
   hosts: *server
   gather_facts: false
   become: true # run as root
+  vars:
+    project_path: /opt/netbox/netbox
+    virtualenv: /opt/netbox/venv
   tasks:
-#    - name: Run 'upgrade.sh' script to install NetBox
-#      command:
-#        cmd: bash /opt/netbox/upgrade.sh
-#      register: upgrade_out
-#    - debug:
-#        msg: "{{ upgrade_out.stdout_lines }}"
+    - name: Apply any database migrations
+      community.general.django_manage:
+        command: migrate
+        project_path: "{{ project_path }}"
+        virtualenv: "{{ virtualenv }}"
+
+    - name: Trace any missing cable paths (no typically needed)
+      community.general.django_manage:
+        command: trace_paths --no-input
+        project_path: "{{ project_path }}"
+        virtualenv: "{{ virtualenv }}"
+
+    - name: Collect static files
+      community.general.django_manage:
+        command: collectstatic --no-input
+        project_path: "{{ project_path }}"
+        virtualenv: "{{ virtualenv }}"
+
+    - name: Delete any stale content types
+      community.general.django_manage:
+        command: remove_stale_contenttypes --no-input
+        project_path: "{{ project_path }}"
+        virtualenv: "{{ virtualenv }}"
+
+    - name: Rebuild the search cache (lazily)
+      community.general.django_manage:
+        command: reindex --lazy
+        project_path: "{{ project_path }}"
+        virtualenv: "{{ virtualenv }}"
+
+    - name: Delete any expired user sessions
+      community.general.django_manage:
+        command: reindex --lazy
+        project_path: "{{ project_path }}"
+        virtualenv: "{{ virtualenv }}"
 
 - name: Enable and run NetBox services
   hosts: *server
