@@ -11,6 +11,7 @@
   hosts: *server
   gather_facts: false
   become: true # run as root
+  tags: apt_install
   tasks: 
     - name: apt install
       apt: 
@@ -35,6 +36,7 @@
   hosts: *server
   gather_facts: false
   become: true # run as root
+  tags: postgresql
   become_method: su
   become_user: postgres # change to postgres user
   vars:
@@ -57,6 +59,7 @@
   hosts: *server
   gather_facts: false
   become: true # run as root
+  tags: apps
   vars:
     netbox_version: 3.7.6
     local_src_folder: *local_src_folder
@@ -123,6 +126,7 @@
   hosts: *server
   gather_facts: false
   become: true # run as root
+  tags: pip
   tasks:
     - name: Copy local requirements.txt to the remote 'netbox' virtual environment
       copy:
@@ -146,6 +150,7 @@
   hosts: *server
   gather_facts: false
   become: true # run as root
+  tags: django
   vars:
     project_path: /opt/netbox/netbox
     virtualenv: /opt/netbox/venv
@@ -190,6 +195,7 @@
   hosts: *server
   gather_facts: false
   become: true # run as root
+  tags: services
   tasks:
     - name: Copy provided netbox service files
       copy:
@@ -213,6 +219,7 @@
   hosts: *server
   gather_facts: false
   become: true # run as root
+  tags: http
   vars:
     local_src_folder: *local_src_folder
   tasks:
@@ -222,17 +229,20 @@
         state: latest
         update_cache: true
 
-    - name: Copy the SSL certificate
-      copy:
-        src: "{{ local_src_folder }}/netbox.key"
-        dest:  /etc/ssl/private/netbox.key 
-        owner: root
-        mode: 0600
-
     - name: Copy the SSL key
       copy:
-        src: "{{ local_src_folder }}/netbox.crt"
-        dest: /etc/ssl/certs/netbox.crt
+        src: "{{ local_src_folder }}/{{ item }}"
+        dest:  /etc/ssl/private/
+        owner: root
+        mode: 0600
+      loop:
+        - pem_pass.txt
+        - rzlx8750_serverkey.pem
+
+    - name: Copy the SSL certificate
+      copy:
+        src: "{{ local_src_folder }}/netbox-bb.hs-esslingen.de.cer"
+        dest: /etc/ssl/certs/
         owner: root
         mode: 0600
 

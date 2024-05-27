@@ -2,6 +2,8 @@
 - name: Create `admin` super-user with Django `auth` module
   hosts: hs_netbox
   gather_facts: false
+  become: true
+  tags: admin
   vars: 
     admin_username: admin
     admin_email: "{{ vault_admin_email }}" # have to be specified in the vault for every `server` group/host

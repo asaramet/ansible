@@ -59,3 +59,12 @@ mkdir packages
 cd packages
 pip download -r ../requirements.txt
 ```
+
+## Download extra plugins
+
+```bash
+pyenv shell 3.11.2
+python3.11 -m venv pip-packages
+cd pip-packages
+pip download netbox-plugin-software-manager -d packages/
+```
