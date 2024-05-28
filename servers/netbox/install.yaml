@@ -4,11 +4,11 @@
   gather_facts: false
   tags: global
   vars: 
-    netbox_version: &netbox_version 3.7.8
+    netbox_version: &netbox_version 4.0.3 #3.7.8
     sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
 
-    server: &server debian12-temp 
-    #server: &server hs_netbox 
+    #server: &server debian12-temp 
+    server: &server hs_netbox 
 
 - name: Install packages and dependencies for NetBox
   hosts: *server
@@ -116,10 +116,12 @@
   gather_facts: false
   become: true # run as root
   tags: pip
+  vars: 
+    netbox_version: *netbox_version
   tasks:
     - name: Copy local requirements.txt to the remote 'netbox' virtual environment
       copy:
-        src: requirements.txt
+        src: "src/requirements-{{ netbox_version }}.txt"
         dest: /opt/netbox/requirements.txt
         owner: root
         mode: 664
@@ -135,11 +137,12 @@
         virtualenv: /opt/netbox/venv/
         extra_args: "--no-index --find-links=file:///opt/packages"
 
-#    - name: Create the NetBox documentation
-#      shell: build
-#      args:
-#        executable: /opt/netbox/venv/bin/mkdocs
-#        chdir: /opt/netbox
+    - name: Create the NetBox documentation
+      tags: mkdocs
+      shell: source venv/bin/activate && mkdocs build
+      args:
+        executable: /usr/bin/bash
+        chdir: /opt/netbox
 
 - name: Link local data
   hosts: *server 
