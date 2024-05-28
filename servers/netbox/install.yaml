@@ -2,10 +2,13 @@
 - name: Define global variables
   hosts: localhost
   gather_facts: false
+  tags: global
   vars: 
-    server: &server hs_netbox #debian12-temp #hs_netbox 
-    local_src_folder: &local_src_folder src/hs_netbox #src/local # src/hs_netbox
+    netbox_version: &netbox_version 3.7.8
     sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
+
+    server: &server debian12-temp 
+    #server: &server hs_netbox 
 
 - name: Install packages and dependencies for NetBox
   hosts: *server
@@ -61,8 +64,7 @@
   become: true # run as root
   tags: apps
   vars:
-    netbox_version: 3.7.6
-    local_src_folder: *local_src_folder
+    netbox_version: *netbox_version
   tasks:
     - name: Unpack the netbox package version "{{ netbox_version }}" from local folder to '/opt'
       unarchive:
@@ -87,19 +89,6 @@
         group: netbox
         system: true
       
-    - name: Give some folders 'rw' permissions to the 'netbox' user and group
-      file:
-        path: "{{ item }}"
-        owner: netbox
-        group: netbox
-        state: directory
-        recurse: true
-        mode: 0644
-      loop:
-        - /opt/netbox/netbox/media
-        - /opt/netbox/netbox/reports
-        - /opt/netbox/netbox/scripts
-
     - name: Copy local 'configuration.py' to remote 'netbox' directory
       copy:
         src: "{{ local_src_folder }}/configuration.py"
@@ -146,6 +135,36 @@
         virtualenv: /opt/netbox/venv/
         extra_args: "--no-index --find-links=file:///opt/packages"
 
+#    - name: Create the NetBox documentation
+#      shell: build
+#      args:
+#        executable: /opt/netbox/venv/bin/mkdocs
+#        chdir: /opt/netbox
+
+- name: Link local data
+  hosts: *server 
+  gather_facts: false
+  become: true # run as root
+  tags: localdata
+  vars:
+    folders:
+      - media
+      - reports
+      - scripts
+  tasks:
+    - name: Remove / unlink existing folders
+      file:
+        path: "/opt/netbox/netbox/{{ item }}"
+        state: absent
+      loop: "{{ folders }}"
+
+    - name: Crete symbolic links to localfiles
+      file:
+        src: "/opt/localdata/{{ item }}"
+        dest: "/opt/netbox/netbox/{{ item }}"
+        state: link
+      loop: "{{ folders }}"
+
 - name: Configure Django settings
   hosts: *server
   gather_facts: false
@@ -187,7 +206,7 @@
 
     - name: Delete any expired user sessions
       community.general.django_manage:
-        command: reindex --lazy
+        command: clearsessions
         project_path: "{{ project_path }}"
         virtualenv: "{{ virtualenv }}"
 
@@ -220,8 +239,6 @@
   gather_facts: false
   become: true # run as root
   tags: http
-  vars:
-    local_src_folder: *local_src_folder
   tasks:
     - name: apt install nginx
       apt: 
@@ -238,6 +255,15 @@
       loop:
         - pem_pass.txt
         - rzlx8750_serverkey.pem
+      when: production
+
+    - name: Copy the SSL key for a local test machine
+      copy:
+        src: "{{ local_src_folder }}/netbox.key"
+        dest:  /etc/ssl/private/
+        owner: root
+        mode: 0600
+      when: not production
 
     - name: Copy the SSL certificate
       copy:
@@ -245,6 +271,15 @@
         dest: /etc/ssl/certs/
         owner: root
         mode: 0600
+      when: production
+
+    - name: Copy the SSL certificate for a local test machine
+      copy:
+        src: "{{ local_src_folder }}/netbox.crt"
+        dest: /etc/ssl/certs/
+        owner: root
+        mode: 0600
+      when: not production
 
     - name: Copy nginx config file
       copy: 

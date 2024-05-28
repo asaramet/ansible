@@ -1,0 +1,4 @@
+---
+production: true
+local_src_folder: src/hs_netbox 
+...

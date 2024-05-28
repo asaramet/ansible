@@ -22,9 +22,9 @@ graphene-django
 gunicorn
 Jinja2
 Markdown
-#mkdocs-material==9.5.18
-#mkdocstrings[python-legacy]==0.24.3
-#mkdocstrings[python-legacy]
+mkdocs-material==9.5.18
+mkdocstrings[python-legacy]==0.24.3
+mkdocstrings[python-legacy]
 netaddr
 Pillow
 psycopg[binary,pool]

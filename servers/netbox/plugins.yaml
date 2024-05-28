@@ -1,0 +1,59 @@
+---
+- name: Define global variables, gather localhost data
+  hosts: localhost
+  gather_facts: false
+  tags: localhost
+  vars: 
+    clear: &clear false
+    server: &server hs_netbox #debian12-temp #hs_netbox 
+    plugins: &plugins
+      - netbox-plugin-software-manager
+
+- name: Install NetBox plugins
+  hosts: *server
+  gather_facts: false
+  become: true # run as root
+  tags: plugins
+  vars:
+    - plugins: *plugins
+    - clear: *clear
+  tasks:
+    - name: Copy pip packages from localhost to the remote server
+      copy:
+        src: "pip_packages/plugins"
+        dest: /opt/
+      when: not clear
+
+    - name: Install apps with pip from the local directory
+      pip:
+        virtualenv: /opt/netbox/venv/
+        extra_args: "--no-index --find-links=file:///opt/plugins"
+        name: "{{ item }}"
+      loop: "{{ plugins }}"
+      when: not clear
+    
+- name: Remove plugins folder und uninstall plugins
+  hosts: *server
+  gather_facts: false
+  become: true # run as root
+  tags: clear
+  vars:
+    - clear: *clear
+    - plugins: *plugins
+  tasks:
+    - name: Remove the '/opt/plugins/' folder
+      file: 
+        path: /opt/plugins
+        state: absent
+      when: clear
+    
+    - name: Uninstall all the plugins
+      pip: 
+        virtualenv: /opt/netbox/venv/
+        state: absent
+        name: "{{ item }}"
+      loop: "{{ plugins }}"
+      when: clear
+    
+
+
