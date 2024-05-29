@@ -7,8 +7,13 @@
     netbox_version: &netbox_version 4.0.3 #3.7.8
     sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
 
-    #server: &server debian12-temp 
-    server: &server hs_netbox 
+    server: &server debian12-temp 
+    #server: &server hs_netbox 
+  tasks:
+    - name: Debug
+      tags: debug
+      debug:
+        msg: "{{ vars }}"
 
 - name: Install packages and dependencies for NetBox
   hosts: *server
@@ -68,7 +73,7 @@
   tasks:
     - name: Unpack the netbox package version "{{ netbox_version }}" from local folder to '/opt'
       unarchive:
-        src: "src/v{{ netbox_version }}.tar.gz" # the source is in the folder the playbook is run from
+        src: "{{ inventory_dir }}/src/v{{ netbox_version }}.tar.gz"
         dest: /opt
 
     - name: Create a relative symlink to the 'netbox' folder
@@ -121,14 +126,14 @@
   tasks:
     - name: Copy local requirements.txt to the remote 'netbox' virtual environment
       copy:
-        src: "src/requirements-{{ netbox_version }}.txt"
+        src: "{{ inventory_dir }}/src/requirements-{{ netbox_version }}.txt"
         dest: /opt/netbox/requirements.txt
         owner: root
         mode: 664
 
     - name: Copy pip packages from localhost to the remote server
       copy:
-        src: pip_packages/packages
+        src: "{{ inventory_dir }}/pip_packages/packages"
         dest: /opt
 
     - name: Install apps with pip from the local directory
@@ -308,3 +313,4 @@
         name: nginx
         state: restarted
         enabled: yes
+...
