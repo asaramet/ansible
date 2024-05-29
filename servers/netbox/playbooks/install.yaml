@@ -9,11 +9,7 @@
 
     server: &server debian12-temp 
     #server: &server hs_netbox 
-  tasks:
-    - name: Debug
-      tags: debug
-      debug:
-        msg: "{{ vars }}"
+    reboot: &reboot true
 
 - name: Install packages and dependencies for NetBox
   hosts: *server
@@ -313,4 +309,15 @@
         name: nginx
         state: restarted
         enabled: yes
+
+- name: Reboot the server
+  hosts: *server
+  gather_facts: false
+  become: true 
+  tags: reboot
+  vars:
+    reboot: *reboot
+  tasks:
+    - name: Reboot the server 
+      reboot:
 ...

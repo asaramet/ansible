@@ -7,12 +7,10 @@
     python_version: 3.11 # check if you have to activate the right python shell with 'pyenv shell 3.11.2' | show versions 'pyenv versions'
     inventory_dir: "{{ playbook_dir }}/.." # localhost doesn't have 'inventory_dir' global variable
     venv_path: "{{ inventory_dir }}/pip_packages" 
+    plugins:
+      - netbox-bgp
   
   tasks:
-    - name: Debug
-      debug:
-        msg: "{{ inventory_dir }}"
-
     - name: Remove existing virtual environment folder
       file:
         path: "{{ venv_path }}"
@@ -24,8 +22,15 @@
         executable: /usr/bin/bash
       
     - name: Download required packages
-      tags: download
       shell: "source bin/activate && pip download -r {{ inventory_dir }}/src/requirements-{{ netbox_version }}.txt -d packages"
       args:
         executable: /usr/bin/bash
         chdir: "{{ venv_path }}"
+
+    - name: Download NetBox plugins
+      tags: plugins
+      shell: "source bin/activate && pip download {{ item }} -d plugins"
+      args:
+        executable: /usr/bin/bash
+        chdir: "{{ venv_path }}"
+      loop: "{{ plugins }}"

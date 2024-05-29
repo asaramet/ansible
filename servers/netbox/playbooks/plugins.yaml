@@ -5,9 +5,10 @@
   tags: localhost
   vars: 
     clear: &clear false
-    server: &server hs_netbox #debian12-temp #hs_netbox 
+    server: &server debian12-temp 
+    #server: &server hs_netbox 
     plugins: &plugins
-      - netbox-plugin-software-manager
+      - netbox-bgp
 
 - name: Install NetBox plugins
   hosts: *server
@@ -20,7 +21,7 @@
   tasks:
     - name: Copy pip packages from localhost to the remote server
       copy:
-        src: "pip_packages/plugins"
+        src: "{{ inventory_dir }}/pip_packages/plugins"
         dest: /opt/
       when: not clear
 
@@ -31,6 +32,14 @@
         name: "{{ item }}"
       loop: "{{ plugins }}"
       when: not clear
+
+    - name: Copy local 'configuration.py' to remote 'netbox' directory
+      copy:
+        src: "{{ local_src_folder }}/configuration.py"
+        dest: /opt/netbox/netbox/netbox
+        owner: netbox
+        group: netbox
+
     
 - name: Remove plugins folder und uninstall plugins
   hosts: *server
@@ -54,6 +63,3 @@
         name: "{{ item }}"
       loop: "{{ plugins }}"
       when: clear
-    
-
-
