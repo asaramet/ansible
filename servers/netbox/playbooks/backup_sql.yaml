@@ -1,0 +1,54 @@
+---
+- name: Define global variables
+  hosts: localhost
+  gather_facts: false
+  vars: 
+    sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
+    dump_folder: &dump_folder "/opt/db_dumps"
+
+    #server: &server debian12-temp 
+    server: &server hs_netbox 
+
+- name: "Create the backup folder on the remote server"
+  hosts: *server
+  gather_facts: false
+  become: true # run as root
+  vars: 
+    dump_folder: *dump_folder
+  tasks:
+    - name: "Create {{ dump_folder }}"
+      file:
+        path: "{{ dump_folder }}"
+        state: directory
+        owner: postgres
+        group: postgres
+
+- name: Backup PostgreSQL database
+  hosts: *server
+  gather_facts: true
+  become: true # run as root
+  tags: postgresql
+  become_method: su
+  become_user: postgres # change to postgres user
+  vars:
+    sql_user_pass: *sql_user_pass
+    dump_folder: *dump_folder
+    dump_file: "netbox-{{ ansible_date_time.date }}.sql.gz"
+  tasks: 
+    - name: Show the backup date
+      debug:
+        msg: "{{ ansible_date_time.date }}"
+
+    - name: "Dump the 'netbox' database to {{ dump_folder }} with compression"
+      community.postgresql.postgresql_db:
+        name: netbox
+        state: dump
+        target: "{{ dump_folder }}/{{ dump_file }}"
+
+    - name: Backup remote data to "{{ local_src_folder }}"
+      fetch:
+        src: "{{ dump_folder }}/{{ dump_file }}"
+        dest: "{{ local_src_folder }}/db_dumps/"
+        flat: true
+
+

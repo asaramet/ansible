@@ -30,6 +30,7 @@ Packages:
 - `src` directory - server specific data used in ansible playbooks
 - `pip_packages` - temporary folder to keep last downloaded pip packages. Used by `pip_packages.yaml` script
 - Playbooks (in `playbooks` folder)
+  - `backup_sql.yaml` - dump the Postgresql database and back it up to local host.
   - `create_admin.yaml` - create a Django superuser on the remote server
   - `install.yaml` - install the required apps and start NetBox on the server
   - `pip_packages.yaml` - create a local python virtual environment and download required packages
