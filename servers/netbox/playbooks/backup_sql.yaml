@@ -8,6 +8,7 @@
 
     #server: &server debian12-temp 
     server: &server hs_netbox 
+    backup_to_99: &backup_to_99 true
 
 - name: "Create the backup folder on the remote server"
   hosts: *server
@@ -33,22 +34,32 @@
   vars:
     sql_user_pass: *sql_user_pass
     dump_folder: *dump_folder
-    dump_file: "netbox-{{ ansible_date_time.date }}.sql.gz"
   tasks: 
-    - name: Show the backup date
-      debug:
-        msg: "{{ ansible_date_time.date }}"
-
     - name: "Dump the 'netbox' database to {{ dump_folder }} with compression"
       community.postgresql.postgresql_db:
         name: netbox
         state: dump
-        target: "{{ dump_folder }}/{{ dump_file }}"
+        target: "{{ dump_folder }}/netbox-{{ ansible_date_time.date }}.sql.gz"
 
     - name: Backup remote data to "{{ local_src_folder }}"
       fetch:
-        src: "{{ dump_folder }}/{{ dump_file }}"
+        src: "{{ dump_folder }}/netbox-{{ ansible_date_time.date }}.sql.gz"
         dest: "{{ local_src_folder }}/db_dumps/"
         flat: true
+
+- name: Double backup to an internal server
+  hosts: rhlx99
+  gather_facts: true
+  vars:
+    backup_folder: /opt/backup_netbox
+    backup_to_99: *backup_to_99
+  tasks:
+    - name: Copy to rhlx99
+      copy: 
+        src: "{{ inventory_dir }}/src/hs_netbox/db_dumps/netbox-{{ ansible_date_time.date }}.sql.gz"
+        dest: "{{ backup_folder }}"
+        owner: asaramet
+        group: asaramet
+      when: backup_to_99
 
 
