@@ -3,10 +3,9 @@
   hosts: localhost
   gather_facts: false
   vars: 
-    sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
     dump_folder: &dump_folder "/opt/db_dumps"
 
-    #server: &server debian12-temp 
+    #server: &server debian12-ansible
     server: &server hs_netbox 
     backup_to_99: &backup_to_99 true
 
@@ -32,7 +31,6 @@
   become_method: su
   become_user: postgres # change to postgres user
   vars:
-    sql_user_pass: *sql_user_pass
     dump_folder: *dump_folder
   tasks: 
     - name: "Dump the 'netbox' database to {{ dump_folder }} with compression"
@@ -40,6 +38,7 @@
         name: netbox
         state: dump
         target: "{{ dump_folder }}/netbox-{{ ansible_date_time.date }}.sql.gz"
+        dump_extra_args: --exclude-table-data extras_cachedvalue --exclude-table-data extras_objectchange
 
     - name: Backup remote data to "{{ local_src_folder }}"
       fetch:

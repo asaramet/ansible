@@ -1,6 +1,7 @@
 ---
 - name: Create `admin` super-user with Django `auth` module
-  hosts: hs_netbox
+  #hosts: hs_netbox
+  hosts: debian12-ansible
   gather_facts: false
   become: true
   tags: admin

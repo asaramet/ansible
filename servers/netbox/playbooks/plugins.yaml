@@ -5,8 +5,8 @@
   tags: localhost
   vars: 
     clear: &clear false
-    server: &server debian12-temp 
-    #server: &server hs_netbox 
+    #server: &server debian12-ansible
+    server: &server hs_netbox 
     plugins: &plugins
       - netbox-bgp
 
@@ -39,7 +39,6 @@
         dest: /opt/netbox/netbox/netbox
         owner: netbox
         group: netbox
-
     
 - name: Remove plugins folder und uninstall plugins
   hosts: *server

@@ -1,6 +1,6 @@
 ---
 - name: Set root login through ssh key only
-  hosts: debian12-temp
+  hosts: debian12-ansible
   gather_facts: false
   become: true # run as root
   vars:

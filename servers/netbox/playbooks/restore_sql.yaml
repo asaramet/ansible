@@ -1,0 +1,67 @@
+---
+- name: Define global variables
+  hosts: localhost
+  gather_facts: false
+  vars: 
+    dump_folder: &dump_folder "/opt/db_dumps"
+    dump_file_date: &dump_file_date 2024-05-29
+
+    from_local: &from_local false
+    server: &server debian12-ansible
+    #server: &server hs_netbox 
+
+- name: Stop the services
+  hosts: *server
+  gather_facts: false
+  become: true 
+  tasks:
+    - name: Stop the 'netbox' service
+      service: 
+        name: netbox
+        state: stopped
+
+- name: Restore PostgreSQL database from a dump file
+  hosts: *server
+  gather_facts: false
+  become: true # run as root
+  become_method: su
+  become_user: postgres # change to postgres user
+  vars:
+    dump_folder: *dump_folder
+    dump_file_date: *dump_file_date
+    from_local: *from_local
+  tasks: 
+    - name: Copy local dump file to the remote "{{ dump_folder }}"
+      copy:
+        src: "{{ local_src_folder }}/db_dumps/netbox-{{ dump_file_date }}.sql.gz"
+        dest: "{{ dump_folder }}/"
+        owner: postgres
+        group: postgres
+      when: from_local
+
+    - name: Drop the 'netbox' database
+      community.postgresql.postgresql_db:
+        name: netbox
+        state: absent
+      
+    - name: Create a new database with the name 'netbox'
+      community.postgresql.postgresql_db:
+        name: netbox
+        comment: NetBox database
+      
+    - name: "Restore the 'netbox' database from {{ dump_file_date }}"
+      community.postgresql.postgresql_db:
+        name: netbox
+        state: restore
+        target: "{{ dump_folder }}/netbox-{{ dump_file_date }}.sql.gz"
+
+- name: Start the services
+  hosts: *server
+  gather_facts: false
+  become: true 
+  tasks:
+    - name: Start the 'netbox' service
+      service: 
+        name: netbox
+        state: started
+        enabled: yes
