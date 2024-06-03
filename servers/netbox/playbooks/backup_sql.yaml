@@ -9,19 +9,31 @@
     server: &server hs_netbox 
     backup_to_99: &backup_to_99 true
 
-- name: "Create the backup folder on the remote server"
+- name: Backup media
   hosts: *server
   gather_facts: false
   become: true # run as root
   vars: 
     dump_folder: *dump_folder
+    archived_data_file: "{{ dump_folder }}/localdata.tgz"
   tasks:
-    - name: "Create {{ dump_folder }}"
+    - name: "Create {{ dump_folder }} on the remote server"
       file:
         path: "{{ dump_folder }}"
         state: directory
         owner: postgres
         group: postgres
+
+    - name: Backup remote data folder
+      archive:
+        path: /opt/localdata
+        dest: "{{ archived_data_file }}"
+
+    - name: "Fetch archived data to {{ local_src_folder }}"
+      fetch:
+        src: "{{ archived_data_file }}"
+        dest: "{{ local_src_folder }}/db_dumps/"
+        flat: true
 
 - name: Backup PostgreSQL database
   hosts: *server
@@ -55,10 +67,13 @@
   tasks:
     - name: Copy to rhlx99
       copy: 
-        src: "{{ inventory_dir }}/src/hs_netbox/db_dumps/netbox-{{ ansible_date_time.date }}.sql.gz"
+        src: "{{ inventory_dir }}/src/hs_netbox/db_dumps/{{ item }}"
         dest: "{{ backup_folder }}"
         owner: asaramet
         group: asaramet
+      loop: 
+        - "netbox-{{ ansible_date_time.date }}.sql.gz"
+        - "localdata.tgz"
       when: backup_to_99
 
 
