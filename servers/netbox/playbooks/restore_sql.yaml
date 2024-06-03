@@ -4,7 +4,7 @@
   gather_facts: false
   vars: 
     dump_folder: &dump_folder "/opt/db_dumps"
-    dump_file_date: &dump_file_date 2024-05-29
+    dump_file_date: &dump_file_date 2024-06-03
 
     from_local: &from_local false
     server: &server debian12-ansible
@@ -54,6 +54,28 @@
         name: netbox
         state: restore
         target: "{{ dump_folder }}/netbox-{{ dump_file_date }}.sql.gz"
+
+- name: Restore media
+  hosts: *server
+  gather_facts: false
+  become: true # run as root
+  tags: media
+  vars:
+    from_local: *from_local
+    archived_data: "{{ local_src_folder }}/db_dumps/localdata.tgz"
+  tasks:
+    - name: "Restore local data from {{ archived_data }}"
+      unarchive:
+        src: "{{ archived_data }}"
+        dest: /opt
+      when: from_local
+
+    - name: Restore local date from a remote backup
+      unarchive:
+        src: /opt/db_dumps/localdata.tgz
+        dest: /opt
+        remote_src: true
+      when: not from_local
 
 - name: Start the services
   hosts: *server
