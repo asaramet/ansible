@@ -3,9 +3,11 @@
   hosts: localhost
   gather_facts: false
   vars: 
-    netbox_server: 192.168.122.140
+    #netbox_server: 192.168.122.140
+    netbox_server: netbox-bb.hs-esslingen.de
     netbox_url: "https://{{ netbox_server }}"
-    netbox_token: 10aefe29d86af92cf9e14e1f804fb7b08c40cf71
+    #netbox_token: "{{ vault_local_token }}"
+    netbox_token: "{{ vault_hs_netbox_token }}"
   tasks:
     - name: Include locations vars
       include_vars:
@@ -36,6 +38,7 @@
           location: f01-0-erdgeschoss
           site: campus-flandernstrasse
         state: present
+      when: false
 
     - name: Debugging 
       debug:
