@@ -1,0 +1,43 @@
+---
+- name: Test device module
+  hosts: localhost
+  gather_facts: false
+  vars: 
+    netbox_server: 192.168.122.140
+    netbox_url: "https://{{ netbox_server }}"
+    netbox_token: 10aefe29d86af92cf9e14e1f804fb7b08c40cf71
+  tasks:
+    - name: Include locations vars
+      include_vars:
+        file: ../data/yaml/locations.yaml
+
+    - name: Create a Room (location)
+      netbox.netbox.netbox_location:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          site: "{{ item.site }}"
+          parent_location: "{{ item.parent_location }}"
+        state: present
+      loop: "{{ locations }}"
+
+    - name: Add Aruba 6100 Switch
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: rhgw1035p
+          device_type: hpe-aruba-6100-12g-poe4-2sfpp
+          device_role: bueroswitch
+          tenant: netzadmin
+          location: f01-0-erdgeschoss
+          site: campus-flandernstrasse
+        state: present
+
+    - name: Debugging 
+      debug:
+        msg: "{{ vars }}"
+      when: false
