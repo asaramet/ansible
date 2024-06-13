@@ -3,15 +3,15 @@
   hosts: localhost
   gather_facts: false
   vars: 
-    #netbox_server: 192.168.122.140
-    netbox_server: netbox-bb.hs-esslingen.de
+    netbox_server: 192.168.122.140
+    #netbox_server: netbox-bb.hs-esslingen.de
+    netbox_token: "{{ vault_local_token }}"
+    #netbox_token: "{{ vault_hs_netbox_token }}"
     netbox_url: "https://{{ netbox_server }}"
-    #netbox_token: "{{ vault_local_token }}"
-    netbox_token: "{{ vault_hs_netbox_token }}"
   tasks:
     - name: Include locations vars
       include_vars:
-        file: ../data/yaml/locations.yaml
+        file: ../data/yaml/aruba_6100.yaml
 
     - name: Create a Room (location)
       netbox.netbox.netbox_location:
@@ -24,20 +24,23 @@
           parent_location: "{{ item.parent_location }}"
         state: present
       loop: "{{ locations }}"
+      when: false
 
-    - name: Add Aruba 6100 Switch
+    - name: Add Aruba 6100-12G-POE4-2SFP+ switches
       netbox.netbox.netbox_device:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
         data:
-          name: rhgw1035p
+          name: "{{ item.name }}"
+          location: "{{ item.location }}"
+          site: "{{ item.site }}"
+          primary_ip4: "{{ item.primary_ip4 }}"
           device_type: hpe-aruba-6100-12g-poe4-2sfpp
           device_role: bueroswitch
           tenant: netzadmin
-          location: f01-0-erdgeschoss
-          site: campus-flandernstrasse
         state: present
+      loop: "{{ aruba_6100_12g }}"
       when: false
 
     - name: Debugging 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, yaml
+import re, os, yaml
 
 this_folder = os.path.dirname(os.path.realpath(__file__))
 main_folder = os.path.dirname(this_folder)
@@ -11,16 +11,10 @@ def search_line(expression, file):
         lines = file.readlines()
     
     for i, line in enumerate(lines):
-        if line.find(expression) == 0:
-            return line
+        if re.search(expression, line): return line
 
     return " " # return empty space if line not found
     
-# return hostname from a config file
-def get_hostname(file):
-    hostname_line = search_line("hostname", file)
-    return hostname_line.split()[1] if not hostname_line.isspace() else " "
-
 def get_location(file):
     location_line = search_line("snmp-server system-location", file)
 
@@ -39,21 +33,26 @@ def get_location(file):
 
     return (location, room)
 
+# get flor number from room number
+def get_flor_nr(room_nr):
+    flor = room_nr[0]
+    flor = int(room_nr[:2]) if flor == '-' else int(flor)
+
+    return str(flor)
+
 # get flor name from room number
-def get_flor(room_nr):
+def get_flor_name(room_nr):
     flor_name = {
         "-2": "Untergeschoss 2",
         "-1": "Untergeschoss",
         "0": "Erdgeschoss"
     }
 
-    flor = room_nr[0]
-    flor = int(room_nr[:2]) if flor == '-' else int(flor)
+    flor = get_flor_nr(room_nr)
+    if int(flor) < 1:
+        return (flor, flor_name[flor])
 
-    if flor < 1:
-        return (str(flor), flor_name[str(flor)])
-
-    return (str(flor), "Etage " + str(flor))
+    return (flor, "Etage " + flor)
 
 # get location's parent
 def get_parent_location(location):
@@ -66,6 +65,21 @@ def get_parent_location(location):
     building = location.split(".")[0]
     return prefixes[building[0]] + "-" + "gebude" + "-" + building[1:]
 
+# get room location
+def get_room_location(location): 
+    # s01-2-etage-2
+    flor_tags = {
+        "-2": "untergeschoss-2",
+        "-1": "untergeschoss",
+        "0": "erdgeschoss"
+    }
+    building, room_nr = location.split(".")
+    flor = get_flor_nr(room_nr)
+    flor_fx = str(abs(int(flor))) # string to use in the label
+    flor_tag = flor_tags[flor] if int(flor) < 1 else "etage-" + flor
+
+    return building.lower() + "-" + flor_fx + "-" + flor_tag
+    
 # get location site
 def get_site(location):
     campuses = {
@@ -74,6 +88,13 @@ def get_site(location):
         "S": "stadtmitte"
     }
     return "campus-" + campuses[location[0]]
+
+def get_hostname(file):
+    hostname_line = search_line("hostname", file)
+    return hostname_line.split()[1] if not hostname_line.isspace() else " "
+
+def get_device_ip(file):
+    return search_line("ip address", file).split()[2]
 
 # create the loactions json objects list
 def locations_json(config_files):
@@ -89,9 +110,24 @@ def locations_json(config_files):
     for location in locations:
         room = rooms[location]
         building = location.split(".")[0]
-        flor_tuple = get_flor(room)
+        flor_tuple = get_flor_name(room)
 
         data["locations"].append({"name": building + "." + flor_tuple[0] + " - " + flor_tuple[1], "site": get_site(location), "parent_location": get_parent_location(location)})
+
+    return data
+
+# create aruba_6100_12g json objects list
+def aruba_6100_12g_json(config_files):
+    data = {"aruba_6100_12g":[]}
+
+    for file in config_files:
+        name = get_hostname(file)
+        location,room = get_location(file)
+        site = get_site(location)
+        location = get_room_location(location)
+        primary_ip4 = get_device_ip(file)
+
+        data["aruba_6100_12g"].append({"name": name, "location": location, "site": site, "primary_ip4": primary_ip4})
 
     return data
 
@@ -102,9 +138,9 @@ def collect_data():
     files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
 
 
-    with open(main_folder + "/data/yaml/locations.yaml", 'w') as locations_yaml:
-        yaml.dump(locations_json(files), locations_yaml)
-
+    with open(main_folder + "/data/yaml/aruba_6100.yaml", 'w') as f:
+        yaml.dump(locations_json(files), f)
+        yaml.dump(aruba_6100_12g_json(files), f)
 
 def main():
     collect_data()
