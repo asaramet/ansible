@@ -116,6 +116,18 @@ def locations_json(config_files):
 
     return data
 
+# create ip_addresses json objects list
+def ip_addressess_json(config_files):
+    data = {"ip_addresses":[]}
+
+    for file in config_files:
+        hostname = get_hostname(file)
+        ip_address = get_device_ip(file)
+
+        data["ip_addresses"].append({"address": ip_address, "dns_name": hostname})
+
+    return data
+
 # create aruba_6100_12g json objects list
 def aruba_6100_12g_json(config_files):
     data = {"aruba_6100_12g":[]}
@@ -137,10 +149,10 @@ def collect_data():
     files = os.listdir(data_folder)
     files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
 
-
     with open(main_folder + "/data/yaml/aruba_6100.yaml", 'w') as f:
         yaml.dump(locations_json(files), f)
         yaml.dump(aruba_6100_12g_json(files), f)
+        yaml.dump(ip_addressess_json(files), f)
 
 def main():
     collect_data()

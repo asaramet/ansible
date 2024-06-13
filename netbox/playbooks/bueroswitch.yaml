@@ -35,10 +35,40 @@
           name: "{{ item.name }}"
           location: "{{ item.location }}"
           site: "{{ item.site }}"
-          primary_ip4: "{{ item.primary_ip4 }}"
           device_type: hpe-aruba-6100-12g-poe4-2sfpp
           device_role: bueroswitch
           tenant: netzadmin
+        state: present
+        #state: absent
+      loop: "{{ aruba_6100_12g }}"
+      when: false
+
+    - name: Add found IP addresses
+      netbox.netbox.netbox_ip_address:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          address: "{{ item.address }}"
+          dns_name: "{{ item.dns_name }}"
+          role: "Loopback"
+          tenant: netzadmin
+          assigned_object:
+            name: 1/1/13
+            device: "{{ item.dns_name }}"
+        #state: present
+        state: absent
+      loop: "{{ ip_addresses }}"
+      #when: false
+
+    - name: Assign IP addresses
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          primary_ip4: "{{ item.primary_ip4 }}"
         state: present
       loop: "{{ aruba_6100_12g }}"
       when: false
