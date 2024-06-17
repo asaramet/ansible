@@ -1,5 +1,5 @@
 ---
-- name: Test device module
+- name: Add Aruba 6100 Switches from configuration files
   hosts: localhost
   gather_facts: false
   vars: 
@@ -72,6 +72,33 @@
         state: present
       loop: "{{ aruba_6100_12g }}"
       when: false
+
+    - name: Create VLAN interfaces
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: rggw1018bp
+          name: vlan 201
+          type: Virtual
+          description: BB-SM
+        state: present
+
+    - name: Assign IP to VLAN interface
+      netbox.netbox.netbox_ip_address:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          address: 134.108.95.36/25
+          dns_name: rggw1018bp
+          description: VLAN 201 (BB-SM)
+          assigned_object:
+            device: rggw1018bp
+            name: vlan 201
+        state: present
+
 
     - name: Debugging 
       debug:

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# Collect Aruba 6100 data and create a aruba_6100.yaml configs file 
+
 import re, os, yaml
 
 this_folder = os.path.dirname(os.path.realpath(__file__))
@@ -128,6 +130,47 @@ def ip_addressess_json(config_files):
 
     return data
 
+# get the interfaces configuration from an Aruba 6100 config file
+def get_interfaces_config(config_file):
+    interface_configs = {
+        'vlan': {},
+        'lag': {},
+        'physical': {}
+    }
+    current_interface = None
+
+    with open(config_file, "r") as f:
+        config_text = f.readlines()
+
+    for line in config_text:
+        line = line.rstrip() # remove the trailing newline character
+        
+        # Detect an interface line
+        if line.startswith('interface'):
+            current_interface = line
+            if 'vlan' in current_interface:
+                interface_type = 'vlan'
+            elif 'lag' in current_interface:
+                interface_type = 'lag'
+            else:
+                interface_type = 'physical'
+
+            interface_configs[interface_type][current_interface] = []
+        elif current_interface:
+            # Check if the line is indented
+            if line.startswith((' ','\t', '!')):  # Lines part of an interface configuration
+                interface_configs[interface_type][current_interface].append(line)
+            else:
+                # End of the current interface configuration block
+                current_interface = None
+                interface_type = None
+
+    # Clean up the config by removing any trailing empty configurations
+    for interface_type in interface_configs:
+        interface_configs[interface_type] = {k: v for k, v in interface_configs[interface_type].items() if v}
+
+    return interface_configs
+
 # create aruba_6100_12g json objects list
 def aruba_6100_12g_json(config_files):
     data = {"aruba_6100_12g":[]}
@@ -154,8 +197,25 @@ def collect_data():
         yaml.dump(aruba_6100_12g_json(files), f)
         yaml.dump(ip_addressess_json(files), f)
 
+def debug_gets():
+    # print some collected or parsed data
+    config_file = data_folder + "rggw1018bp"
+
+    interfaces_config = get_interfaces_config(config_file)
+
+    # Printing the configurations for demonstration purposes
+    for interface_type, configs in interfaces_config.items():
+        print(f"{interface_type.capitalize()} Interfaces:")
+        for interface, config in configs.items():
+            print(f"  {interface}:")
+            for line in config:
+                print(f"    {line}")
+            print()
+
 def main():
     collect_data()
 
 if __name__ == "__main__":
-    main()
+    #main()
+    debug_gets()
+
