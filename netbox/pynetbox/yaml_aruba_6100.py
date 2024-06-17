@@ -187,6 +187,38 @@ def get_vlan_interface(config_file):
 
     return vlan, ip, description
 
+# get physical interfaces configs
+def get_interfaces(config_file):
+    interfaces_dict = get_interfaces_config(config_file)['physical']
+    return interfaces_dict
+
+def get_lag_interfaces(config_file):
+    """
+    Extracts LAG information from the interfaces dictionary.
+    
+    Args:
+        config_file (text file): Aruba 6100 switch configuration file containing interface configurations.
+    
+    Returns:
+        dict: A dictionary where keys are LAG IDs and values are lists of interfaces belonging to each LAG.
+    """
+    lag_interfaces = {}
+    
+    interfaces_dict = get_interfaces_config(config_file)['physical']
+    for interface, configs in interfaces_dict.items():
+        for config in configs:
+            config = config.strip()
+            if config.startswith('lag'):
+                lag_id = config.split()[1]
+                if lag_id not in lag_interfaces:
+                    lag_interfaces[lag_id] = []
+
+                interface = interface.split()[1]
+                lag_interfaces[lag_id].append(interface)
+                break
+    
+    return lag_interfaces
+
 # create ip_addresses json objects list
 def ip_addressess_json(config_files):
     data = {"ip_addresses":[]}
@@ -233,11 +265,33 @@ def debug_ip_addresses_json():
     for dict in ip_addressess_json(files)['ip_addresses']:
         print(dict)
 
+def debug_get_interfaces():
+    file = data_folder + "rggw1018bp"
+    interfaces_config = get_interfaces(file)
+
+    print(interfaces_config)
+    # Printing the configurations for demonstration purposes
+    for interface, config in interfaces_config.items():
+        print(f"  {interface}:")
+        for line in config:
+            print(f"    {line}")
+        print()
+
+def debug_get_lag_interfaces():
+    file = data_folder + "rggw1018bp"
+    lag_interfaces = get_lag_interfaces(file)
+    for lag, interfaces in lag_interfaces.items():
+        print(f"LAG {lag}: {interfaces}")
+
+    print(lag_interfaces)
+
 def main():
     collect_data()
 
 if __name__ == "__main__":
-    main()
-    #debug_get_interfaces_config()
+    #main()
     #debug_ip_addresses_json()
+    #debug_get_interfaces_config()
+    #debug_get_interfaces()
+    debug_get_lag_interfaces()
 
