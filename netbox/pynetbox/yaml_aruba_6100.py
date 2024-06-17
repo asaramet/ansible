@@ -95,41 +95,6 @@ def get_hostname(file):
     hostname_line = search_line("hostname", file)
     return hostname_line.split()[1] if not hostname_line.isspace() else " "
 
-def get_device_ip(file):
-    return search_line("ip address", file).split()[2]
-
-# create the loactions json objects list
-def locations_json(config_files):
-    data = {"locations":[]}
-    locations = set()
-    rooms = {}
-
-    for file in config_files:
-        location,room = get_location(file)
-        locations.add(location)
-        rooms.update({location:room})
-
-    for location in locations:
-        room = rooms[location]
-        building = location.split(".")[0]
-        flor_tuple = get_flor_name(room)
-
-        data["locations"].append({"name": building + "." + flor_tuple[0] + " - " + flor_tuple[1], "site": get_site(location), "parent_location": get_parent_location(location)})
-
-    return data
-
-# create ip_addresses json objects list
-def ip_addressess_json(config_files):
-    data = {"ip_addresses":[]}
-
-    for file in config_files:
-        hostname = get_hostname(file)
-        ip_address = get_device_ip(file)
-
-        data["ip_addresses"].append({"address": ip_address, "dns_name": hostname})
-
-    return data
-
 # get the interfaces configuration from an Aruba 6100 config file
 def get_interfaces_config(config_file):
     interface_configs = {
@@ -171,6 +136,26 @@ def get_interfaces_config(config_file):
 
     return interface_configs
 
+# create the loactions json objects list
+def locations_json(config_files):
+    data = {"locations":[]}
+    locations = set()
+    rooms = {}
+
+    for file in config_files:
+        location,room = get_location(file)
+        locations.add(location)
+        rooms.update({location:room})
+
+    for location in locations:
+        room = rooms[location]
+        building = location.split(".")[0]
+        flor_tuple = get_flor_name(room)
+
+        data["locations"].append({"name": building + "." + flor_tuple[0] + " - " + flor_tuple[1], "site": get_site(location), "parent_location": get_parent_location(location)})
+
+    return data
+
 # create aruba_6100_12g json objects list
 def aruba_6100_12g_json(config_files):
     data = {"aruba_6100_12g":[]}
@@ -180,9 +165,38 @@ def aruba_6100_12g_json(config_files):
         location,room = get_location(file)
         site = get_site(location)
         location = get_room_location(location)
-        primary_ip4 = get_device_ip(file)
 
-        data["aruba_6100_12g"].append({"name": name, "location": location, "site": site, "primary_ip4": primary_ip4})
+        data["aruba_6100_12g"].append({"name": name, "location": location, "site": site})
+
+    return data
+
+# get vlan interface with IP loopback
+def get_vlan_interface(config_file):
+    vlan_interfaces = get_interfaces_config(config_file)['vlan']
+
+    vlan = list(vlan_interfaces.keys())[1:]
+    if len(vlan) != 1: # more or none interface vlans
+        return 
+
+    vlan = vlan[0].split()[2]
+
+    [description, ip] = list(vlan_interfaces.values())[1]
+
+    ip = ip.split()[2]
+    description = description.split()[1]
+
+    return vlan, ip, description
+
+# create ip_addresses json objects list
+def ip_addressess_json(config_files):
+    data = {"ip_addresses":[]}
+
+    for file in config_files:
+        hostname = get_hostname(file)
+
+        vlan_interface = get_vlan_interface(file)
+
+        data["ip_addresses"].append({"hostname": hostname, "ip": vlan_interface[1], "vlan_nr": vlan_interface[0], "vlan_name": vlan_interface[2]})
 
     return data
 
@@ -197,7 +211,7 @@ def collect_data():
         yaml.dump(aruba_6100_12g_json(files), f)
         yaml.dump(ip_addressess_json(files), f)
 
-def debug_gets():
+def debug_get_interfaces_config():
     # print some collected or parsed data
     config_file = data_folder + "rggw1018bp"
 
@@ -212,10 +226,18 @@ def debug_gets():
                 print(f"    {line}")
             print()
 
+def debug_ip_addresses_json():
+    files = os.listdir(data_folder)
+    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
+
+    for dict in ip_addressess_json(files)['ip_addresses']:
+        print(dict)
+
 def main():
     collect_data()
 
 if __name__ == "__main__":
-    #main()
-    debug_gets()
+    main()
+    #debug_get_interfaces_config()
+    #debug_ip_addresses_json()
 

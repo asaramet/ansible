@@ -43,47 +43,19 @@
       loop: "{{ aruba_6100_12g }}"
       when: false
 
-    - name: Add found IP addresses
-      netbox.netbox.netbox_ip_address:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          address: "{{ item.address }}"
-          dns_name: "{{ item.dns_name }}"
-          role: "Loopback"
-          tenant: netzadmin
-          assigned_object:
-            name: 1/1/13
-            device: "{{ item.dns_name }}"
-        #state: present
-        state: absent
-      loop: "{{ ip_addresses }}"
-      #when: false
-
-    - name: Assign IP addresses
-      netbox.netbox.netbox_device:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          name: "{{ item.name }}"
-          primary_ip4: "{{ item.primary_ip4 }}"
-        state: present
-      loop: "{{ aruba_6100_12g }}"
-      when: false
-
     - name: Create VLAN interfaces
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
         data:
-          device: rggw1018bp
-          name: vlan 201
+          device: "{{ item.hostname }}"
+          name: "vlan {{ item.vlan_nr }}"
           type: Virtual
-          description: BB-SM
+          description: "{{ item.vlan_name }}"
         state: present
+      loop: "{{ ip_addresses }}"
+      when: false
 
     - name: Assign IP to VLAN interface
       netbox.netbox.netbox_ip_address:
@@ -91,14 +63,29 @@
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
         data:
-          address: 134.108.95.36/25
-          dns_name: rggw1018bp
-          description: VLAN 201 (BB-SM)
+          address: "{{ item.ip }}"
+          dns_name: "{{ item.hostname }}"
+          description: "VLAN {{ item.vlan_nr }} ({{ item.vlan_name }})"
           assigned_object:
-            device: rggw1018bp
-            name: vlan 201
+            device: "{{item.hostname }}"
+            name: "vlan {{ item.vlan_nr }}"
+          role: Loopback
+          tenant: netzadmin
         state: present
+      loop: "{{ ip_addresses }}"
+      when: false
 
+    - name: Assign IP addresses to devices
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.hostname }}"
+          primary_ip4: "{{ item.ip }}"
+        state: present
+      loop: "{{ ip_addresses }}"
+      when: false
 
     - name: Debugging 
       debug:
