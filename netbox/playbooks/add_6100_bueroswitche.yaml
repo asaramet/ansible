@@ -100,6 +100,36 @@
       loop: "{{ ip_addresses }}"
       when: false
 
+    - name: Create LAG interfaces
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "lag {{ item.lag_id }}"
+          type: Link Aggregation Group (LAG)
+        state: present
+        #state: absent
+      loop: "{{ lags }}"
+      when: false
+
+    - name: Assign interfaces to LAGs
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          lag:
+            name: "lag {{ item.lag_id}}"
+        state: present
+        #state: absent
+      loop: "{{ lag_interfaces }}"
+      when: false
+
+
     - name: Debugging 
       debug:
         msg: "{{ vars }}"

@@ -223,17 +223,33 @@ def get_lag_interfaces(config_file):
 def ip_addressess_json(config_files):
     data = {"ip_addresses":[]}
 
-    for file in config_files:
-        hostname = get_hostname(file)
+    for config_file in config_files:
+        hostname = get_hostname(config_file)
 
-        vlan_interface = get_vlan_interface(file)
+        vlan_interface = get_vlan_interface(config_file)
 
         data["ip_addresses"].append({"hostname": hostname, "ip": vlan_interface[1], "vlan_nr": vlan_interface[0], "vlan_name": vlan_interface[2]})
 
     return data
 
-def collect_data():
+# create lags json objects list
+def lags_json(config_files):
+    data = {"lags":[], "lag_interfaces":[]}
 
+    for config_file in config_files:
+        hostname = get_hostname(config_file)
+
+        lag_interfaces = get_lag_interfaces(config_file).items()
+        if not lag_interfaces:
+            continue
+        for lag, interfaces in lag_interfaces:
+            data["lags"].append({"hostname": hostname, "lag_id": lag})
+            for interface in interfaces:
+                data["lag_interfaces"].append({"hostname": hostname, "lag_id": lag, "interface": interface})
+
+    return data
+
+def collect_data():
     # get data files
     files = os.listdir(data_folder)
     files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
@@ -242,6 +258,7 @@ def collect_data():
         yaml.dump(locations_json(files), f)
         yaml.dump(aruba_6100_12g_json(files), f)
         yaml.dump(ip_addressess_json(files), f)
+        yaml.dump(lags_json(files), f)
 
 def debug_get_interfaces_config():
     # print some collected or parsed data
@@ -285,13 +302,20 @@ def debug_get_lag_interfaces():
 
     print(lag_interfaces)
 
+def debug_lags_json():
+    files = os.listdir(data_folder)
+    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
+    print(lags_json(files))
+
+
 def main():
     collect_data()
 
 if __name__ == "__main__":
-    #main()
-    #debug_ip_addresses_json()
+    main()
     #debug_get_interfaces_config()
+    #debug_ip_addresses_json()
     #debug_get_interfaces()
-    debug_get_lag_interfaces()
+    #debug_get_lag_interfaces()
+    #debug_lags_json()
 
