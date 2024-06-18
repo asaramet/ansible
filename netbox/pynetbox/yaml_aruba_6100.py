@@ -219,6 +219,43 @@ def get_lag_interfaces(config_file):
     
     return lag_interfaces
 
+def get_vlans(config_file):
+    """
+    Parses VLAN information from a given configuration file content.
+
+    Args:
+        file_content (str): The content of the configuration file as a string.
+
+    Returns:
+        dict: A dictionary where each key is a VLAN ID (str) and the value is another
+              dictionary with keys 'name' and 'description'. If a VLAN does not have a
+              name or description, the corresponding value will be None.
+    """
+
+    with open(config_file, "r") as f:
+        config_text = f.readlines()
+
+    vlans = {}
+    vlan_pattern = re.compile(r"vlan (\d+)")
+    name_pattern = re.compile(r"\s+name (.+)")
+    description_pattern = re.compile(r"\s+description (.+)")
+    current_vlan = None
+
+    for line in config_text:
+        vlan_match = vlan_pattern.match(line)
+        name_match = name_pattern.match(line)
+        description_match = description_pattern.match(line)
+
+        if vlan_match:
+            current_vlan = vlan_match.group(1)
+            vlans[current_vlan] = {'name': None, 'description': None}
+        elif name_match and current_vlan:
+            vlans[current_vlan]['name'] = name_match.group(1)
+        elif description_match and current_vlan:
+            vlans[current_vlan]['description'] = description_match.group(1)
+
+    return vlans
+
 # create ip_addresses json objects list
 def ip_addressess_json(config_files):
     data = {"ip_addresses":[]}
@@ -249,6 +286,29 @@ def lags_json(config_files):
 
     return data
 
+# collect all the vlans from the config files
+def collect_vlans(config_files):
+    vlans = {}
+    for config_file in config_files:
+        vlan_ids = vlans.keys()
+        #print(vlan_ids)
+        collected_vlans = get_vlans(config_file)
+        for vlan_id in collected_vlans:
+            if vlan_id not in vlan_ids:
+                vlans[vlan_id] = collected_vlans[vlan_id]
+    return vlans
+
+def vlans_jason(config_files):
+    data = {'vlans':[]}
+
+    collected_vlans = collect_vlans(config_files)
+    for vlan_id in collected_vlans:
+        name = str(collected_vlans[vlan_id]["name"])
+        data['vlans'].append({'vlan_id': vlan_id, 'name': name})
+
+    return data
+
+# Collect all the data and saved it to a YAML file
 def collect_data():
     # get data files
     files = os.listdir(data_folder)
@@ -259,7 +319,12 @@ def collect_data():
         yaml.dump(aruba_6100_12g_json(files), f)
         yaml.dump(ip_addressess_json(files), f)
         yaml.dump(lags_json(files), f)
+        yaml.dump(vlans_jason(files), f)
 
+def main():
+    collect_data()
+
+#---- Debugging ----#
 def debug_get_interfaces_config():
     # print some collected or parsed data
     config_file = data_folder + "rggw1018bp"
@@ -307,15 +372,26 @@ def debug_lags_json():
     files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
     print(lags_json(files))
 
+def debug_get_vlans():
+    file = data_folder + "rggw1018bp"
+    vlans = get_vlans(file)
+    print(vlans)
+    for vlan_id, info in vlans.items():
+        print(f"VLAN ID: {vlan_id}, Name: {info['name']}, Description: {info['description']}")
 
-def main():
-    collect_data()
+def debug_collect_vlans():
+    files = os.listdir(data_folder)
+    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
+    info = collect_vlans(files)
+    for vlan_id in info:
+        print(f"VLAN ID: {vlan_id}, Name: {info[vlan_id]['name']}, Description: {info[vlan_id]['description']}")
 
 if __name__ == "__main__":
-    main()
-    #debug_get_interfaces_config()
+    #main()
+    debug_get_interfaces_config()
     #debug_ip_addresses_json()
     #debug_get_interfaces()
     #debug_get_lag_interfaces()
     #debug_lags_json()
-
+    #debug_get_vlans()
+    #debug_collect_vlans()
