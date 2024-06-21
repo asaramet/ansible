@@ -187,11 +187,6 @@ def get_vlan_interface(config_file):
 
     return vlan, ip, description
 
-# get physical interfaces configs
-def get_interfaces(config_file):
-    interfaces_dict = get_interfaces_config(config_file)['physical']
-    return interfaces_dict
-
 def get_lag_interfaces(config_file):
     """
     Extracts LAG information from the interfaces dictionary.
@@ -256,6 +251,75 @@ def get_vlans(config_file):
 
     return vlans
 
+def get_interfaces_recursively(config_text_list, interfaces = None, current_interface = None, found_interface_flag = False):
+
+    # initialize interfaces properly if not provided
+    if not interfaces:
+        interfaces = []
+
+    if not config_text_list:
+        # Append the last interface if the recursion is terminating and an interface was being processed
+        if found_interface_flag and current_interface is not None:
+            interfaces.append(current_interface)
+        return interfaces # Terminate recursion
+
+    line = config_text_list[0] # get a line
+
+    # Find interface and save it to current_interface they start recursively from the next line
+    if line.startswith('interface ') and not found_interface_flag: 
+        name = " ".join(line.split()[1:])
+        current_interface = {'name': name, 'description': None, 'vlan': None, 'vlan_mode': None} 
+
+        return get_interfaces_recursively(config_text_list[1:], interfaces, current_interface, True)
+
+    # if the line starts with a word and the flag is True, switch the flag to False and append the current interface
+    if not re.match(r'\s', line) and found_interface_flag:
+        found_interface_flag = False
+        interfaces.append(current_interface)
+        return get_interfaces_recursively(config_text_list, interfaces, current_interface, found_interface_flag)
+
+    # Remove spaces
+    line = line.strip()
+
+    # Match vlan access
+    if line.startswith('description') and found_interface_flag: 
+        description = " ".join(line.split()[1:])
+        current_interface['description'] = description
+
+    # Match vlan access
+    elif 'vlan access' in line:
+        vlan_id = line.split()[-1]
+        current_interface['vlan'] = vlan_id
+        current_interface['vlan_mode'] = "access"
+        
+    # Match vlan trunk
+    elif 'vlan trunk' in line:
+        mode = line.split()[2]
+        vlan_id = line.split()[-1]
+        current_interface['vlan_mode'] = "tagged-all"
+        if mode == 'native':
+            current_interface['vlan'] = vlan_id
+
+    return get_interfaces_recursively(config_text_list[1:], interfaces, current_interface, found_interface_flag)
+
+def get_interfaces(config_file):
+    """
+    Parse a configuration file and extract interface names, descriptions, and VLAN assignments.
+
+    Args:
+    - config_file (str): The path to the configuration file to parse.
+
+    Returns:
+    - list of dicts: A list of dictionaries, each representing an interface with keys:
+                     'name' (str): Interface name
+                     'description' (str): Interface description or "none" if not provided
+                     'vlan' (str): Native/untagged VLAN ID assigned to the interface
+    """
+    with open(config_file, 'r') as f:
+        config_text_list = f.readlines()
+
+    return  get_interfaces_recursively(config_text_list)
+
 # create ip_addresses json objects list
 def ip_addressess_json(config_files):
     data = {"ip_addresses":[]}
@@ -308,6 +372,23 @@ def vlans_jason(config_files):
 
     return data
 
+def interfaces_json(config_files):
+    data = {"interfaces":[], "interfaces_vlan":[]}
+
+    for config_file in config_files:
+        hostname = get_hostname(config_file)
+        interfaces = get_interfaces(config_file)
+
+        for interface in interfaces:
+            description = interface["description"]
+            vlan = interface["vlan"]
+            if description:
+                data["interfaces"].append({"hostname":hostname, "interface":interface["name"], "description":description})
+
+            if vlan:
+                data["interfaces_vlan"].append({"hostname":hostname, "interface":interface["name"], "vlan_id":vlan, "vlan_mode":interface["vlan_mode"]})
+    return data
+
 # Collect all the data and saved it to a YAML file
 def collect_data():
     # get data files
@@ -320,6 +401,7 @@ def collect_data():
         yaml.dump(ip_addressess_json(files), f)
         yaml.dump(lags_json(files), f)
         yaml.dump(vlans_jason(files), f)
+        yaml.dump(interfaces_json(files), f)
 
 def main():
     collect_data()
@@ -346,18 +428,6 @@ def debug_ip_addresses_json():
 
     for dict in ip_addressess_json(files)['ip_addresses']:
         print(dict)
-
-def debug_get_interfaces():
-    file = data_folder + "rggw1018bp"
-    interfaces_config = get_interfaces(file)
-
-    print(interfaces_config)
-    # Printing the configurations for demonstration purposes
-    for interface, config in interfaces_config.items():
-        print(f"  {interface}:")
-        for line in config:
-            print(f"    {line}")
-        print()
 
 def debug_get_lag_interfaces():
     file = data_folder + "rggw1018bp"
@@ -386,12 +456,29 @@ def debug_collect_vlans():
     for vlan_id in info:
         print(f"VLAN ID: {vlan_id}, Name: {info[vlan_id]['name']}, Description: {info[vlan_id]['description']}")
 
+def debug_get_interfaces():
+    config_files = [data_folder + "rsgw7203p"]
+    config_files.append(data_folder + "rggw1018bp")
+
+    for config_file in config_files:
+        interfaces = get_interfaces(config_file)
+
+        print("Interfaces List:", interfaces)
+
+        # Print out the extracted interfaces
+        for interface in interfaces:
+            print(f"Interface Name: {interface['name']}")
+            print(f"Description: {interface['description']}")
+            print(f"VLAN: {interface['vlan']}")
+            print(f"VLAN Mode: {interface['vlan_mode']}")
+            print()    
+
 if __name__ == "__main__":
-    #main()
-    debug_get_interfaces_config()
+    main()
+    #debug_get_interfaces_config()
     #debug_ip_addresses_json()
-    #debug_get_interfaces()
     #debug_get_lag_interfaces()
     #debug_lags_json()
     #debug_get_vlans()
     #debug_collect_vlans()
+    #debug_get_interfaces()

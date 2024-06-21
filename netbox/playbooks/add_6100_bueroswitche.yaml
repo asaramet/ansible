@@ -3,10 +3,10 @@
   hosts: localhost
   gather_facts: false
   vars: 
-    netbox_server: 192.168.122.140
-    #netbox_server: netbox-bb.hs-esslingen.de
-    netbox_token: "{{ vault_local_token }}"
-    #netbox_token: "{{ vault_hs_netbox_token }}"
+    #netbox_server: 192.168.122.140
+    netbox_server: netbox-bb.hs-esslingen.de
+    #netbox_token: "{{ vault_local_token }}"
+    netbox_token: "{{ vault_hs_netbox_token }}"
     netbox_url: "https://{{ netbox_server }}"
   tasks:
     - name: Include locations vars
@@ -24,7 +24,7 @@
           parent_location: "{{ item.parent_location }}"
         state: present
       loop: "{{ locations }}"
-      when: false
+      #when: false
 
     - name: Add Aruba 6100-12G-POE4-2SFP+ switches
       netbox.netbox.netbox_device:
@@ -36,12 +36,13 @@
           location: "{{ item.location }}"
           site: "{{ item.site }}"
           device_type: hpe-aruba-6100-12g-poe4-2sfpp
-          device_role: bueroswitch
+          #device_role: bueroswitch
+          device_role: access-layer-switch
           tenant: netzadmin
         state: present
         #state: absent
       loop: "{{ aruba_6100_12g }}"
-      when: false
+      #when: false
 
     - name: Create VLAN 1 interfaces
       netbox.netbox.netbox_device_interface:
@@ -54,7 +55,7 @@
           type: Virtual
         state: present
       loop: "{{ aruba_6100_12g }}"
-      when: false
+      #when: false
 
     - name: Create VLAN interfaces
       netbox.netbox.netbox_device_interface:
@@ -68,7 +69,7 @@
           description: "{{ item.vlan_name }}"
         state: present
       loop: "{{ ip_addresses }}"
-      when: false
+      #when: false
 
     - name: Assign IP to VLAN interface
       netbox.netbox.netbox_ip_address:
@@ -86,7 +87,7 @@
           tenant: netzadmin
         state: present
       loop: "{{ ip_addresses }}"
-      when: false
+      #when: false
 
     - name: Assign IP addresses to devices
       netbox.netbox.netbox_device:
@@ -98,7 +99,7 @@
           primary_ip4: "{{ item.ip }}"
         state: present
       loop: "{{ ip_addresses }}"
-      when: false
+      #when: false
 
     - name: Create LAG interfaces
       netbox.netbox.netbox_device_interface:
@@ -112,7 +113,7 @@
         state: present
         #state: absent
       loop: "{{ lags }}"
-      when: false
+      #when: false
 
     - name: Assign interfaces to LAGs
       netbox.netbox.netbox_device_interface:
@@ -127,7 +128,7 @@
         state: present
         #state: absent
       loop: "{{ lag_interfaces }}"
-      when: false
+      #when: false
 
     - name: Create new VLANs
       netbox.netbox.netbox_vlan:
@@ -139,9 +140,30 @@
           vid: "{{ item.vlan_id }}"
         state: present
       loop: "{{ vlans }}"
-      when: false
+      #when: false
 
-    - name: Debugging 
-      debug:
-        msg: "{{ vars }}"
-      when: false
+    - name: Update interfaces description
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          description: "{{ item.description }}"
+        state: present
+      loop: "{{ interfaces }}"
+      #when: false
+
+    - name: Update interfaces description
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          mode: "{{ item.vlan_mode }}"
+          untagged_vlan: "{{ item.vlan_id }}"
+      loop: "{{ interfaces_vlan }}"
+      #when: false
