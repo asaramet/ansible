@@ -9,6 +9,14 @@
     server: &server hs_netbox 
     plugins: &plugins
       - netbox-bgp
+      - netbox-documents
+      - netbox-floorplan-plugin
+      - netbox_acls
+      - netbox-plugin-dns
+      - netbox-qrcode
+      - netbox-reorder-rack
+      - netbox-topology-views
+      - netbox-inventory
 
 - name: Install NetBox plugins
   hosts: *server
