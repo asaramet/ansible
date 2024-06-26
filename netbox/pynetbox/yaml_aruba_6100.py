@@ -136,6 +136,10 @@ def get_interfaces_config(config_file):
 
     return interface_configs
 
+# Get uplink vlan
+def get_uplink_vlan(config_file):
+    return get_vlan_interface(config_file)[0]
+
 # create the loactions json objects list
 def locations_json(config_files):
     data = {"locations":[]}
@@ -159,6 +163,7 @@ def locations_json(config_files):
 # create aruba_6100_12g json objects list
 def aruba_6100_12g_json(config_files):
     data = {"aruba_6100_12g":[]}
+    rsm_vlans = ['102','202','302']
 
     for file in config_files:
         name = get_hostname(file)
@@ -166,7 +171,11 @@ def aruba_6100_12g_json(config_files):
         site = get_site(location)
         location = get_room_location(location)
 
-        data["aruba_6100_12g"].append({"name": name, "location": location, "site": site})
+        uplink_vlan = get_uplink_vlan(file)
+        
+        device_role = "bueroswitch" if uplink_vlan in rsm_vlans else "access-layer-switch"
+
+        data["aruba_6100_12g"].append({"name": name, "location": location, "site": site, "device_role": device_role})
 
     return data
 
@@ -473,6 +482,18 @@ def debug_get_interfaces():
             print(f"VLAN Mode: {interface['vlan_mode']}")
             print()    
 
+def debug_get_uplink_vlan():
+    files = os.listdir(data_folder)
+    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
+
+    rsm_vlans = ['102','202','302']
+    for f in files:
+        vlan = get_uplink_vlan(f)
+        if vlan in rsm_vlans:
+            print("Bueroswitch - ", vlan)
+        else:
+            print("Access Switch - ", vlan)
+
 if __name__ == "__main__":
     main()
     #debug_get_interfaces_config()
@@ -482,3 +503,4 @@ if __name__ == "__main__":
     #debug_get_vlans()
     #debug_collect_vlans()
     #debug_get_interfaces()
+    debug_get_uplink_vlan()
