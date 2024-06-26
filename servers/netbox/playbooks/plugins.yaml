@@ -5,26 +5,17 @@
   tags: localhost
   vars: 
     clear: &clear false
-    #server: &server debian12-ansible
-    server: &server hs_netbox 
-    plugins: &plugins
-      - netbox-bgp
-      - netbox-documents
-      - netbox-floorplan-plugin
-      - netbox_acls
-      - netbox-plugin-dns
-      - netbox-qrcode
-      - netbox-reorder-rack
-      - netbox-topology-views
-      - netbox-inventory
+    server: &server debian12-ansible
+    #server: &server hs_netbox 
 
 - name: Install NetBox plugins
   hosts: *server
   gather_facts: false
   become: true # run as root
   tags: plugins
+  vars_files:
+    - "{{ inventory_dir }}/host_vars/localhost/plugins.yaml"
   vars:
-    - plugins: *plugins
     - clear: *clear
   tasks:
     - name: Copy pip packages from localhost to the remote server
@@ -53,9 +44,10 @@
   gather_facts: false
   become: true # run as root
   tags: clear
+  vars_files:
+    - "{{ inventory_dir }}/host_vars/localhost/plugins.yaml"
   vars:
     - clear: *clear
-    - plugins: *plugins
   tasks:
     - name: Remove the '/opt/plugins/' folder
       file: 

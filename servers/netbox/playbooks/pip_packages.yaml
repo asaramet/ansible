@@ -7,17 +7,7 @@
     python_version: 3.11 # check if you have to activate the right python shell with 'pyenv shell 3.11.2' | show versions 'pyenv versions'
     inventory_dir: "{{ playbook_dir }}/.." # localhost doesn't have 'inventory_dir' global variable
     venv_path: "{{ inventory_dir }}/pip_packages" 
-    plugins:
-      - netbox-bgp
-      - netbox_documents
-      - netbox-floorplan-plugin
-      - netbox_acls
-      - netbox-plugin-dns
-      - netbox-qrcode
-      - netbox-reorder-rack
-      - netbox-topology-views
-      - netbox-inventory
-  
+
   tasks:
     - name: Remove existing virtual environment folder
       file:

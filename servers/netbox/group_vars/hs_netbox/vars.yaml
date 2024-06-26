@@ -1,4 +1,3 @@
 ---
-production: true
 local_src_folder: "{{ inventory_dir }}/src/hs_netbox"
 ...
