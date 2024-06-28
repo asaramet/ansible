@@ -61,7 +61,8 @@ def get_parent_location(location):
     prefixes = {
         "F": "fl",
         "G": "gp",
-        "S": "sm"
+        "S": "sm",
+        "W": "ws"
     }
 
     building = location.split(".")[0]
@@ -87,7 +88,8 @@ def get_site(location):
     campuses = {
         "F": "flandernstrasse",
         "G": "gppingen",
-        "S": "stadtmitte"
+        "S": "stadtmitte",
+        "W": "weststadt"
     }
     return "campus-" + campuses[location[0]]
 
@@ -399,7 +401,7 @@ def interfaces_json(config_files):
     return data
 
 # Collect all the data and saved it to a YAML file
-def collect_data():
+def main():
     # get data files
     files = os.listdir(data_folder)
     files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
@@ -411,9 +413,6 @@ def collect_data():
         yaml.dump(lags_json(files), f)
         yaml.dump(vlans_jason(files), f)
         yaml.dump(interfaces_json(files), f)
-
-def main():
-    collect_data()
 
 #---- Debugging ----#
 def debug_get_interfaces_config():
@@ -503,4 +502,4 @@ if __name__ == "__main__":
     #debug_get_vlans()
     #debug_collect_vlans()
     #debug_get_interfaces()
-    debug_get_uplink_vlan()
+    #debug_get_uplink_vlan()

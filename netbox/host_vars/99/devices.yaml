@@ -1,0 +1,22 @@
+---
+cisco-ios:
+  - rgcs0003
+  - rhcs0001
+  - rhcs0007
+  - rscs0003
+  - rscs0009
+
+J8697A:
+  - rhcs0005
+  - rhcs0006
+  - rscs0006
+  - rhgw1u119amp
+  - rhgw1302mp
+  - rsgw1u125mp
+
+JL075A-stack:
+  - rgcs0005
+
+J9850A:
+  - rhcs0010
+  - rscs0007

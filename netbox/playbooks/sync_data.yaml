@@ -2,13 +2,21 @@
 - name: Sync data from rhlx99
   hosts: rhlx99
   gather_facts: false
-  vars: 
   tasks:
-    - name: Sync aruba config files from rhlx99
+    - name: Sync aruba 6100 config files from rhlx99
       ansible.posix.synchronize:
         mode: pull
         src: /tftpboot/aruba_6100
         dest: "{{ inventory_dir }}/data/"
+
+    - name: Sync aruba J8697A config files from rhlx99
+      #ansible.posix.synchronize:
+       # mode: pull
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/aruba-J8697A/{{ item }}"
+        flat: yes
+      loop: "{{ J8697A }}"
 
     - name: Debug
       debug:
