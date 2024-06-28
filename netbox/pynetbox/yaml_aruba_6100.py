@@ -263,7 +263,6 @@ def get_vlans(config_file):
     return vlans
 
 def get_interfaces_recursively(config_text_list, interfaces = None, current_interface = None, found_interface_flag = False):
-
     # initialize interfaces properly if not provided
     if not interfaces:
         interfaces = []

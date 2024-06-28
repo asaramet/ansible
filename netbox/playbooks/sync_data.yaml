@@ -10,8 +10,6 @@
         dest: "{{ inventory_dir }}/data/"
 
     - name: Sync aruba J8697A config files from rhlx99
-      #ansible.posix.synchronize:
-       # mode: pull
       fetch:
         src: "/tftpboot/{{ item }}/running-config"
         dest: "{{ inventory_dir }}/data/aruba-J8697A/{{ item }}"
