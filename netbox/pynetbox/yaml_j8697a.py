@@ -127,7 +127,7 @@ def trunks_json(config_files):
     return data
 
 # return a tuple, ex: (interface, interface_name), recursively from a switch config
-def recursive_names_tuple(text, pattern = 'interface'):
+def recursive_names_tuple(text, pattern):
     # Base case
     if not text:
         return []
@@ -146,10 +146,10 @@ def recursive_names_tuple(text, pattern = 'interface'):
                 names_tuple.append((p_line, name))
                 
                 # Recur from the line after the name line
-                names_tuple += recursive_names_tuple(text[i + 2:])
+                names_tuple += recursive_names_tuple(text[i + 2:], pattern)
             else:
                 # Recur from the next line if no name found
-                names_tuple += recursive_names_tuple(text[i + 1:])
+                names_tuple += recursive_names_tuple(text[i + 1:], pattern)
             break
 
     return names_tuple
@@ -158,7 +158,7 @@ def get_interface_names(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    return recursive_names_tuple(text)
+    return recursive_names_tuple(text, 'interface')
 
 def interface_names_json(config_files):
     data = {'interface_names':[]}
@@ -169,6 +169,27 @@ def interface_names_json(config_files):
             interface, name = i_tuple
             data['interface_names'].append({'hostname': hostname, 'interface': interface, 'name': name})
     
+    return data
+
+def get_vlans(t_file):
+    with open(t_file, "r") as f:
+        text = f.readlines()
+
+    return recursive_names_tuple(text, 'vlan')
+
+def vlans_jason(config_files):
+    # collect unique vlans
+    vlans = set()
+
+    for t_file in config_files:
+        for vlan in get_vlans(t_file):
+            vlans.add(vlan)
+
+    # save them to a json dict
+    data = {'vlans':[]}
+    for vlan in vlans:
+        data['vlans'].append({'name': vlan[1], 'id': vlan[0]})
+
     return data
 
 # Collect all the data and saved it to a YAML file
@@ -182,6 +203,7 @@ def main():
         yaml.dump(modules_json(files), f)
         yaml.dump(trunks_json(files), f)
         yaml.dump(interface_names_json(files), f)
+        yaml.dump(vlans_jason(files), f)
 
 #---- Debugging ----#
 def text_files():
@@ -233,6 +255,10 @@ def debug_get_interface_names():
     for f in text_files():
         print(os.path.basename(f), '---> ', get_interface_names(f))
 
+def debug_get_vlans():
+    for f in text_files():
+        print(os.path.basename(f), '---> ', get_vlans(f))
+
 if __name__ == "__main__":
     main()
     #debug_get_hostname()
@@ -240,4 +266,5 @@ if __name__ == "__main__":
     #debug_get_device_role()
     #debug_get_modules()
     #debug_get_trunks()
-    debug_get_interface_names()
+    #debug_get_interface_names()
+    #debug_get_vlans()

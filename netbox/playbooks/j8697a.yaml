@@ -112,4 +112,16 @@
           description: "{{ item.name }}"
         state: present
       loop: "{{ interface_names }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
+
+    - name: Create VLANs
+      netbox.netbox.netbox_vlan:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          vid: "{{ item.id }}"
+        state: present
+      loop: "{{ vlans }}"
+      when: "{{ do_it }}"
