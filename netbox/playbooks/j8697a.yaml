@@ -71,3 +71,45 @@
         state: present
       loop: "{{ modules }}"
       when: "{{ do_it }}"
+
+    - name: Create Trunk interfaces as LAG
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.name }}"
+          type: Link Aggregation Group (LAG)
+        state: present
+        #state: absent
+      loop: "{{ trunks }}"
+      when: "{{ do_it }}"
+
+    - name: Assign interfaces to Trunks
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          lag:
+            name: "{{ item.trunk_name }}"
+        state: present
+        #state: absent
+      loop: "{{ trunk_interfaces }}"
+      when: "{{ do_it }}"
+
+    - name: Update interfaces description (here name)
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          description: "{{ item.name }}"
+        state: present
+      loop: "{{ interface_names }}"
+      #when: "{{ do_it }}"

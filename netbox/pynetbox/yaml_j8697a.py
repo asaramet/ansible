@@ -102,9 +102,74 @@ def get_trunks(t_file):
 
     trunks = []
     for line in recursive_search(text, "trunk"):
-        trunks.append(line)
+        line_data = line.split()
+        trunks.append({"name": line_data[2], 'interfaces': line_data[1]})
 
     return trunks
+
+# return trunks and interfaces json objects
+def trunks_json(config_files):
+    data = {'trunks':[], 'trunk_interfaces':[]}
+
+    for t_file in config_files:
+        hostname = get_hostname(t_file)
+        trk_lists = get_trunks(t_file)
+
+        for trunk in trk_lists:
+            trk_name = trunk['name']
+            data['trunks'].append({'hostname': hostname, 'name': trk_name})
+
+            #there is always max 2 interfaces in a trunk, but sometimes they are created with '-' instead of ','
+            interfaces = trunk['interfaces'].replace('-', ',').split(',') 
+            for interface in interfaces:
+                data['trunk_interfaces'].append({'hostname': hostname, 'interface': interface, 'trunk_name': trk_name})
+
+    return data
+
+# return a tuple, ex: (interface, interface_name), recursively from a switch config
+def recursive_names_tuple(text, pattern = 'interface'):
+    # Base case
+    if not text:
+        return []
+
+    names_tuple = []
+    for i, line in enumerate(text):
+
+        if line.startswith(pattern):
+            # Found a pattern line
+            p_line = line.strip().split()[1]
+            
+            # Check the next line for the name
+            if i + 1 < len(text) and text[i + 1].strip().startswith('name'):
+                name_line = text[i + 1].strip()
+                name = name_line.split(' ', 1)[1].strip('"')
+                names_tuple.append((p_line, name))
+                
+                # Recur from the line after the name line
+                names_tuple += recursive_names_tuple(text[i + 2:])
+            else:
+                # Recur from the next line if no name found
+                names_tuple += recursive_names_tuple(text[i + 1:])
+            break
+
+    return names_tuple
+
+def get_interface_names(t_file):
+    with open(t_file, "r") as f:
+        text = f.readlines()
+
+    return recursive_names_tuple(text)
+
+def interface_names_json(config_files):
+    data = {'interface_names':[]}
+
+    for t_file in config_files:
+        hostname = get_hostname(t_file)
+        for i_tuple in get_interface_names(t_file):
+            interface, name = i_tuple
+            data['interface_names'].append({'hostname': hostname, 'interface': interface, 'name': name})
+    
+    return data
 
 # Collect all the data and saved it to a YAML file
 def main():
@@ -115,6 +180,8 @@ def main():
     with open(main_folder + "/data/yaml/j8697a.yaml", 'w') as f:
         yaml.dump(devices_json(files), f)
         yaml.dump(modules_json(files), f)
+        yaml.dump(trunks_json(files), f)
+        yaml.dump(interface_names_json(files), f)
 
 #---- Debugging ----#
 def text_files():
@@ -162,10 +229,15 @@ def debug_get_trunks():
         table.append([os.path.basename(f), get_trunks(f)])
     print(tabulate(table, headers))
 
+def debug_get_interface_names():
+    for f in text_files():
+        print(os.path.basename(f), '---> ', get_interface_names(f))
+
 if __name__ == "__main__":
     main()
     #debug_get_hostname()
     #debug_get_site()
     #debug_get_device_role()
-    debug_get_modules()
-    debug_get_trunks()
+    #debug_get_modules()
+    #debug_get_trunks()
+    debug_get_interface_names()
