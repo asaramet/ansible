@@ -135,9 +135,11 @@
           device: "{{ item.hostname }}"
           name: "{{ item.interface }}"
           mode: Access
-          untagged_vlan: "{{ item.vlan }}"
+          untagged_vlan: 
+            vlan_id: "{{ item.vlan_id }}"
+            name: "{{ item.vlan_name }}"
       loop: "{{ untagged_vlans }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
 
     - name: Assign tagged vlans to interfaces
       netbox.netbox.netbox_device_interface:
