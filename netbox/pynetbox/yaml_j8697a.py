@@ -126,8 +126,8 @@ def trunks_json(config_files):
 
     return data
 
-# return a tuple, ex: (interface, interface_name), recursively from a switch config
-def recursive_names_tuple(text, pattern):
+# return a tuple (section, value), ex: (interface, interface_name), recursively from a switch config
+def recursive_section_search(text, section, value):
     # Base case
     if not text:
         return []
@@ -135,21 +135,21 @@ def recursive_names_tuple(text, pattern):
     names_tuple = []
     for i, line in enumerate(text):
 
-        if line.startswith(pattern):
-            # Found a pattern line
-            p_line = line.strip().split()[1]
-            
-            # Check the next line for the name
-            if i + 1 < len(text) and text[i + 1].strip().startswith('name'):
-                name_line = text[i + 1].strip()
-                name = name_line.split(' ', 1)[1].strip('"')
-                names_tuple.append((p_line, name))
-                
-                # Recur from the line after the name line
-                names_tuple += recursive_names_tuple(text[i + 2:], pattern)
-            else:
-                # Recur from the next line if no name found
-                names_tuple += recursive_names_tuple(text[i + 1:], pattern)
+        if line.startswith(section):
+            # Found a section line
+            section_value = line.split()[1]
+
+            # Collect lines until 'exit' is found
+            j = i + 1
+            while j < len(text) and not text[j].strip().startswith('exit'):
+                next_line = text[j].strip()
+                if next_line.startswith(value):
+                    found_value = next_line.split(' ', 1)[1].strip('"')
+                    names_tuple.append((section_value, found_value))
+                j += 1
+
+            # Recur from the line after the 'exit' line
+            names_tuple += recursive_section_search(text[j + 1:], section, value)
             break
 
     return names_tuple
@@ -158,7 +158,7 @@ def get_interface_names(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    return recursive_names_tuple(text, 'interface')
+    return recursive_section_search(text, 'interface', 'name')
 
 def interface_names_json(config_files):
     data = {'interface_names':[]}
@@ -175,7 +175,7 @@ def get_vlans(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    return recursive_names_tuple(text, 'vlan')
+    return recursive_section_search(text, 'vlan', 'name')
 
 def vlans_jason(config_files):
     # collect unique vlans
@@ -191,6 +191,12 @@ def vlans_jason(config_files):
         data['vlans'].append({'name': vlan[1], 'id': vlan[0]})
 
     return data
+
+def get_untagged_vlans(t_file):
+    with open(t_file, "r") as f:
+        text = f.readlines()
+
+    return recursive_section_search(text, 'vlan', 'untagged')
 
 # Collect all the data and saved it to a YAML file
 def main():
@@ -259,6 +265,10 @@ def debug_get_vlans():
     for f in text_files():
         print(os.path.basename(f), '---> ', get_vlans(f))
 
+def debug_get_untagged_vlans():
+    for f in text_files():
+        print(os.path.basename(f), '---> ', get_untagged_vlans(f))
+
 if __name__ == "__main__":
     main()
     #debug_get_hostname()
@@ -268,3 +278,4 @@ if __name__ == "__main__":
     #debug_get_trunks()
     #debug_get_interface_names()
     #debug_get_vlans()
+    debug_get_untagged_vlans()

@@ -254,12 +254,36 @@ def get_vlans(config_file):
 
         if vlan_match:
             current_vlan = vlan_match.group(1)
-            vlans[current_vlan] = {'name': None, 'description': None}
+            vlans[current_vlan] = {'name': 'default', 'description': 'default'}
         elif name_match and current_vlan:
             vlans[current_vlan]['name'] = name_match.group(1)
         elif description_match and current_vlan:
             vlans[current_vlan]['description'] = description_match.group(1)
 
+    return vlans
+
+def get_vlan_names(config_file):
+    with open(config_file, "r") as f:
+        lines = f.readlines()
+
+    # vlans dictionary in form of {'vlan_id': 'vlan_name'}
+    vlans = {}
+
+    current_vlan = None
+    for line in lines:
+        line = line.strip()
+        
+        if line.startswith("vlan "):
+            current_vlan = line.split()[1]
+        elif line.startswith("name ") and current_vlan is not None:
+            vlan_name = line.split(" ", 1)[1]
+            vlans[current_vlan] = vlan_name
+            current_vlan = None
+
+        if current_vlan == "1":
+            vlans["1"] = "default"
+            current_vlan = None
+    
     return vlans
 
 def get_interfaces_recursively(config_text_list, interfaces = None, current_interface = None, found_interface_flag = False):
@@ -388,6 +412,7 @@ def interfaces_json(config_files):
     for config_file in config_files:
         hostname = get_hostname(config_file)
         interfaces = get_interfaces(config_file)
+        vlan_names = get_vlan_names(config_file)
 
         for interface in interfaces:
             description = interface["description"]
@@ -396,7 +421,8 @@ def interfaces_json(config_files):
                 data["interfaces"].append({"hostname":hostname, "interface":interface["name"], "description":description})
 
             if vlan:
-                data["interfaces_vlan"].append({"hostname":hostname, "interface":interface["name"], "vlan_id":vlan, "vlan_mode":interface["vlan_mode"]})
+                data["interfaces_vlan"].append({"hostname":hostname, "interface":interface["name"], "vlan_id":vlan, 
+                    "vlan_name":vlan_names[vlan], "vlan_mode":interface["vlan_mode"]})
     return data
 
 # Collect all the data and saved it to a YAML file

@@ -125,3 +125,29 @@
         state: present
       loop: "{{ vlans }}"
       when: "{{ do_it }}"
+    
+    - name: Assign untagged vlans to interfaces
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          mode: Access
+          untagged_vlan: "{{ item.vlan }}"
+      loop: "{{ untagged_vlans }}"
+      #when: "{{ do_it }}"
+
+    - name: Assign tagged vlans to interfaces
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          mode: Tagged
+          tagged_vlans: "{{ item.vlans }}"
+      loop: "{{ tagged_vlans }}"
+      when: "{{ do_it }}"
