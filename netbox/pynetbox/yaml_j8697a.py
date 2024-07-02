@@ -192,11 +192,11 @@ def vlans_jason(config_files):
 
     return data
 
-def get_untagged_vlans(t_file):
+def get_untagged_vlans(t_file, pattern = 'untagged'):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    return recursive_section_search(text, 'vlan', 'untagged')
+    return recursive_section_search(text, 'vlan', pattern)
 
 def get_vlans_names(t_file):
     with open(t_file, "r") as f:
@@ -256,6 +256,38 @@ def get_untagged_vlans_json(config_files):
 
     return data
 
+def get_tagged_vlans_json(config_files):
+    data = {'tagged_vlans':[]}
+
+    for t_file in config_files:
+
+        hostname = get_hostname(t_file)
+
+        # get list of tagged vlan tuples like:
+        # [('5', 'A23-A24,B10,B20,F1,F4'), ('9', 'A23-A24,B10,B20,F1,F4'), ('50', 'A23-A24,B10,B20,F1,F4')]
+        vlan_sets = get_untagged_vlans(t_file, 'tagged')
+
+        for vlan_id, interfaces_range in vlan_sets:
+            vlan_name = get_vlans_names(t_file)[vlan_id]
+
+            # iterate through all the interfaces that belong to a vlan
+            for interface in convert_interfaces_range(interfaces_range):
+                
+                interface_exists = False # flag to notify that the interface exist in data['tagged_vlans'][hostname]
+                for v_dict in data['tagged_vlans']:
+                    if v_dict['hostname'] == hostname and v_dict['interface'] == interface:
+                        # update the interface list with vlan data
+                        v_dict['tagged_vlans'].append({'name': vlan_name, 'vlan_id': vlan_id})
+                        interface_exists = True # update flag
+                        break # exit the loop with updated flag
+
+                # create a new dictionary entry if the interface vlan list does not exists
+                if not interface_exists:
+                    data['tagged_vlans'].append({ 'hostname': hostname, 'interface': interface, 
+                        'tagged_vlans': [{'name': vlan_name, 'vlan_id': vlan_id}] })
+                    interface_exists = False
+    return data
+
 # Collect all the data and saved it to a YAML file
 def main():
     # get data files
@@ -269,6 +301,7 @@ def main():
         yaml.dump(interface_names_json(files), f)
         yaml.dump(vlans_jason(files), f)
         yaml.dump(get_untagged_vlans_json(files), f)
+        yaml.dump(get_tagged_vlans_json(files), f)
 
 #---- Debugging ----#
 def text_files():
@@ -325,8 +358,10 @@ def debug_get_vlans():
         print(os.path.basename(f), '---> ', get_vlans(f))
 
 def debug_get_untagged_vlans():
+    print("\n== Collect interfaces ranges for untagged vlans ==")
     for f in text_files():
         print(os.path.basename(f), '---> ', get_untagged_vlans(f))
+    print('\n')
 
 def debug_convert_interfaces_range():
     i_strings = [
@@ -349,9 +384,9 @@ if __name__ == "__main__":
     #debug_get_site()
     #debug_get_device_role()
     #debug_get_modules()
-    debug_get_trunks()
+    #debug_get_trunks()
     #debug_get_interface_names()
     #debug_get_vlans()
     #debug_get_vlans_names()
-    debug_get_untagged_vlans()
-    debug_convert_interfaces_range()
+    #debug_get_untagged_vlans()
+    #debug_convert_interfaces_range()

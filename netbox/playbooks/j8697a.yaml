@@ -150,6 +150,6 @@
           device: "{{ item.hostname }}"
           name: "{{ item.interface }}"
           mode: Tagged
-          tagged_vlans: "{{ item.vlans }}"
+          tagged_vlans: "{{ item.tagged_vlans }}"
       loop: "{{ tagged_vlans }}"
-      when: "{{ do_it }}"
+      #when: "{{ do_it }}"
