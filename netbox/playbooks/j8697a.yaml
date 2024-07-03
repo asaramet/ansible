@@ -152,4 +152,36 @@
           mode: Tagged
           tagged_vlans: "{{ item.tagged_vlans }}"
       loop: "{{ tagged_vlans }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
+
+    - name: Create VLAN interfaces for loopback IPs
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "vlan {{ item.vlan_id }}"
+          type: Virtual
+          description: "{{ item.vlan_name }}"
+        state: present
+      loop: "{{ ip_addresses }}"
+      when: "{{ do_it }}"
+
+    - name: Assign IP to VLAN interfaces
+      netbox.netbox.netbox_ip_address:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          address: "{{ item.ip }}"
+          dns_name: "{{ item.hostname }}"
+          description: "VLAN {{ item.vlan_id }} ({{ item.vlan_name }})"
+          assigned_object:
+            device: "{{item.hostname }}"
+            name: "vlan {{ item.vlan_id }}"
+          role: Loopback
+          tenant: netzadmin
+        state: present
+      loop: "{{ ip_addresses }}"
+      when: "{{ do_it }}"

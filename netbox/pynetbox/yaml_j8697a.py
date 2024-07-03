@@ -240,7 +240,7 @@ def convert_interfaces_range(interfaces_string):
 
     return i_list
 
-def get_untagged_vlans_json(config_files):
+def untagged_vlans_json(config_files):
     data = {'untagged_vlans':[]}
 
     for t_file in config_files:
@@ -256,11 +256,10 @@ def get_untagged_vlans_json(config_files):
 
     return data
 
-def get_tagged_vlans_json(config_files):
+def tagged_vlans_json(config_files):
     data = {'tagged_vlans':[]}
 
     for t_file in config_files:
-
         hostname = get_hostname(t_file)
 
         # get list of tagged vlan tuples like:
@@ -288,6 +287,33 @@ def get_tagged_vlans_json(config_files):
                     interface_exists = False
     return data
 
+def get_ip_address(t_file):
+    with open(t_file, "r") as f:
+        text = f.readlines()
+
+    vlan_id, ip_string = recursive_section_search(text, 'vlan', 'ip')[0]
+    vlan_name = get_vlans_names(t_file)[vlan_id]
+
+    _, ip, netmask = ip_string.split(' ')
+
+    # count 1-bits in the binary representation of the netmask
+    ip_bits = sum(bin(int(x)).count('1') for x in netmask.split('.'))
+
+    return vlan_id, vlan_name, ip + '/' + str(ip_bits)
+
+def ip_addresses_json(config_files):
+    data = {'ip_addresses':[]}
+
+    for t_file in config_files:
+        hostname = get_hostname(t_file)
+        vlan_id, vlan_name, ip = get_ip_address(t_file)
+
+        data['ip_addresses'].append({'hostname': hostname, 'ip': ip, 'vlan_id': vlan_id, 'vlan_name': vlan_name})
+    
+    print(data)
+    return data
+
+
 # Collect all the data and saved it to a YAML file
 def main():
     # get data files
@@ -300,8 +326,9 @@ def main():
         yaml.dump(trunks_json(files), f)
         yaml.dump(interface_names_json(files), f)
         yaml.dump(vlans_jason(files), f)
-        yaml.dump(get_untagged_vlans_json(files), f)
-        yaml.dump(get_tagged_vlans_json(files), f)
+        yaml.dump(untagged_vlans_json(files), f)
+        yaml.dump(tagged_vlans_json(files), f)
+        yaml.dump(ip_addresses_json(files), f)
 
 #---- Debugging ----#
 def text_files():
@@ -378,6 +405,13 @@ def debug_get_vlans_names():
     for f in text_files():
         print(os.path.basename(f), '---> ', get_vlans_names(f))
 
+def debug_get_ip_address():
+    table = []
+    headers = ["File Name", "IP"]
+    for f in text_files():
+        table.append([os.path.basename(f), get_ip_address(f)])
+    print(tabulate(table, headers))
+
 if __name__ == "__main__":
     main()
     #debug_get_hostname()
@@ -390,3 +424,4 @@ if __name__ == "__main__":
     #debug_get_vlans_names()
     #debug_get_untagged_vlans()
     #debug_convert_interfaces_range()
+    debug_get_ip_address()
