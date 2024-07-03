@@ -5,6 +5,9 @@ cisco-ios:
   - rhcs0007
   - rscs0003
   - rscs0009
+  - rggw1230as
+  - rggw2107s
+  - rggw4103s
 
 J8697A:
   - rhcs0005
@@ -14,9 +17,48 @@ J8697A:
   - rhgw1302mp
   - rsgw1u125mp
 
-JL075A-stack:
-  - rgcs0005
+J9562A:
+  - rhgw1015p
+  - rhgw1016p
+
+J9729A:
+  - rggw3102p
+
+J9774A:
+  - rhgw1071ap
 
 J9850A:
   - rhcs0010
   - rscs0007
+
+JL075A-stack:
+  - rgcs0005
+
+JL258A:
+  - rggw2107p
+  - rggw4121p
+
+JL322A:
+  - rggw1027p
+
+JL322A-stack:
+  - rggw1018sp
+  - rggw1105sp
+  - rggw2001asp
+  - rggw4117sp
+  - rggw4121sp
+  - rggw4u116sp
+  - rggw5007sp
+
+JL357A:
+  - rggw1010p
+  - rggw1u102p
+
+JL693A:
+  - rggw4016p
+  - rggw4322p
+
+JL693A-stack:
+  - rggw4122sp
+  - rggw4124sp
+  - rggw4319sp
