@@ -9,12 +9,12 @@
         src: /tftpboot/aruba_6100
         dest: "{{ inventory_dir }}/data/"
 
-    - name: Sync aruba J8697A config files from rhlx99
+    - name: Sync aruba HP Modular Switches config files from rhlx99
       fetch:
         src: "/tftpboot/{{ item }}/running-config"
-        dest: "{{ inventory_dir }}/data/aruba-J8697A/{{ item }}"
+        dest: "{{ inventory_dir }}/data/hp-modular/{{ item }}"
         flat: yes
-      loop: "{{ J8697A }}"
+      loop: "{{ J8697A + J8698A + J8770A + J8773A }}"
 
     - name: Debug
       debug:
