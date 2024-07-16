@@ -83,15 +83,15 @@ def get_modules(t_file):
 
     names = {
         '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E', '6': 'F',
-        '7': 'G', '8': 'H', '9': 'I', '10': 'J', '11': 'K', '12': 'L',
-        'A': 'A', 'B': 'B', 'C': 'C', 'D': 'D', 'E': 'E', 'F': 'F', 'G': 'G',
-        'H': 'H', 'I': 'I', 'J': 'J', 'K': 'K', 'L': 'L'
+        '7': 'G', '8': 'H', '9': 'I', '10': 'J', '11': 'K', '12': 'L'
     }
     modules = []
     for line in recursive_search(text, "module"):
         m_list = line.split()
-        modules.append({'module': names[m_list[1]], 'type': m_list[3]})
-        #modules.append({'module': m_list[1], 'type': m_list[3]})
+        name = m_list[1]
+        if name in names.keys():
+            name = names[name]
+        modules.append({'module': name, 'type': m_list[3]})
     return modules
 
 # return the modules json object
@@ -111,8 +111,8 @@ def modules_json(config_files):
         "j9537a": "Aruba J9537A",
         "j9538a": "Aruba J9538A",
         "j9986a": "Aruba J9986A",
-        "j9990a": "",
-        "j9992a": "",
+        "j9990a": "Aruba J9990A",
+        "j9992a": "Aruba J9992A",
         "j9993a": "Aruba J9993A"
         }
     for t_file in config_files:
@@ -318,7 +318,7 @@ def get_ip_address(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    vlan_id, ip_string = recursive_section_search(text, 'vlan', 'ip')[0]
+    vlan_id, ip_string = recursive_section_search(text, 'vlan', 'ip address')[0]
     vlan_name = get_vlans_names(t_file)[vlan_id]
 
     _, ip, netmask = ip_string.split(' ')
@@ -347,7 +347,7 @@ def main():
     files = os.listdir(data_folder)
     files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
 
-    with open(main_folder + "/data/yaml/hp_modular-temp.yaml", 'w') as f:
+    with open(main_folder + "/data/yaml/hp_modular.yaml", 'w') as f:
         yaml.dump(devices_json(files), f)
         yaml.dump(modules_json(files), f)
         yaml.dump(trunks_json(files), f)
