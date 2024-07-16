@@ -8,7 +8,8 @@ from std_functions import serial_numbers, device_type
 
 this_folder = os.path.dirname(os.path.realpath(__file__))
 main_folder = os.path.dirname(this_folder)
-data_folder = main_folder + "/data/aruba-J8697A/"
+#data_folder = main_folder + "/data/aruba-J8697A/"
+data_folder = main_folder + "/data/hp-modular/"
 
 def search_line(expression, t_file):
     with open(t_file, "r") as f:
@@ -48,6 +49,8 @@ def devices_json(config_files):
         'J8698A': 'hpe-procurve-5412zl',
         'J8770A': 'hpe-procurve-4204vl',
         'J8773A': 'hpe-procurve-4208vl',
+        'J9850A': 'hpe-5406r-zl2',
+        'J9851A': 'hpe-5412r-zl2'
     }
 
     data = {'devices':[]}
@@ -78,7 +81,12 @@ def get_modules(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    names = {'1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E', '6': 'F'}
+    names = {
+        '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E', '6': 'F',
+        '7': 'G', '8': 'H', '9': 'I', '10': 'J', '11': 'K', '12': 'L',
+        'A': 'A', 'B': 'B', 'C': 'C', 'D': 'D', 'E': 'E', 'F': 'F', 'G': 'G',
+        'H': 'H', 'I': 'I', 'J': 'J', 'K': 'K', 'L': 'L'
+    }
     modules = []
     for line in recursive_search(text, "module"):
         m_list = line.split()
@@ -94,16 +102,25 @@ def modules_json(config_files):
         "j8705a": "HP J8705A ProCurve PoE 20 Port Gig-T SFP Plus 4 Port Mini GBIC ZL Module",
         "j8706a": "ProCurve Switch 5400zl 24p Mini-GBIC Module",
         "j8707a": "HP 4-Port 10GbE X2 ZL Module",
+        "j8765a": "ProCurve Switch VL 24-Port 10/100-TX Module",
+        "j8766a": "HP ProCurve J8766A VL 1-Port 10GbE X2 ZL Module",
+        "j8768a": "ProCurve Switch 24-port Gig-T vl Module",
+        "j9033a": "HP ProCurve Switch vl 20-Port Gig-T+ 4 SFP Module",
         "j9534a": "Aruba J9534A",
+        "j9550a": "HP 24-Port GiG-T v2 ZL Module",
         "j9537a": "Aruba J9537A",
-        "j9538a": "Aruba J9538A"
+        "j9538a": "Aruba J9538A",
+        "j9986a": "Aruba J9986A",
+        "j9990a": "",
+        "j9992a": "",
+        "j9993a": "Aruba J9993A"
         }
     for t_file in config_files:
         modules = get_modules(t_file)
         device = get_hostname(t_file)
 
         for module in modules:
-            data['modules'].append({'device': device, 'module_bay': module['module'], 'type': types[module['type']]})
+            data['modules'].append({'device': device, 'module_bay': module['module'], 'type': types[module['type'].lower()]})
     return data
 
 def get_trunks(t_file):
@@ -330,7 +347,7 @@ def main():
     files = os.listdir(data_folder)
     files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
 
-    with open(main_folder + "/data/yaml/j8697a.yaml", 'w') as f:
+    with open(main_folder + "/data/yaml/hp_modular-temp.yaml", 'w') as f:
         yaml.dump(devices_json(files), f)
         yaml.dump(modules_json(files), f)
         yaml.dump(trunks_json(files), f)

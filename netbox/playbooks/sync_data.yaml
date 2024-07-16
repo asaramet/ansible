@@ -8,6 +8,7 @@
         mode: pull
         src: /tftpboot/aruba_6100
         dest: "{{ inventory_dir }}/data/"
+      when: no
 
     - name: Sync aruba HP Modular Switches config files from rhlx99
       fetch:
@@ -15,6 +16,14 @@
         dest: "{{ inventory_dir }}/data/hp-modular/{{ item }}"
         flat: yes
       loop: "{{ J8697A + J8698A + J8770A + J8773A }}"
+      when: no
+
+    - name: Sync aruba HP Modular Switches config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/aruba-modular/{{ item }}"
+        flat: yes
+      loop: "{{ J9850A + J9851A }}"
 
     - name: Debug
       debug:
