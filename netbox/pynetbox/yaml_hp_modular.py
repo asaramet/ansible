@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
-# Collect Aruba J8697A data and create a j8697a.yaml configs file 
+# Collect ProCurve and HP Modular Switches data and create a hp_modular.yaml configs file 
 
 import re, os, yaml
 from tabulate import tabulate
-from std_functions import search_line, get_hostname
+from std_functions import this_folder, main_folder
+from std_functions import search_line, recursive_search
+from std_functions import get_hostname
 from std_functions import serial_numbers, device_type
+from std_functions import config_files, debug_get_hostname
 
-this_folder = os.path.dirname(os.path.realpath(__file__))
-main_folder = os.path.dirname(this_folder)
-#data_folder = main_folder + "/data/aruba-J8697A/"
 data_folder = main_folder + "/data/hp-modular/"
 
 def get_site(t_file):
@@ -48,22 +48,6 @@ def devices_json(config_files):
         data['devices'].append({'name': hostname, 'device_role': get_device_role(t_file), 'device_type': d_type,
             'site': get_site(t_file), 'tags': set_tags(), 'serial':serial_numbers()[hostname]})
     return data
-
-# search lines in a text recursively
-def recursive_search(text, pattern):
-    # base case
-    if not text:
-        return []
-
-    found_lines = []
-    for i, line in enumerate(text):
-        if line.startswith(pattern):
-            found_lines.append(line.strip())
-
-            found_lines += recursive_search(text[i+1:], pattern)
-            break 
-
-    return found_lines
 
 def get_modules(t_file):
     with open(t_file, "r") as f:
@@ -331,8 +315,7 @@ def ip_addresses_json(config_files):
 # Collect all the data and saved it to a YAML file
 def main():
     # get data files
-    files = os.listdir(data_folder)
-    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
+    files = config_files(data_folder)
 
     with open(main_folder + "/data/yaml/hp_modular.yaml", 'w') as f:
         yaml.dump(devices_json(files), f)
@@ -345,29 +328,17 @@ def main():
         yaml.dump(ip_addresses_json(files), f)
 
 #---- Debugging ----#
-def text_files():
-    files = os.listdir(data_folder)
-    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
-    return files
-
-def debug_get_hostname():
-    table = []
-    headers = ["File name", "Hostname"]
-    for f in text_files():
-        table.append([ os.path.basename(f), get_hostname(f) ])
-    print(tabulate(table, headers, "github"))
-
 def debug_get_site():
     table = []
     headers = ["File Name", "Location"]
-    for f in text_files():
+    for f in config_files(data_folder):
         table.append([ os.path.basename(f), get_site(f) ])
     print(tabulate(table, headers, "github"))
 
 def debug_get_device_role():
     table = []
     headers = ["File name", "Device role"]
-    for f in text_files():
+    for f in config_files(data_folder):
         table.append([os.path.basename(f), get_device_role(f)])
     print(tabulate(table, headers, "github"))
 
@@ -375,7 +346,7 @@ def debug_get_modules():
     table = []
     types = set()
     headers = ["File Name", "Modules"]
-    for f in text_files():
+    for f in config_files(data_folder):
         modules = get_modules(f)
         table.append([os.path.basename(f), modules])
         for module in modules:
@@ -386,21 +357,21 @@ def debug_get_modules():
 def debug_get_trunks():
     table = []
     headers = ["File Name", "Trunks"]
-    for f in text_files():
+    for f in config_files(data_folder):
         table.append([os.path.basename(f), get_trunks(f)])
     print(tabulate(table, headers))
 
 def debug_get_interface_names():
-    for f in text_files():
+    for f in config_files(data_folder):
         print(os.path.basename(f), '---> ', get_interface_names(f))
 
 def debug_get_vlans():
-    for f in text_files():
+    for f in config_files(data_folder):
         print(os.path.basename(f), '---> ', get_vlans(f))
 
 def debug_get_untagged_vlans():
     print("\n== Collect interfaces ranges for untagged vlans ==")
-    for f in text_files():
+    for f in config_files(data_folder):
         print(os.path.basename(f), '---> ', get_untagged_vlans(f))
     print('\n')
 
@@ -416,19 +387,19 @@ def debug_convert_interfaces_range():
         print(i_str, " ----> ", convert_interfaces_range(i_str))
 
 def debug_get_vlans_names():
-    for f in text_files():
+    for f in config_files(data_folder):
         print(os.path.basename(f), '---> ', get_vlans_names(f))
 
 def debug_get_ip_address():
     table = []
     headers = ["File Name", "IP"]
-    for f in text_files():
+    for f in config_files(data_folder):
         table.append([os.path.basename(f), get_ip_address(f)])
     print(tabulate(table, headers))
 
 if __name__ == "__main__":
     main()
-    #debug_get_hostname()
+    debug_get_hostname(data_folder)
     #debug_get_site()
     #debug_get_device_role()
     #debug_get_modules()

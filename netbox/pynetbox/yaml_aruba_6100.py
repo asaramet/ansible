@@ -3,10 +3,10 @@
 # Collect Aruba 6100 data and create a aruba_6100.yaml configs file 
 
 import re, os, yaml
-from std_functions import search_line
+from std_functions import this_folder, main_folder
+from std_functions import config_files, search_line
+from std_functions import get_hostname
 
-this_folder = os.path.dirname(os.path.realpath(__file__))
-main_folder = os.path.dirname(this_folder)
 data_folder = main_folder + "/data/aruba_6100/"
 
 def get_location(file):
@@ -84,10 +84,6 @@ def get_site(location):
         "W": "weststadt"
     }
     return "campus-" + campuses[location[0]]
-
-def get_hostname(file):
-    hostname_line = search_line("hostname", file)
-    return hostname_line.split()[1] if not hostname_line.isspace() else " "
 
 # get the interfaces configuration from an Aruba 6100 config file
 def get_interfaces_config(config_file):
@@ -420,8 +416,7 @@ def interfaces_json(config_files):
 # Collect all the data and saved it to a YAML file
 def main():
     # get data files
-    files = os.listdir(data_folder)
-    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
+    files = config_files(data_folder)
 
     with open(main_folder + "/data/yaml/aruba_6100.yaml", 'w') as f:
         yaml.dump(locations_json(files), f)

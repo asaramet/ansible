@@ -2,19 +2,31 @@
 - name: Sync data from rhlx99
   hosts: rhlx99
   gather_facts: false
+  vars:
+    do_it: no
   tasks:
-    - name: Sync aruba 6100 config files from rhlx99
+    - name: Sync Aruba 6100 config files from rhlx99
       ansible.posix.synchronize:
         mode: pull
         src: /tftpboot/aruba_6100
         dest: "{{ inventory_dir }}/data/"
+      when: "{{ do_it }}"
 
-    - name: Sync aruba HP Modular Switches config files from rhlx99
+    - name: Sync Aruba Modular Switches config files from rhlx99
       fetch:
         src: "/tftpboot/{{ item }}/running-config"
         dest: "{{ inventory_dir }}/data/hp-modular/{{ item }}"
         flat: yes
       loop: "{{ J8697A + J8698A + J8770A + J8773A + J9850A + J9851A }}"
+      when: "{{ do_it }}"
+
+    - name: Sync Aruba single Switches config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/hp-single/{{ item }}"
+        flat: yes
+      loop: "{{ J9085A }}"
+      #when: "{{ do_it }}"
 
     - name: Debug
       debug:

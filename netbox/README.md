@@ -54,9 +54,11 @@ sudo pacman -Syu python-pynetbox python-packaging
 - `sync_data.yaml` - gather and distribute data. Config files mostly.
 - `aruba_6100.yaml` - add aruba 6100 switches from config files to a NetBox platform.
 - `hp_modular.yaml` - add ProCurve and old HP Modular switches to a NetBox platform.
+- `hp_single.yaml` - add ProCurve and Aruba single switches to a NetBox platform.
 
 ### Python scripts
 
 - `std_functions.py` - standard functions used in multiple python scripts.
 - `yaml_aruba_6100.py` - Collect Aruba 6100 data from config files and generate a yaml data file.
 - `yaml_hp_modular.py` - Collect ProCurve and HP modular switches data from config files and generate a yaml data file.
+- `yaml_hp_single.py` - Collect ProCurve and Aruba single switches data from config files and generate a yaml data file.

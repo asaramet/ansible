@@ -1,9 +1,18 @@
 #!/usr/bin/env  python3
 
+# Standard reusable functions
+
 import re, os, yaml
+from tabulate import tabulate
 
 this_folder = os.path.dirname(os.path.realpath(__file__))
 main_folder = os.path.dirname(this_folder)
+
+# Return a list of file paths from a folder
+def config_files(data_folder):
+    files = os.listdir(data_folder)
+    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
+    return files
 
 def search_line(expression, t_file):
     with open(t_file, "r") as f:
@@ -14,6 +23,22 @@ def search_line(expression, t_file):
 
     return " " # return empty space if line not found
     
+# search lines in a text recursively
+def recursive_search(text, pattern):
+    # base case
+    if not text:
+        return []
+
+    found_lines = []
+    for i, line in enumerate(text):
+        if line.startswith(pattern):
+            found_lines.append(line.strip())
+
+            found_lines += recursive_search(text[i+1:], pattern)
+            break 
+
+    return found_lines
+
 def get_hostname(t_file):
     hostname_line = search_line("hostname", t_file)
     return hostname_line.split()[1].replace('"','') if not hostname_line.isspace() else " "
@@ -47,8 +72,18 @@ def device_type(hostname):
 
     return None
 
+#----- Debugging -------
+def debug_get_hostname(data_folder):
+    table = []
+    headers = ["File name", "Hostname"]
+    for f in config_files(data_folder):
+        table.append([ os.path.basename(f), get_hostname(f) ])
+    print(tabulate(table, headers, "github"))
+
+
 if __name__ == "__main__":
-    #print(serial_numbers())
-    #print(devices())
-    print(device_type('rgcs0003'))
-    print(device_type('rhsw1004p'))
+    data_folder = main_folder + "/data/hp-single/"
+
+    debug_get_hostname(data_folder)
+
+    print(config_files(data_folder))
