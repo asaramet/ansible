@@ -3,20 +3,12 @@
 # Collect Aruba 6100 data and create a aruba_6100.yaml configs file 
 
 import re, os, yaml
+from std_functions import search_line
 
 this_folder = os.path.dirname(os.path.realpath(__file__))
 main_folder = os.path.dirname(this_folder)
 data_folder = main_folder + "/data/aruba_6100/"
 
-def search_line(expression, file):
-    with open(file, "r") as file:
-        lines = file.readlines()
-    
-    for i, line in enumerate(lines):
-        if re.search(expression, line): return line
-
-    return " " # return empty space if line not found
-    
 def get_location(file):
     location_line = search_line("snmp-server system-location", file)
 
@@ -521,7 +513,7 @@ def debug_get_uplink_vlan():
 if __name__ == "__main__":
     main()
     #debug_get_interfaces_config()
-    #debug_ip_addresses_json()
+    debug_ip_addresses_json()
     #debug_get_lag_interfaces()
     #debug_lags_json()
     #debug_get_vlans()

@@ -4,25 +4,13 @@
 
 import re, os, yaml
 from tabulate import tabulate
+from std_functions import search_line, get_hostname
 from std_functions import serial_numbers, device_type
 
 this_folder = os.path.dirname(os.path.realpath(__file__))
 main_folder = os.path.dirname(this_folder)
 #data_folder = main_folder + "/data/aruba-J8697A/"
 data_folder = main_folder + "/data/hp-modular/"
-
-def search_line(expression, t_file):
-    with open(t_file, "r") as f:
-        lines = f.readlines()
-    
-    for i, line in enumerate(lines):
-        if re.search(expression, line): return line
-
-    return " " # return empty space if line not found
-    
-def get_hostname(t_file):
-    hostname_line = search_line("hostname", t_file)
-    return hostname_line.split()[1].replace('"','') if not hostname_line.isspace() else " "
 
 def get_site(t_file):
     campuses = {
@@ -337,7 +325,6 @@ def ip_addresses_json(config_files):
 
         data['ip_addresses'].append({'hostname': hostname, 'ip': ip, 'vlan_id': vlan_id, 'vlan_name': vlan_name})
     
-    print(data)
     return data
 
 

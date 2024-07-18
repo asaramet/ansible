@@ -1,9 +1,22 @@
 #!/usr/bin/env  python3
 
-import os, yaml
+import re, os, yaml
 
 this_folder = os.path.dirname(os.path.realpath(__file__))
 main_folder = os.path.dirname(this_folder)
+
+def search_line(expression, t_file):
+    with open(t_file, "r") as f:
+        lines = f.readlines()
+    
+    for i, line in enumerate(lines):
+        if re.search(expression, line): return line
+
+    return " " # return empty space if line not found
+    
+def get_hostname(t_file):
+    hostname_line = search_line("hostname", t_file)
+    return hostname_line.split()[1].replace('"','') if not hostname_line.isspace() else " "
 
 # Return a list of devices serial numbers from the yaml file
 def serial_numbers():
