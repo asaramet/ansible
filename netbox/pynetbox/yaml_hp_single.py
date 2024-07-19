@@ -3,10 +3,9 @@
 # Collect ProCurve and Aruba single switches data and create a hp_single.yaml configs file 
 
 import re, os, yaml
-from std_functions import this_folder, main_folder
-from std_functions import serial_numbers, config_files
-from std_functions import get_hostname, get_site, get_device_role
-from std_functions import devices_json
+from std_functions import this_folder, main_folder, config_files
+from std_functions import devices_json, trunks_json, interface_names_json
+from std_functions import vlans_jason
 
 data_folder = main_folder + "/data/hp-single/"
 
@@ -25,6 +24,9 @@ def main():
 
     with open(main_folder + "/data/yaml/hp_single.yaml", 'w') as f:
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
+        yaml.dump(trunks_json(files), f)
+        yaml.dump(interface_names_json(files), f)
+        yaml.dump(vlans_jason(files), f)
 
 if __name__ == "__main__":
     main()

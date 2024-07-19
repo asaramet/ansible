@@ -3,19 +3,25 @@
   hosts: localhost
   gather_facts: false
   vars: 
-    #netbox_server: 192.168.122.140
-    #netbox_token: "{{ vault_local_token }}"
-    netbox_server: netbox-bb.hs-esslingen.de
-    netbox_token: "{{ vault_hs_netbox_token }}"
     netbox_url: "https://{{ netbox_server }}"
-    #do_it: yes
-    do_it: no
   tasks:
-    - name: Include locations vars
+    - name: Include data file
+      tags: data
       include_vars:
         file: ../data/yaml/hp_modular.yaml
 
+    - name: Include development server variables
+      tags: development
+      include_vars:
+        file: ../data/src/development_server.yaml
+
+    - name: Include production server variables
+      tags: production
+      include_vars:
+        file: ../data/src/production_server.yaml
+
     - name: Add switches
+      tags: switches
       netbox.netbox.netbox_device:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -31,9 +37,11 @@
         state: present
         #state: absent
       loop: "{{ devices }}"
-      #when: "{{ do_it }}"
 
     - name: Delete module bays
+      tags:
+        - delete_bays
+        - modules
       netbox.netbox.netbox_module_bay:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -44,9 +52,11 @@
           position: "{{ item.module_bay }}"
         state: absent
       loop: "{{ modules }}"
-      when: "{{ do_it }}"
 
     - name: Create module bays
+      tags:
+        - create_bays
+        - modules
       netbox.netbox.netbox_module_bay:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -57,9 +67,11 @@
           position: "{{ item.module_bay }}"
         state: present
       loop: "{{ modules }}"
-      when: "{{ do_it }}"
 
     - name: Add modules
+      tags:
+        - add_modules
+        - modules
       netbox.netbox.netbox_module:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -71,9 +83,11 @@
           status: active
         state: present
       loop: "{{ modules }}"
-      when: "{{ do_it }}"
 
     - name: Create Trunk interfaces as LAG
+      tags:
+        - lags
+        - trunks
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -85,9 +99,11 @@
         state: present
         #state: absent
       loop: "{{ trunks }}"
-      when: "{{ do_it }}"
 
     - name: Assign interfaces to Trunks
+      tags:
+        - trunk_interfaces
+        - trunks
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -100,9 +116,10 @@
         state: present
         #state: absent
       loop: "{{ trunk_interfaces }}"
-      when: "{{ do_it }}"
 
     - name: Update interfaces description (here name)
+      tags:
+        - interfaces
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -113,9 +130,11 @@
           description: "{{ item.name }}"
         state: present
       loop: "{{ interface_names }}"
-      when: "{{ do_it }}"
 
     - name: Create VLANs
+      tags:
+        - create_vlans
+        - vlans
       netbox.netbox.netbox_vlan:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -125,9 +144,11 @@
           vid: "{{ item.id }}"
         state: present
       loop: "{{ vlans }}"
-      when: "{{ do_it }}"
     
     - name: Assign untagged vlans to interfaces
+      tags:
+        - untagged_vlans
+        - vlans
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -140,9 +161,11 @@
             vlan_id: "{{ item.vlan_id }}"
             name: "{{ item.vlan_name }}"
       loop: "{{ untagged_vlans }}"
-      when: "{{ do_it }}"
 
     - name: Assign tagged vlans to interfaces
+      tags: 
+        - tagged_vlans
+        - vlans
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -153,9 +176,12 @@
           mode: Tagged
           tagged_vlans: "{{ item.tagged_vlans }}"
       loop: "{{ tagged_vlans }}"
-      when: "{{ do_it }}"
 
     - name: Create VLAN interfaces for loopback IPs
+      tags:
+        - loopback
+        - vlans
+        - ip
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -167,9 +193,12 @@
           description: "{{ item.vlan_name }}"
         state: present
       loop: "{{ ip_addresses }}"
-      when: "{{ do_it }}"
 
     - name: Assign IP to VLAN interfaces
+      tags:
+        - assign_ip
+        - vlans
+        - ip
       netbox.netbox.netbox_ip_address:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -185,4 +214,3 @@
           tenant: netzadmin
         state: present
       loop: "{{ ip_addresses }}"
-      when: "{{ do_it }}"
