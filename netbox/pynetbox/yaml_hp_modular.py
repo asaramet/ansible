@@ -6,29 +6,14 @@ import re, os, yaml
 from tabulate import tabulate
 from std_functions import this_folder, main_folder
 from std_functions import search_line, recursive_search
-from std_functions import get_hostname
+from std_functions import get_hostname, get_site, get_device_role
 from std_functions import serial_numbers, device_type
 from std_functions import config_files, debug_get_hostname
 
 data_folder = main_folder + "/data/hp-modular/"
 
-def get_site(t_file):
-    campuses = {
-        "h": "flandernstrasse",
-        "g": "gppingen",
-        "s": "stadtmitte",
-        "w": "weststadt"
-    }
-    return "campus-" + campuses[get_hostname(t_file)[1]]
-
-def get_device_role(t_file):
-    role_code = get_hostname(t_file)[2:4]
-    if role_code == "cs":
-        return "distribution-layer-switch"
-    return "access-layer-switch"
-
 def set_tags():
-    return "switch"
+    return ["switch", "modular-switch"]
 
 # return the devices json object
 def devices_json(config_files):
@@ -328,20 +313,6 @@ def main():
         yaml.dump(ip_addresses_json(files), f)
 
 #---- Debugging ----#
-def debug_get_site():
-    table = []
-    headers = ["File Name", "Location"]
-    for f in config_files(data_folder):
-        table.append([ os.path.basename(f), get_site(f) ])
-    print(tabulate(table, headers, "github"))
-
-def debug_get_device_role():
-    table = []
-    headers = ["File name", "Device role"]
-    for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_device_role(f)])
-    print(tabulate(table, headers, "github"))
-
 def debug_get_modules():
     table = []
     types = set()
@@ -399,7 +370,6 @@ def debug_get_ip_address():
 
 if __name__ == "__main__":
     main()
-    debug_get_hostname(data_folder)
     #debug_get_site()
     #debug_get_device_role()
     #debug_get_modules()

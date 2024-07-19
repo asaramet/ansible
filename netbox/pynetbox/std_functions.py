@@ -8,12 +8,7 @@ from tabulate import tabulate
 this_folder = os.path.dirname(os.path.realpath(__file__))
 main_folder = os.path.dirname(this_folder)
 
-# Return a list of file paths from a folder
-def config_files(data_folder):
-    files = os.listdir(data_folder)
-    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
-    return files
-
+# --- Base functions ---
 def search_line(expression, t_file):
     with open(t_file, "r") as f:
         lines = f.readlines()
@@ -39,10 +34,33 @@ def recursive_search(text, pattern):
 
     return found_lines
 
+# Return a list of file paths from a folder
+def config_files(data_folder):
+    files = os.listdir(data_folder)
+    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
+    return files
+
+# --- Get functions ---
 def get_hostname(t_file):
     hostname_line = search_line("hostname", t_file)
     return hostname_line.split()[1].replace('"','') if not hostname_line.isspace() else " "
 
+def get_site(t_file):
+    campuses = {
+        "h": "flandernstrasse",
+        "g": "gppingen",
+        "s": "stadtmitte",
+        "w": "weststadt"
+    }
+    return "campus-" + campuses[get_hostname(t_file)[1]]
+
+def get_device_role(t_file):
+    role_code = get_hostname(t_file)[2:4]
+    if role_code == "cs":
+        return "distribution-layer-switch"
+    return "access-layer-switch"
+
+# --- Additional function ---
 # Return a list of devices serial numbers from the yaml file
 def serial_numbers():
     yaml_file = main_folder + "/data/src/serial_numbers.yaml"
@@ -73,6 +91,13 @@ def device_type(hostname):
     return None
 
 #----- Debugging -------
+def debug_config_files(data_folder):
+    table = []
+    headers = ["File name", "Path"]
+    for f in config_files(data_folder):
+        table.append([ os.path.basename(f), f ])
+    print(tabulate(table, headers, "github"))
+
 def debug_get_hostname(data_folder):
     table = []
     headers = ["File name", "Hostname"]
@@ -80,10 +105,24 @@ def debug_get_hostname(data_folder):
         table.append([ os.path.basename(f), get_hostname(f) ])
     print(tabulate(table, headers, "github"))
 
+def debug_get_site(data_folder):
+    table = []
+    headers = ["File Name", "Location"]
+    for f in config_files(data_folder):
+        table.append([ os.path.basename(f), get_site(f) ])
+    print(tabulate(table, headers, "github"))
+
+def debug_get_device_role(data_folder):
+    table = []
+    headers = ["File name", "Device role"]
+    for f in config_files(data_folder):
+        table.append([os.path.basename(f), get_device_role(f)])
+    print(tabulate(table, headers, "github"))
 
 if __name__ == "__main__":
     data_folder = main_folder + "/data/hp-single/"
 
-    debug_get_hostname(data_folder)
-
-    print(config_files(data_folder))
+    #debug_config_files(data_folder)
+    #debug_get_hostname(data_folder)
+    #debug_get_site(data_folder)
+    debug_get_device_role(data_folder)

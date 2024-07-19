@@ -25,7 +25,7 @@
         src: "/tftpboot/{{ item }}/running-config"
         dest: "{{ inventory_dir }}/data/hp-single/{{ item }}"
         flat: yes
-      loop: "{{ J9085A }}"
+      loop: "{{ J9085A + J9086A + J9089A }}"
       #when: "{{ do_it }}"
 
     - name: Debug

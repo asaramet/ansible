@@ -31,7 +31,7 @@
         state: present
         #state: absent
       loop: "{{ devices }}"
-      when: "{{ do_it }}"
+      #when: "{{ do_it }}"
 
     - name: Delete module bays
       netbox.netbox.netbox_module_bay:
@@ -153,7 +153,7 @@
           mode: Tagged
           tagged_vlans: "{{ item.tagged_vlans }}"
       loop: "{{ tagged_vlans }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
 
     - name: Create VLAN interfaces for loopback IPs
       netbox.netbox.netbox_device_interface:
@@ -167,7 +167,7 @@
           description: "{{ item.vlan_name }}"
         state: present
       loop: "{{ ip_addresses }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
 
     - name: Assign IP to VLAN interfaces
       netbox.netbox.netbox_ip_address:
@@ -185,4 +185,4 @@
           tenant: netzadmin
         state: present
       loop: "{{ ip_addresses }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"

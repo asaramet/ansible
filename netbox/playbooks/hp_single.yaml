@@ -1,0 +1,34 @@
+---
+- name: Add ProCurve Single Switches from configuration files
+  hosts: localhost
+  gather_facts: false
+  vars: 
+    netbox_server: 192.168.122.140
+    netbox_token: "{{ vault_local_token }}"
+    #netbox_server: netbox-bb.hs-esslingen.de
+    #netbox_token: "{{ vault_hs_netbox_token }}"
+    netbox_url: "https://{{ netbox_server }}"
+    #do_it: yes
+    do_it: no
+  tasks:
+    - name: Include locations vars
+      include_vars:
+        file: ../data/yaml/hp_single.yaml
+
+    - name: Add switches
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          site: "{{ item.site }}"
+          device_type: "{{ item.device_type }}" 
+          device_role: "{{ item.device_role }}"
+          serial: "{{ item.serial }}"
+          tags: "{{ item.tags }}"
+          tenant: netzadmin
+        state: present
+        #state: absent
+      loop: "{{ devices }}"
+      #when: "{{ do_it }}"
