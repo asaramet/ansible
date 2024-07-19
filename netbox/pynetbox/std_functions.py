@@ -60,6 +60,17 @@ def get_device_role(t_file):
         return "distribution-layer-switch"
     return "access-layer-switch"
 
+def get_trunks(t_file):
+    with open(t_file, "r") as f:
+        text = f.readlines()
+
+    trunks = []
+    for line in recursive_search(text, "trunk"):
+        line_data = line.split()
+        trunks.append({"name": line_data[2], 'interfaces': line_data[1]})
+
+    return trunks
+
 # --- Additional function ---
 # Return a list of devices serial numbers from the yaml file
 def serial_numbers():
@@ -84,11 +95,38 @@ def devices():
 
 # Return device type for a given hostname
 def device_type(hostname):
-    for d_type, d_list in devices().items():
+    for device_type, d_list in devices().items():
         if hostname in d_list:
-            return d_type
+            return device_type
 
     return None
+
+#----- Return JSON Objects -----#
+
+# return the devices json object
+# Input: 
+# 1. device type slags dict, for example:
+# device_type_slags = { 
+#     'J8697A': 'hpe-procurve-5406zl',
+#     'J8698A': 'hpe-procurve-5412zl',
+#     'J8770A': 'hpe-procurve-4204vl',
+#     'J8773A': 'hpe-procurve-4208vl',
+#     'J9850A': 'hpe-5406r-zl2',
+#     'J9851A': 'hpe-5412r-zl2'
+# }
+# 2. General tags, for example:
+# tags = "switch"
+# tags = ["switch", "modular_switch"]
+
+
+def devices_json(config_files, device_type_slags, tags):
+    data = {'devices':[]}
+    for t_file in config_files:
+        hostname = get_hostname(t_file)
+        d_label = device_type_slags[device_type(hostname)]
+        data['devices'].append({'name': hostname, 'device_role': get_device_role(t_file), 'device_type': d_label,
+            'site': get_site(t_file), 'tags': tags, 'serial':serial_numbers()[hostname]})
+    return data
 
 #----- Debugging -------
 def debug_config_files(data_folder):
@@ -119,6 +157,13 @@ def debug_get_device_role(data_folder):
         table.append([os.path.basename(f), get_device_role(f)])
     print(tabulate(table, headers, "github"))
 
+def debug_get_trunks(data_folder):
+    table = []
+    headers = ["File Name", "Trunks"]
+    for f in config_files(data_folder):
+        table.append([os.path.basename(f), get_trunks(f)])
+    print(tabulate(table, headers))
+
 if __name__ == "__main__":
     data_folder = main_folder + "/data/hp-single/"
 
@@ -126,3 +171,4 @@ if __name__ == "__main__":
     #debug_get_hostname(data_folder)
     #debug_get_site(data_folder)
     debug_get_device_role(data_folder)
+    debug_get_trunks(data_folder)

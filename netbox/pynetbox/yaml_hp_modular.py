@@ -6,33 +6,22 @@ import re, os, yaml
 from tabulate import tabulate
 from std_functions import this_folder, main_folder
 from std_functions import search_line, recursive_search
-from std_functions import get_hostname, get_site, get_device_role
-from std_functions import serial_numbers, device_type
-from std_functions import config_files, debug_get_hostname
+from std_functions import serial_numbers, device_type, config_files
+from std_functions import get_hostname, get_site, get_device_role, get_trunks
+from std_functions import devices_json
 
 data_folder = main_folder + "/data/hp-modular/"
 
-def set_tags():
-    return ["switch", "modular-switch"]
+devices_tags = ["switch", "modular-switch"]
 
-# return the devices json object
-def devices_json(config_files):
-    d_types = { 
-        'J8697A': 'hpe-procurve-5406zl',
-        'J8698A': 'hpe-procurve-5412zl',
-        'J8770A': 'hpe-procurve-4204vl',
-        'J8773A': 'hpe-procurve-4208vl',
-        'J9850A': 'hpe-5406r-zl2',
-        'J9851A': 'hpe-5412r-zl2'
-    }
-
-    data = {'devices':[]}
-    for t_file in config_files:
-        hostname = get_hostname(t_file)
-        d_type = d_types[device_type(hostname)]
-        data['devices'].append({'name': hostname, 'device_role': get_device_role(t_file), 'device_type': d_type,
-            'site': get_site(t_file), 'tags': set_tags(), 'serial':serial_numbers()[hostname]})
-    return data
+device_type_slags = { 
+    'J8697A': 'hpe-procurve-5406zl',
+    'J8698A': 'hpe-procurve-5412zl',
+    'J8770A': 'hpe-procurve-4204vl',
+    'J8773A': 'hpe-procurve-4208vl',
+    'J9850A': 'hpe-5406r-zl2',
+    'J9851A': 'hpe-5412r-zl2'
+}
 
 def get_modules(t_file):
     with open(t_file, "r") as f:
@@ -80,17 +69,6 @@ def modules_json(config_files):
             data['modules'].append({'device': device, 'module_bay': module['module'], 'type': types[module['type'].lower()]})
     return data
 
-def get_trunks(t_file):
-    with open(t_file, "r") as f:
-        text = f.readlines()
-
-    trunks = []
-    for line in recursive_search(text, "trunk"):
-        line_data = line.split()
-        trunks.append({"name": line_data[2], 'interfaces': line_data[1]})
-
-    return trunks
-
 # return trunks and interfaces json objects
 def trunks_json(config_files):
     data = {'trunks':[], 'trunk_interfaces':[]}
@@ -100,6 +78,7 @@ def trunks_json(config_files):
         trk_lists = get_trunks(t_file)
 
         for trunk in trk_lists:
+            if trunk == []: continue
             trk_name = trunk['name'].title()
             data['trunks'].append({'hostname': hostname, 'name': trk_name})
 
@@ -303,7 +282,7 @@ def main():
     files = config_files(data_folder)
 
     with open(main_folder + "/data/yaml/hp_modular.yaml", 'w') as f:
-        yaml.dump(devices_json(files), f)
+        yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(modules_json(files), f)
         yaml.dump(trunks_json(files), f)
         yaml.dump(interface_names_json(files), f)
@@ -324,13 +303,6 @@ def debug_get_modules():
             types.add(module['type'])
     print(tabulate(table, headers, "github"))
     print(types)
-
-def debug_get_trunks():
-    table = []
-    headers = ["File Name", "Trunks"]
-    for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_trunks(f)])
-    print(tabulate(table, headers))
 
 def debug_get_interface_names():
     for f in config_files(data_folder):
@@ -370,10 +342,7 @@ def debug_get_ip_address():
 
 if __name__ == "__main__":
     main()
-    #debug_get_site()
-    #debug_get_device_role()
     #debug_get_modules()
-    #debug_get_trunks()
     #debug_get_interface_names()
     #debug_get_vlans()
     #debug_get_vlans_names()
