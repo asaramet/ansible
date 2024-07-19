@@ -68,6 +68,43 @@ def config_files(data_folder):
     files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
     return files
 
+# Convert a range string, i.e A1-A4, to a list of elements, i.e [A1,A2,A3,A4]
+def convert_range(range_str):
+    # Split the input string into the start and end parts
+    start, end = range_str.split('-')
+    
+    # Extract the prefix and numeric parts of the start and end
+    if re.match(r'[^\d]+', start): 
+        prefix_start = re.match(r'[^\d]+', start).group()
+        prefix_end = re.match(r'[^\d]+', end).group()
+
+        # Ensure the prefixes are the same
+        if prefix_start != prefix_end:
+            raise ValueError("Prefixes do not match")
+        
+        num_start = int(re.search(r'\d+', start).group())
+        num_end = int(re.search(r'\d+', end).group())
+        
+        # Generate the list of elements
+        return [f"{prefix_start}{num}" for num in range(num_start, num_end + 1)]
+    
+    return [num for num in range(int(start), int(end))]
+
+# Convert and interfaces range string, such as 'B10-B13,B15-B20,E2,E4,E6,E8,F2,F4,F6,F8'
+# to a valid list of interfaces
+def convert_interfaces_range(interfaces_string):
+    i_list = []
+
+    for el in interfaces_string.split(","):
+        if '-' in el:
+            for interface in convert_range(el):
+                # convert range string to list interfaces list and save them
+                i_list.append(interface)
+            continue
+        i_list.append(el)
+
+    return i_list
+
 # --- Get functions ---
 def get_hostname(t_file):
     hostname_line = search_line("hostname", t_file)
@@ -110,6 +147,35 @@ def get_vlans(t_file):
         text = f.readlines()
 
     return recursive_section_search(text, 'vlan', 'name')
+
+def get_vlans_names(t_file):
+    with open(t_file, "r") as f:
+        text = f.readlines()
+
+    vlans = {}
+    for vlan_id, vlan_name in recursive_section_search(text, 'vlan', 'name'):
+        vlans[vlan_id] = vlan_name
+    return vlans
+
+def get_untagged_vlans(t_file, pattern = 'untagged'):
+    with open(t_file, "r") as f:
+        text = f.readlines()
+
+    return recursive_section_search(text, 'vlan', pattern)
+
+def get_ip_address(t_file):
+    with open(t_file, "r") as f:
+        text = f.readlines()
+
+    vlan_id, ip_string = recursive_section_search(text, 'vlan', 'ip address')[0]
+    vlan_name = get_vlans_names(t_file)[vlan_id]
+
+    _, ip, netmask = ip_string.split(' ')
+
+    # count 1-bits in the binary representation of the netmask
+    ip_bits = sum(bin(int(x)).count('1') for x in netmask.split('.'))
+
+    return vlan_id, vlan_name, ip + '/' + str(ip_bits)
 
 # --- Additional function ---
 # Return a list of devices serial numbers from the yaml file
@@ -212,12 +278,97 @@ def vlans_jason(config_files):
 
     return data
 
+def untagged_vlans_json(config_files):
+    data = {'untagged_vlans':[]}
+
+    for t_file in config_files:
+        hostname = get_hostname(t_file)
+        vlan_sets = get_untagged_vlans(t_file)
+        # ex: [('1', 'B10-B13,B15-B20,E2,E4,E6,E8,F2,F4,F6,F8'), ('50', 'A2-A24'), ('101', 'A1,B2,B9,B14,B21-B24,E5,E7,F5,F7,Trk1,Trk20-Trk24')]
+        for vlan_id, interfaces_range in vlan_sets:
+            vlan_name = get_vlans_names(t_file)[vlan_id]
+            for interface in convert_interfaces_range(interfaces_range):
+                data['untagged_vlans'].append({'hostname': hostname, 'interface': interface,
+                    'vlan_id': vlan_id, 'vlan_name': vlan_name})
+            continue
+
+    return data
+
+def tagged_vlans_json(config_files):
+    data = {'tagged_vlans':[]}
+
+    for t_file in config_files:
+        hostname = get_hostname(t_file)
+
+        # get list of tagged vlan tuples like:
+        # [('5', 'A23-A24,B10,B20,F1,F4'), ('9', 'A23-A24,B10,B20,F1,F4'), ('50', 'A23-A24,B10,B20,F1,F4')]
+        vlan_sets = get_untagged_vlans(t_file, 'tagged')
+
+        for vlan_id, interfaces_range in vlan_sets:
+            vlan_name = get_vlans_names(t_file)[vlan_id]
+
+            # iterate through all the interfaces that belong to a vlan
+            for interface in convert_interfaces_range(interfaces_range):
+                
+                interface_exists = False # flag to notify that the interface exist in data['tagged_vlans'][hostname]
+                for v_dict in data['tagged_vlans']:
+                    if v_dict['hostname'] == hostname and v_dict['interface'] == interface:
+                        # update the interface list with vlan data
+                        v_dict['tagged_vlans'].append({'name': vlan_name, 'vlan_id': vlan_id})
+                        interface_exists = True # update flag
+                        break # exit the loop with updated flag
+
+                # create a new dictionary entry if the interface vlan list does not exists
+                if not interface_exists:
+                    data['tagged_vlans'].append({ 'hostname': hostname, 'interface': interface, 
+                        'tagged_vlans': [{'name': vlan_name, 'vlan_id': vlan_id}] })
+                    interface_exists = False
+    return data
+
+def ip_addresses_json(config_files):
+    data = {'ip_addresses':[]}
+
+    for t_file in config_files:
+        hostname = get_hostname(t_file)
+        vlan_id, vlan_name, ip = get_ip_address(t_file)
+
+        data['ip_addresses'].append({'hostname': hostname, 'ip': ip, 'vlan_id': vlan_id, 'vlan_name': vlan_name})
+    
+    return data
+
 #----- Debugging -------
 def debug_config_files(data_folder):
     table = []
     headers = ["File name", "Path"]
     for f in config_files(data_folder):
         table.append([ os.path.basename(f), f ])
+    print(tabulate(table, headers, "github"))
+
+def debug_convert_range():
+    print("\n== Converting ranges to list of elements ==")
+
+    ranges = ['B10-B13', 'B15-B20', 'E2,E4,E6-E8,F2,F4,F6,F8']
+
+    table = []
+    headers = ["String", "Converted"]
+    for value in ranges:
+        table.append([value, convert_range(value)])
+    print(tabulate(table, headers, "github"))
+
+def debug_convert_interfaces_range():
+    print("\n== Converting interface ranges strings to list of interfaces ==")
+
+    i_strings = [
+        'B10-B13,B15-B20,E2,E4,E6,E8,F2,F4,F6,F8',
+        'A2-A3,A6-A9,A12,A15-A20,A23,B13-B14',
+        'A1,B17,B20-B24,E3,E5,E7,F5,F7,Trk20-Trk25,Trk27,Trk30',
+        '6-26,28', '50,52,55', '50'
+    ] 
+
+    table = []
+    headers = ["String", "Converted"]
+    for value in i_strings:
+        table.append([value, convert_interfaces_range(value)])
     print(tabulate(table, headers, "github"))
 
 def debug_get_hostname(data_folder):
@@ -256,23 +407,35 @@ def debug_get_vlans(data_folder):
     for f in config_files(data_folder):
         print(os.path.basename(f), '---> ', get_vlans(f))
 
-# def debug_get_untagged_vlans():
-#     print("\n== Collect interfaces ranges for untagged vlans ==")
-#     for f in config_files(data_folder):
-#         print(os.path.basename(f), '---> ', get_untagged_vlans(f))
-#     print('\n')
+def debug_get_vlans_names(data_folder):
+    for f in config_files(data_folder):
+        print(os.path.basename(f), '---> ', get_vlans_names(f))
+
+def debug_get_untagged_vlans(data_folder):
+    print("\n== Collect interfaces ranges for untagged vlans ==")
+    for f in config_files(data_folder):
+        print(os.path.basename(f), '---> ', get_untagged_vlans(f))
+    print('\n')
+
+def debug_get_ip_address(data_folder):
+    table = []
+    headers = ["File Name", "IP"]
+    for f in config_files(data_folder):
+        table.append([os.path.basename(f), get_ip_address(f)])
+    print(tabulate(table, headers))
 
 if __name__ == "__main__":
     data_folder = main_folder + "/data/hp-single/"
 
     #debug_config_files(data_folder)
+    #debug_convert_range()
+    #debug_convert_interfaces_range()
     #debug_get_hostname(data_folder)
     #debug_get_site(data_folder)
     #debug_get_device_role(data_folder)
     #ebug_get_trunks(data_folder)
-    debug_get_interface_names(data_folder)
-    debug_get_vlans(data_folder)
-    #debug_get_vlans_names()
-    #debug_get_untagged_vlans()
-    #debug_convert_interfaces_range()
-    #debug_get_ip_address()
+    #debug_get_interface_names(data_folder)
+    #debug_get_vlans(data_folder)
+    #debug_get_vlans_names(data_folder)
+    #debug_get_untagged_vlans(data_folder)
+    debug_get_ip_address(data_folder)

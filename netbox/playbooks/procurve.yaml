@@ -1,14 +1,24 @@
 ---
-- name: Add ProCurve Modular Switches from configuration files
+# Examples how to use:
+# ansible-playbook playbooks/procurve.yaml --tags modular,development,add_modules
+# ansible-playbook playbooks/procurve.yaml --tags single,development,vlans
+# ansible-playbook playbooks/procurve.yaml --tags single,production,create_vlans
+
+- name: Add ProCurve Switches from configuration files
   hosts: localhost
   gather_facts: false
   vars: 
     netbox_url: "https://{{ netbox_server }}"
   tasks:
-    - name: Include data file
-      tags: data
+    - name: Include data for modular switches 
+      tags: modular
       include_vars:
         file: ../data/yaml/hp_modular.yaml
+
+    - name: Include data for single switches
+      tags: single
+      include_vars:
+        file: ../data/yaml/hp_single.yaml
 
     - name: Include development server variables
       tags: development
@@ -52,6 +62,7 @@
           position: "{{ item.module_bay }}"
         state: absent
       loop: "{{ modules }}"
+      when: "{{ modular }}"
 
     - name: Create module bays
       tags:
@@ -67,6 +78,7 @@
           position: "{{ item.module_bay }}"
         state: present
       loop: "{{ modules }}"
+      when: "{{ modular }}"
 
     - name: Add modules
       tags:
@@ -83,6 +95,7 @@
           status: active
         state: present
       loop: "{{ modules }}"
+      when: "{{ modular }}"
 
     - name: Create Trunk interfaces as LAG
       tags:
