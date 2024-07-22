@@ -1,24 +1,24 @@
 ---
 # Examples how to use:
-# ansible-playbook playbooks/procurve.yaml --tags modular,development,add_modules
-# ansible-playbook playbooks/procurve.yaml --tags single,development,vlans
-# ansible-playbook playbooks/procurve.yaml --tags single,production,create_vlans
+# ansible-playbook playbooks/hp_switches.yaml --tags procurve_modular,development,add_modules
+# ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,development,vlans
+# ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,create_vlans
 
-- name: Add ProCurve Switches from configuration files
+- name: Add HP Switches from configuration files
   hosts: localhost
   gather_facts: false
   vars: 
     netbox_url: "https://{{ netbox_server }}"
   tasks:
     - name: Include data for modular switches 
-      tags: modular
+      tags: procurve_modular
       include_vars:
-        file: ../data/yaml/hp_modular.yaml
+        file: ../data/yaml/procurve_modular.yaml
 
     - name: Include data for single switches
-      tags: single
+      tags: procurve_single
       include_vars:
-        file: ../data/yaml/hp_single.yaml
+        file: ../data/yaml/procurve_single.yaml
 
     - name: Include development server variables
       tags: development

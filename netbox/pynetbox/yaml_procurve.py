@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Collect ProCurve and HP Modular Switches data and create a hp_modular.yaml configs file 
+# Collect ProCurve and old HP Switches data and create a hp_modular.yaml configs file 
 
 import re, os, yaml
 from tabulate import tabulate
@@ -11,18 +11,6 @@ from std_functions import devices_json, trunks_json, interface_names_json
 from std_functions import vlans_jason, untagged_vlans_json, tagged_vlans_json
 from std_functions import ip_addresses_json
 
-data_folder = main_folder + "/data/hp-modular/"
-
-devices_tags = ["switch", "modular-switch"]
-
-device_type_slags = { 
-    'J8697A': 'hpe-procurve-5406zl',
-    'J8698A': 'hpe-procurve-5412zl',
-    'J8770A': 'hpe-procurve-4204vl',
-    'J8773A': 'hpe-procurve-4208vl',
-    'J9850A': 'hpe-5406r-zl2',
-    'J9851A': 'hpe-5412r-zl2'
-}
 
 def get_modules(t_file):
     with open(t_file, "r") as f:
@@ -70,12 +58,23 @@ def modules_json(config_files):
             data['modules'].append({'device': device, 'module_bay': module['module'], 'type': types[module['type'].lower()]})
     return data
 
-# Collect all the data and saved it to a YAML file
-def main():
-    # get data files
-    files = config_files(data_folder)
+# Collect modular switches data and saved it to a YAML file
+def modular():
+    data_folder = main_folder + "/data/procurve-modular/"
 
-    with open(main_folder + "/data/yaml/hp_modular.yaml", 'w') as f:
+    devices_tags = ["switch", "modular-switch"]
+
+    device_type_slags = { 
+        'J8697A': 'hpe-procurve-5406zl',
+        'J8698A': 'hpe-procurve-5412zl',
+        'J8770A': 'hpe-procurve-4204vl',
+        'J8773A': 'hpe-procurve-4208vl',
+        'J9850A': 'hpe-5406r-zl2',
+        'J9851A': 'hpe-5412r-zl2'
+    }
+
+    files = config_files(data_folder)
+    with open(main_folder + "/data/yaml/procurve_modular.yaml", 'w') as f:
         yaml.dump({"modular": True}, f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(modules_json(files), f)
@@ -85,6 +84,33 @@ def main():
         yaml.dump(untagged_vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)
+
+# Collect single switches data and saved it to a YAML file
+def single():
+    data_folder = main_folder + "/data/procurve-single/"
+
+    devices_tags = "switch"
+
+    device_type_slags = {
+        'J9085A': 'hpe-procurve-2610-24',
+        'J9086A': 'hpe-procurve-2610-24-12-pwr',
+        'J9089A': 'hpe-procurve-2610-48-pwr'
+    }
+
+    files = config_files(data_folder)
+    with open(main_folder + "/data/yaml/procurve_single.yaml", 'w') as f:
+        yaml.dump({"modular": False}, f)
+        yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
+        yaml.dump(trunks_json(files), f)
+        yaml.dump(interface_names_json(files), f)
+        yaml.dump(vlans_jason(files), f)
+        yaml.dump(untagged_vlans_json(files), f)
+        yaml.dump(tagged_vlans_json(files), f)
+        yaml.dump(ip_addresses_json(files), f)
+
+def main():
+    modular()
+    single()
 
 #---- Debugging ----#
 def debug_get_modules():
