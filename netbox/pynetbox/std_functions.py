@@ -123,6 +123,12 @@ def get_device_role(t_file):
     role_code = get_hostname(t_file)[2:4]
     if role_code == "cs":
         return "distribution-layer-switch"
+
+    vlan_id, _, _ =  get_ip_address(t_file)
+
+    if vlan_id in ["102", "202", "302"]:
+        return "bueroswitch"
+
     return "access-layer-switch"
 
 def get_trunks(t_file):
@@ -424,8 +430,16 @@ def debug_get_ip_address(data_folder):
         table.append([os.path.basename(f), get_ip_address(f)])
     print(tabulate(table, headers))
 
+def debug_device_type(data_folder):
+    table = []
+    headers = ["File Name", "Device Type"]
+    for f in config_files(data_folder):
+        hostname = get_hostname(f)
+        table.append([hostname, device_type(hostname)])
+    print(tabulate(table, headers))
+
 if __name__ == "__main__":
-    data_folder = main_folder + "/data/hp-single/"
+    data_folder = main_folder + "/data/hpe-8-ports/"
 
     #debug_config_files(data_folder)
     #debug_convert_range()
@@ -438,4 +452,5 @@ if __name__ == "__main__":
     #debug_get_vlans(data_folder)
     #debug_get_vlans_names(data_folder)
     #debug_get_untagged_vlans(data_folder)
-    debug_get_ip_address(data_folder)
+    #debug_get_ip_address(data_folder)
+    debug_device_type(data_folder)

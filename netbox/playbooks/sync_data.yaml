@@ -12,20 +12,28 @@
         dest: "{{ inventory_dir }}/data/"
       when: "{{ do_it }}"
 
-    - name: Sync Aruba Modular Switches config files from rhlx99
+    - name: Sync ProCurve Modular Switches config files from rhlx99
       fetch:
         src: "/tftpboot/{{ item }}/running-config"
         dest: "{{ inventory_dir }}/data/procurve-modular/{{ item }}"
         flat: yes
       loop: "{{ J8697A + J8698A + J8770A + J8773A + J9850A + J9851A }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
 
-    - name: Sync Aruba single Switches config files from rhlx99
+    - name: Sync ProCurve single Switches config files from rhlx99
       fetch:
         src: "/tftpboot/{{ item }}/running-config"
         dest: "{{ inventory_dir }}/data/procurve-single/{{ item }}"
         flat: yes
       loop: "{{ J9085A + J9086A + J9089A }}"
+      when: "{{ do_it }}"
+
+    - name: Sync HP 8 ports switches config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/hpe-8-ports/{{ item }}"
+        flat: yes
+      loop: "{{ J9562A + J9565A + J9774A + J9780A}}"
       #when: "{{ do_it }}"
 
     - name: Debug

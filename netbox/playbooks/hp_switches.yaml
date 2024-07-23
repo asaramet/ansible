@@ -3,6 +3,14 @@
 # ansible-playbook playbooks/hp_switches.yaml --tags procurve_modular,development,add_modules
 # ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,development,vlans
 # ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,create_vlans
+#
+# ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,switches
+# ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,trunks,interfaces
+# ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,create_vlans
+# ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,untagged_vlans
+# ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,tagged_vlans
+# ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,ip
+
 
 - name: Add HP Switches from configuration files
   hosts: localhost
@@ -10,15 +18,20 @@
   vars: 
     netbox_url: "https://{{ netbox_server }}"
   tasks:
-    - name: Include data for modular switches 
+    - name: Include data for ProCurve modular switches 
       tags: procurve_modular
       include_vars:
         file: ../data/yaml/procurve_modular.yaml
 
-    - name: Include data for single switches
+    - name: Include data for ProCurve single switches
       tags: procurve_single
       include_vars:
         file: ../data/yaml/procurve_single.yaml
+
+    - name: Include data for 8 Ports old HP and ProCurve switches
+      tags: hpe_8
+      include_vars:
+        file: ../data/yaml/hpe_8_ports.yaml
 
     - name: Include development server variables
       tags: development

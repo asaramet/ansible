@@ -86,19 +86,9 @@ def modular():
         yaml.dump(ip_addresses_json(files), f)
 
 # Collect single switches data and saved it to a YAML file
-def single():
-    data_folder = main_folder + "/data/procurve-single/"
-
-    devices_tags = "switch"
-
-    device_type_slags = {
-        'J9085A': 'hpe-procurve-2610-24',
-        'J9086A': 'hpe-procurve-2610-24-12-pwr',
-        'J9089A': 'hpe-procurve-2610-48-pwr'
-    }
-
+def single(data_folder, output_file_path, device_type_slags, devices_tags):
     files = config_files(data_folder)
-    with open(main_folder + "/data/yaml/procurve_single.yaml", 'w') as f:
+    with open(main_folder + output_file_path, 'w') as f:
         yaml.dump({"modular": False}, f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(trunks_json(files), f)
@@ -109,8 +99,35 @@ def single():
         yaml.dump(ip_addresses_json(files), f)
 
 def main():
+    # ProCurve Modular Switches
     modular()
-    single()
+
+    # ProCurve Single Switches
+    data_folder = main_folder + "/data/procurve-single/"
+    output_file_path = "/data/yaml/procurve_single.yaml"
+
+    devices_tags = "switch"
+
+    device_type_slags = {
+        'J9085A': 'hpe-procurve-2610-24',
+        'J9086A': 'hpe-procurve-2610-24-12-pwr',
+        'J9089A': 'hpe-procurve-2610-48-pwr'
+    }
+
+    single(data_folder, output_file_path, device_type_slags, devices_tags)
+
+    # HPE 8 Ports Switches
+    data_folder = main_folder + "/data/hpe-8-ports/"
+    output_file_path = "/data/yaml/hpe_8_ports.yaml"
+
+    device_type_slags = {
+        'J9562A': 'hpe-procurve-2915-8-poe',
+        'J9565A': 'hpe-procurve-2615-8-poe',
+        'J9774A': 'hpe-aruba-2530-8g-poep',
+        'J9780A': 'hpe-aruba-2530-8-poep'
+    }
+
+    single(data_folder, output_file_path, device_type_slags, devices_tags)
 
 #---- Debugging ----#
 def debug_get_modules():

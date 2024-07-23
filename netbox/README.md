@@ -59,4 +59,4 @@ sudo pacman -Syu python-pynetbox python-packaging
 
 - `std_functions.py` - standard functions used in multiple python scripts.
 - `yaml_aruba_6100.py` - Collect Aruba 6100 data from config files and generate a yaml data file.
-- `yaml_procurve.py` - Collect ProCurve and old HP modular and single switches data from config files and generate a yaml data file.
+- `yaml_hpe.py` - Collect HPE switches data from config files and generate a yaml data file.
