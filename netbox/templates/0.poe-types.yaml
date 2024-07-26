@@ -1,0 +1,15 @@
+---
+# POE - Type 1
+
+    poe_mode: pd
+    poe_type: type1-ieee802.3af
+
+# POE+ and POE4 - Type 2
+
+    poe_mode: pd
+    poe_type: type2-ieee802.3at
+
+# POE6 
+
+    poe_mode: pd
+    poe_type: type3-ieee802.3bt

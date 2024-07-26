@@ -1,6 +1,3 @@
-    poe_mode: pd
-    poe_type: type2-ieee802.3at
-
 ---
 manufacturer: HPE
 model: Aruba 2530-8-PoE+

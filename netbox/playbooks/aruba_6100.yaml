@@ -1,20 +1,37 @@
+# Examples production flow 
+#
+# ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,location
+# ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,switches
+# ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,lags
+# ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,vlans
+# ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,ip
+# ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,interfaces
+
 ---
 - name: Add Aruba 6100 Switches from configuration files
   hosts: localhost
   gather_facts: false
   vars: 
-    netbox_server: 192.168.122.140
-    netbox_token: "{{ vault_local_token }}"
-    #netbox_server: netbox-bb.hs-esslingen.de
-    #netbox_token: "{{ vault_hs_netbox_token }}"
     netbox_url: "https://{{ netbox_server }}"
-    do_it: no
+    do_it: yes
   tasks:
     - name: Include locations vars
+      tags: aruba_6100
       include_vars:
         file: ../data/yaml/aruba_6100.yaml
 
+    - name: Include development server variables
+      tags: development
+      include_vars:
+        file: ../data/src/development_server.yaml
+
+    - name: Include production server variables
+      tags: production
+      include_vars:
+        file: ../data/src/production_server.yaml
+
     - name: Create a Room (location)
+      tags: location
       netbox.netbox.netbox_location:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -28,6 +45,7 @@
       when: "{{ do_it }}"
 
     - name: Add Aruba 6100-12G-POE4-2SFP+ switches
+      tags: switches
       netbox.netbox.netbox_device:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -45,6 +63,10 @@
       when: "{{ do_it }}"
 
     - name: Create VLAN 1 interfaces
+      tags: 
+        - vlan_1
+        - create_vlans
+        - vlans
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -59,6 +81,9 @@
       when: "{{ do_it }}"
 
     - name: Create VLAN interfaces
+      tags: 
+        - create_vlan_interfaces
+        - vlans
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -73,6 +98,9 @@
       when: "{{ do_it }}"
 
     - name: Assign IP to VLAN interface
+      tags:
+        - ip_to_vlans
+        - ip
       netbox.netbox.netbox_ip_address:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -91,6 +119,9 @@
       when: "{{ do_it }}"
 
     - name: Assign IP addresses to devices
+      tags:
+        - ip_to_devices
+        - ip
       netbox.netbox.netbox_device:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -103,6 +134,9 @@
       when: "{{ do_it }}"
 
     - name: Create LAG interfaces
+      tags:
+        - create_lags
+        - lags
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -117,6 +151,9 @@
       when: "{{ do_it }}"
 
     - name: Assign interfaces to LAGs
+      tags:
+        - ip_to_lags
+        - ip
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -132,6 +169,9 @@
       when: "{{ do_it }}"
 
     - name: Create new VLANs
+      tags: 
+        - create_vlans
+        - vlans
       netbox.netbox.netbox_vlan:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -144,6 +184,9 @@
       when: "{{ do_it }}"
 
     - name: Update interfaces description
+      tags:
+        - interface_description
+        - interfaces
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -157,6 +200,9 @@
       when: "{{ do_it }}"
 
     - name: Assign untagged vlans to interfaces
+      tags:
+        - vlans_to_interfaces
+        - interfaces
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -169,4 +215,4 @@
             vlan_id: "{{ item.vlan_id }}"
             name: "{{ item.vlan_name }}"
       loop: "{{ interfaces_vlan }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
