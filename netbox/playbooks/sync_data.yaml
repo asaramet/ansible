@@ -18,8 +18,8 @@
         src: "/tftpboot/{{ item }}/running-config"
         dest: "{{ inventory_dir }}/data/procurve-modular/{{ item }}"
         flat: yes
-      loop: "{{ J8697A + J8698A + J8770A + J8773A + J9850A + J9851A }}"
-      when: "{{ do_it }}"
+      loop: "{{ J8697A + J8698A + J8770A + J8773A + J9850A + J9851A + J9729A }}"
+      #when: "{{ do_it }}"
 
     - name: Sync ProCurve single Switches config files from rhlx99
       fetch:

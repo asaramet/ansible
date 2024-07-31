@@ -45,6 +45,8 @@ def modules_json(config_files):
         "j9550a": "HP 24-Port GiG-T v2 ZL Module",
         "j9537a": "Aruba J9537A",
         "j9538a": "Aruba J9538A",
+        "j9731a": "Aruba 2920 2-Port 10GbE SFP+ Module",
+        "j9729a": "Aruba 2920 2-Port 10GbE SFP+ Module", # same as j9731a
         "j9986a": "Aruba J9986A",
         "j9990a": "Aruba J9990A",
         "j9992a": "Aruba J9992A",
@@ -70,7 +72,8 @@ def modular():
         'J8770A': 'hpe-procurve-4204vl',
         'J8773A': 'hpe-procurve-4208vl',
         'J9850A': 'hpe-5406r-zl2',
-        'J9851A': 'hpe-5412r-zl2'
+        'J9851A': 'hpe-5412r-zl2',
+        'J9729A': 'hpe-aruba-2920-48g-poep'
     }
 
     files = config_files(data_folder)

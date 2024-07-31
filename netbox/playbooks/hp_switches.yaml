@@ -1,11 +1,12 @@
 ---
 # Examples how to use:
-# ansible-playbook playbooks/hp_switches.yaml --tags procurve_modular,development,add_modules
-# ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,development,vlans
-# ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,create_vlans
+# ansible-playbook playbooks/hp_switches.yaml --tags procurve_modular,production,switches
+# ansible-playbook playbooks/hp_switches.yaml --tags procurve_modular,production,modules
 #
 # ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,switches
-# ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,trunks,interfaces
+# ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,trunks
+# ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,interfaces
+#
 # ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,create_vlans
 # ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,untagged_vlans
 # ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,development,tagged_vlans
