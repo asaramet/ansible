@@ -33,6 +33,11 @@
       include_vars:
         file: ../data/yaml/hpe_8_ports.yaml
 
+    - name: Include data for 24 and 48 Ports old HP switches
+      tags: hpe_48
+      include_vars:
+        file: ../data/yaml/hpe_48_ports.yaml
+
     - name: Include development server variables
       tags: development
       include_vars:

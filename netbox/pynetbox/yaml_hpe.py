@@ -129,6 +129,19 @@ def main():
 
     single(data_folder, output_file_path, device_type_slags, devices_tags)
 
+    # HPE 24 and 48 Ports Switches
+    data_folder = main_folder + "/data/hpe-48-ports/"
+    output_file_path = "/data/yaml/hpe_48_ports.yaml"
+
+    device_type_slags = {
+      'J9623A': 'hpe-aruba-2620-24',
+      'J9772A': 'hpe-aruba-2530-48g-poep',
+      'J9853A': 'hpe-aruba-2530-48g-poep-2sfpp'
+    }
+
+    single(data_folder, output_file_path, device_type_slags, devices_tags)
+
+
 #---- Debugging ----#
 def debug_get_modules():
     table = []

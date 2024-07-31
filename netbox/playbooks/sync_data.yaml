@@ -3,8 +3,8 @@
   hosts: rhlx99
   gather_facts: false
   vars:
-    #do_it: no
-    do_it: yes
+    do_it: no
+    #do_it: yes
   tasks:
     - name: Sync Aruba 6100 config files from rhlx99
       ansible.posix.synchronize:
@@ -35,6 +35,14 @@
         dest: "{{ inventory_dir }}/data/hpe-8-ports/{{ item }}"
         flat: yes
       loop: "{{ J9562A + J9565A + J9774A + J9780A}}"
+      when: "{{ do_it }}"
+
+    - name: Sync HP 24+ ports switches config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/hpe-48-ports/{{ item }}"
+        flat: yes
+      loop: "{{ J9623A + J9772A + J9853A }}"
       when: "{{ do_it }}"
 
     - name: Debug
