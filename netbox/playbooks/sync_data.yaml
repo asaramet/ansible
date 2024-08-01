@@ -3,8 +3,8 @@
   hosts: rhlx99
   gather_facts: false
   vars:
-    do_it: no
-    #do_it: yes
+    #do_it: no
+    do_it: yes
   tasks:
     - name: Sync Aruba 6100 config files from rhlx99
       ansible.posix.synchronize:
@@ -19,7 +19,7 @@
         dest: "{{ inventory_dir }}/data/procurve-modular/{{ item }}"
         flat: yes
       loop: "{{ J8697A + J8698A + J8770A + J8773A + J9850A + J9851A + J9729A }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
 
     - name: Sync ProCurve single Switches config files from rhlx99
       fetch:
@@ -43,6 +43,30 @@
         dest: "{{ inventory_dir }}/data/hpe-48-ports/{{ item }}"
         flat: yes
       loop: "{{ J9623A + J9772A + J9853A }}"
+      when: "{{ do_it }}"
+
+    - name: Sync Aruba 24+ ports switches config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/aruba-48-ports/{{ item }}"
+        flat: yes
+      loop: "{{ JL255A + JL256A + JL322A + JL357A }}"
+      when: "{{ do_it }}"
+
+    - name: Sync Aruba 12 ports switches config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/aruba-12-ports/{{ item }}"
+        flat: yes
+      loop: "{{ JL693A }}"
+      when: "{{ do_it }}"
+
+    - name: Sync Aruba 8 ports switches config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/aruba-8-ports/{{ item }}"
+        flat: yes
+      loop: "{{ JL258A }}"
       when: "{{ do_it }}"
 
     - name: Debug

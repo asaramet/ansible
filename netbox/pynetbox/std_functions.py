@@ -439,7 +439,7 @@ def debug_device_type(data_folder):
     print(tabulate(table, headers))
 
 if __name__ == "__main__":
-    data_folder = main_folder + "/data/hpe-8-ports/"
+    data_folder = main_folder + "/data/aruba-12-ports/"
 
     #debug_config_files(data_folder)
     #debug_convert_range()

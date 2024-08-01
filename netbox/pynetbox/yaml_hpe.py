@@ -144,6 +144,39 @@ def main():
 
     single(data_folder, output_file_path, device_type_slags, devices_tags)
 
+    # Aruba 24 and 48 Ports Switches
+    data_folder = main_folder + "/data/aruba-48-ports/"
+    output_file_path = "/data/yaml/aruba_48_ports.yaml"
+
+    device_type_slags = {
+      'JL255A': "hpe-aruba-2930f-24g-poep-4sfpp", 
+      'JL256A': "hpe-aruba-2930f-48g-poep-4sfpp",
+      'JL322A': "hpe-aruba-2930m-48g-poep",
+      'JL357A': "hpe-aruba-2540-48g-poep-4sfpp"
+    }
+
+    single(data_folder, output_file_path, device_type_slags, devices_tags)
+
+    # Aruba 8 Ports Switches
+    data_folder = main_folder + "/data/aruba-8-ports/"
+    output_file_path = "/data/yaml/aruba_8_ports.yaml"
+
+    device_type_slags = {
+        'JL258A': "hpe-aruba-2930f-8g-poep-2sfpp"
+    }
+
+    single(data_folder, output_file_path, device_type_slags, devices_tags)
+
+    # Aruba 12 Ports Switches
+    data_folder = main_folder + "/data/aruba-12-ports/"
+    output_file_path = "/data/yaml/aruba_12_ports.yaml"
+
+    device_type_slags = {
+        'JL693A': "hpe-aruba-2930f-12g-poep-2sfpp"
+    }
+
+    single(data_folder, output_file_path, device_type_slags, devices_tags)
+
 
 #---- Debugging ----#
 def debug_get_modules():
