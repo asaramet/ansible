@@ -1,3 +1,4 @@
 data
 host_vars/99/
 pynetbox/__pycache__/
+cronjobs/logs
