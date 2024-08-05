@@ -5,8 +5,8 @@
 cd `dirname $0`
 this_folder=$PWD
 
-exec_folder="${this_folder}/../"
-logs_folder=${this_folder}/logs/
+exec_folder="${this_folder}/.."
+logs_folder=${this_folder}/logs
 
 export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
