@@ -3,8 +3,8 @@
   hosts: rhlx99
   gather_facts: false
   vars:
-    #do_it: no
-    do_it: yes
+    do_it: no
+    #do_it: yes
   tasks:
     - name: Sync Aruba 6100 config files from rhlx99
       ansible.posix.synchronize:
@@ -68,6 +68,14 @@
         flat: yes
       loop: "{{ JL258A }}"
       when: "{{ do_it }}"
+
+    - name: Sync ProCurve Modular stack switches config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/procurve-modular-stack/{{ item }}"
+        flat: yes
+      loop: "{{ J9729A_stack }}"
+      #when: "{{ do_it }}"
 
     - name: Debug
       debug:

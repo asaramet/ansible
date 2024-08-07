@@ -11,7 +11,6 @@ from std_functions import devices_json, trunks_json, interface_names_json
 from std_functions import vlans_jason, untagged_vlans_json, tagged_vlans_json
 from std_functions import ip_addresses_json
 
-
 def get_modules(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
@@ -21,7 +20,7 @@ def get_modules(t_file):
         '7': 'G', '8': 'H', '9': 'I', '10': 'J', '11': 'K', '12': 'L'
     }
     modules = []
-    for line in recursive_search(text, "module"):
+    for line in recursive_search("module", text):
         m_list = line.split()
         name = m_list[1]
         if name in names.keys():
@@ -61,23 +60,9 @@ def modules_json(config_files):
     return data
 
 # Collect modular switches data and saved it to a YAML file
-def modular():
-    data_folder = main_folder + "/data/procurve-modular/"
-
-    devices_tags = ["switch", "modular-switch"]
-
-    device_type_slags = { 
-        'J8697A': 'hpe-procurve-5406zl',
-        'J8698A': 'hpe-procurve-5412zl',
-        'J8770A': 'hpe-procurve-4204vl',
-        'J8773A': 'hpe-procurve-4208vl',
-        'J9850A': 'hpe-5406r-zl2',
-        'J9851A': 'hpe-5412r-zl2',
-        'J9729A': 'hpe-aruba-2920-48g-poep'
-    }
-
+def modular(data_folder, output_file_path, device_type_slags, devices_tags):
     files = config_files(data_folder)
-    with open(main_folder + "/data/yaml/procurve_modular.yaml", 'w') as f:
+    with open(main_folder + output_file_path, 'w') as f:
         yaml.dump({"modular": True}, f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(modules_json(files), f)
@@ -103,7 +88,22 @@ def single(data_folder, output_file_path, device_type_slags, devices_tags):
 
 def main():
     # ProCurve Modular Switches
-    modular()
+    data_folder = main_folder + "/data/procurve-modular/"
+    output_file_path = "/data/yaml/procurve_modular.yaml"
+
+    devices_tags = ["switch", "modular-switch"]
+
+    device_type_slags = { 
+        'J8697A': 'hpe-procurve-5406zl',
+        'J8698A': 'hpe-procurve-5412zl',
+        'J8770A': 'hpe-procurve-4204vl',
+        'J8773A': 'hpe-procurve-4208vl',
+        'J9850A': 'hpe-5406r-zl2',
+        'J9851A': 'hpe-5412r-zl2',
+        'J9729A': 'hpe-aruba-2920-48g-poep'
+    }
+
+    modular(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # ProCurve Single Switches
     data_folder = main_folder + "/data/procurve-single/"
@@ -177,9 +177,8 @@ def main():
 
     single(data_folder, output_file_path, device_type_slags, devices_tags)
 
-
 #---- Debugging ----#
-def debug_get_modules():
+def debug_get_modules(data_folder):
     table = []
     types = set()
     headers = ["File Name", "Modules"]
@@ -189,8 +188,9 @@ def debug_get_modules():
         for module in modules:
             types.add(module['type'])
     print(tabulate(table, headers, "github"))
-    print(types)
 
 if __name__ == "__main__":
     main()
-    #debug_get_modules()
+
+    #data_folder = main_folder + "/data/procurve-modular-stack/"
+    #debug_get_modules(data_folder)

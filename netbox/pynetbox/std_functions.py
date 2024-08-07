@@ -16,10 +16,10 @@ def search_line(expression, t_file):
     for i, line in enumerate(lines):
         if re.search(expression, line): return line
 
-    return " " # return empty space if line not found
+    return None
     
 # search lines in a text recursively
-def recursive_search(text, pattern):
+def recursive_search(pattern, text):
     # base case
     if not text:
         return []
@@ -29,7 +29,7 @@ def recursive_search(text, pattern):
         if line.startswith(pattern):
             found_lines.append(line.strip())
 
-            found_lines += recursive_search(text[i+1:], pattern)
+            found_lines += recursive_search(pattern, text[i+1:])
             break 
 
     return found_lines
@@ -108,7 +108,30 @@ def convert_interfaces_range(interfaces_string):
 # --- Get functions ---
 def get_hostname(t_file):
     hostname_line = search_line("hostname", t_file)
-    return hostname_line.split()[1].replace('"','') if not hostname_line.isspace() else " "
+
+    hostname = hostname_line.split()[1].replace('"','') if not hostname_line.isspace() else " "
+
+    if not search_line("stacking", t_file):
+        # Not a stack
+        return hostname
+
+    with open(t_file, "r") as f:
+        raw_text = f.readlines()
+
+    text = []
+    for line in raw_text:
+        text.append(line.strip())
+
+    stacks = set()
+    for line in recursive_search("member", text):
+        line_data = line.split()
+        stacks.add(line_data[1])
+
+    hostnames = {}
+    for member in stacks:
+        hostnames[member] = hostname + "-" + member
+    return hostnames
+
 
 def get_site(t_file):
     campuses = {
@@ -136,7 +159,7 @@ def get_trunks(t_file):
         text = f.readlines()
 
     trunks = []
-    for line in recursive_search(text, "trunk"):
+    for line in recursive_search("trunk", text):
         line_data = line.split()
         trunks.append({"name": line_data[2], 'interfaces': line_data[1]})
 
@@ -447,10 +470,22 @@ if __name__ == "__main__":
     #debug_get_hostname(data_folder)
     #debug_get_site(data_folder)
     #debug_get_device_role(data_folder)
-    #ebug_get_trunks(data_folder)
+    #debug_get_trunks(data_folder)
     #debug_get_interface_names(data_folder)
     #debug_get_vlans(data_folder)
     #debug_get_vlans_names(data_folder)
     #debug_get_untagged_vlans(data_folder)
     #debug_get_ip_address(data_folder)
+    #debug_device_type(data_folder)
+
+    print("\n=== Stacking ===\n")
+    data_folder = main_folder + "/data/procurve-modular-stack/"
+
+    #debug_get_hostname(data_folder)
     debug_device_type(data_folder)
+
+
+    #files = config_files(data_folder)
+    #device_type_slags = { 'J9729A': 'hpe-aruba-2920-48g-poep' }
+    #devices_tags = ["switch", "stack"]
+    #print(devices_json(files, device_type_slags, devices_tags))
