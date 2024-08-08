@@ -69,12 +69,36 @@
       loop: "{{ JL258A }}"
       when: "{{ do_it }}"
 
-    - name: Sync ProCurve Modular stack switches config files from rhlx99
+    - name: Sync Aruba modular switches config files from rhlx99
       fetch:
         src: "/tftpboot/{{ item }}/running-config"
-        dest: "{{ inventory_dir }}/data/procurve-modular-stack/{{ item }}"
+        dest: "{{ inventory_dir }}/data/aruba-modular/{{ item }}"
         flat: yes
-      loop: "{{ J9729A_stack }}"
+      loop: "{{ JL322A_module }}"
+      #when: "{{ do_it }}"
+
+    - name: Sync HPE Modular stack switches config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/hpe-stack/{{ item }}"
+        flat: yes
+      loop: "{{ J9729A_stack + JL322A_stack  }}"
+      #when: "{{ do_it }}"
+
+    - name: Sync Aruba stack switches config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/aruba-stack/{{ item }}"
+        flat: yes
+      loop: "{{ JL256A_stack + JL693A_stack }}"
+      #when: "{{ do_it }}"
+
+    - name: Sync Aruba modular stack switches config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/aruba-modular-stack/{{ item }}"
+        flat: yes
+      loop: "{{ J9850A_stack }}"
       #when: "{{ do_it }}"
 
     - name: Debug
