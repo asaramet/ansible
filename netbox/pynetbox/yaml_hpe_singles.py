@@ -5,8 +5,7 @@
 import re, os, yaml
 from tabulate import tabulate
 from std_functions import this_folder, main_folder
-from std_functions import serial_numbers, config_files
-from std_functions import recursive_search, get_hostname
+from std_functions import config_files
 from std_functions import devices_json, trunks_json, interface_names_json
 from std_functions import vlans_jason, untagged_vlans_json, tagged_vlans_json
 from std_functions import ip_addresses_json
