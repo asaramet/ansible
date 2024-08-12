@@ -3,8 +3,8 @@
   hosts: rhlx99
   gather_facts: false
   vars:
-    do_it: no
-    #do_it: yes
+    #do_it: no
+    do_it: yes
   tasks:
     - name: Sync Aruba 6100 config files from rhlx99
       ansible.posix.synchronize:
@@ -75,7 +75,7 @@
         dest: "{{ inventory_dir }}/data/aruba-modular/{{ item }}"
         flat: yes
       loop: "{{ JL322A_module }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
 
     - name: Sync HPE Modular stack switches config files from rhlx99
       fetch:
@@ -83,7 +83,7 @@
         dest: "{{ inventory_dir }}/data/hpe-stack/{{ item }}"
         flat: yes
       loop: "{{ J9729A_stack + JL322A_stack  }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
 
     - name: Sync Aruba stack switches config files from rhlx99
       fetch:
@@ -91,7 +91,7 @@
         dest: "{{ inventory_dir }}/data/aruba-stack/{{ item }}"
         flat: yes
       loop: "{{ JL256A_stack + JL693A_stack }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
 
     - name: Sync Aruba modular stack switches config files from rhlx99
       fetch:
@@ -99,7 +99,7 @@
         dest: "{{ inventory_dir }}/data/aruba-modular-stack/{{ item }}"
         flat: yes
       loop: "{{ J9850A_stack }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
 
     - name: Debug
       debug:

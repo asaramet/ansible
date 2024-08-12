@@ -26,9 +26,9 @@ def main():
     output_file_path = "/data/yaml/aruba_stack.yaml"
 
     device_type_slags = {
-        'JL256A_stack': '',
+        'JL256A_stack': "hpe-aruba-2930f-48g-poep-4sfpp",
         'JL075A_stack': '',
-        'JL693A_stack': ''
+        'JL693A_stack': "hpe-aruba-2930f-12g-poep-2sfpp"
     }
 
     devices_tags = ["switch", "stack"]
@@ -41,7 +41,7 @@ def main():
 
     device_type_slags = {
         'J9729A_stack': 'hpe-aruba-2920-48g-poep',
-        'JL322A_stack': ''
+        'JL322A_stack': 'hpe-aruba-2930m-48g-poep'
     }
 
     devices_tags = ["switch", "stack"]
@@ -53,7 +53,7 @@ def main():
     output_file_path = "/data/yaml/aruba_modular_stack.yaml"
 
     device_type_slags = {
-        'J9850A_stack': ''
+        'J9850A_stack': 'hpe-5406r-zl2'
     }
 
     devices_tags = ["switch", "stack"]
