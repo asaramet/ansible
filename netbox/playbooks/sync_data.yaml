@@ -59,7 +59,8 @@
         dest: "{{ inventory_dir }}/data/aruba-12-ports/{{ item }}"
         flat: yes
       loop: "{{ JL693A }}"
-      when: "{{ do_it }}"
+      #when: "{{ do_it }}"
+      when: no
 
     - name: Sync Aruba 8 ports switches config files from rhlx99
       fetch:

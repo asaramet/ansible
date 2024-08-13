@@ -111,7 +111,8 @@ def get_hostname(t_file):
 
     hostname = hostname_line.split()[1].replace('"','') if not hostname_line.isspace() else " "
 
-    if not search_line("stacking", t_file):
+    #if not search_line("stacking", t_file):
+    if not search_line("member", t_file):
         # Not a stack
         return hostname
 
@@ -133,17 +134,17 @@ def get_hostname(t_file):
     return hostnames
 
 
-def get_site(t_file):
+def get_site(hostname):
     campuses = {
         "h": "flandernstrasse",
         "g": "gppingen",
         "s": "stadtmitte",
         "w": "weststadt"
     }
-    return "campus-" + campuses[get_hostname(t_file)[1]]
+    return "campus-" + campuses[hostname[1]]
 
-def get_device_role(t_file):
-    role_code = get_hostname(t_file)[2:4]
+def get_device_role(t_file, hostname):
+    role_code = hostname[2:4]
     if role_code == "cs":
         return "distribution-layer-switch"
 
@@ -256,9 +257,21 @@ def devices_json(config_files, device_type_slags, tags):
     data = {'devices':[]}
     for t_file in config_files:
         hostname = get_hostname(t_file)
-        d_label = device_type_slags[device_type(hostname)]
-        data['devices'].append({'name': hostname, 'device_role': get_device_role(t_file), 'device_type': d_label,
-            'site': get_site(t_file), 'tags': tags, 'serial':serial_numbers()[hostname]})
+
+        # update data for single switches 
+        if isinstance(hostname, str):
+            d_label = device_type_slags[device_type(hostname)]
+            data['devices'].append({'name': hostname, 'device_role': get_device_role(t_file, hostname), 'device_type': d_label,
+                'site': get_site(hostname), 'tags': tags, 'serial':serial_numbers()[hostname]})
+            continue
+
+        # update data for stacks 
+        clean_name = hostname['1'][:-2]
+        d_label = device_type_slags[device_type(clean_name)]
+        for h_name in hostname.values(): 
+            data['devices'].append({'name': h_name, 'device_role': get_device_role(t_file, clean_name), 'device_type': d_label, 
+                'site': get_site(clean_name), 'tags': tags, 'serial':serial_numbers()[h_name]})
+
     return data
 
 # return trunks and interfaces json objects
@@ -405,20 +418,26 @@ def debug_get_hostname(data_folder):
     headers = ["File name", "Hostname"]
     for f in config_files(data_folder):
         table.append([ os.path.basename(f), get_hostname(f) ])
+    print("\n== Debug: get_hostname ==")
     print(tabulate(table, headers, "github"))
 
 def debug_get_site(data_folder):
     table = []
     headers = ["File Name", "Location"]
     for f in config_files(data_folder):
-        table.append([ os.path.basename(f), get_site(f) ])
+        hostname = os.path.basename(f)
+        table.append([ hostname, get_site(hostname) ])
+    print("\n== Debug: get_site ==")
     print(tabulate(table, headers, "github"))
 
 def debug_get_device_role(data_folder):
     table = []
     headers = ["File name", "Device role"]
+
     for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_device_role(f)])
+        hostname = os.path.basename(f)
+        table.append([os.path.basename(f), get_device_role(f, hostname)])
+    print("\n== Debug: get_device_role ==")
     print(tabulate(table, headers, "github"))
 
 def debug_get_trunks(data_folder):
@@ -426,17 +445,21 @@ def debug_get_trunks(data_folder):
     headers = ["File Name", "Trunks"]
     for f in config_files(data_folder):
         table.append([os.path.basename(f), get_trunks(f)])
+    print("\n== Debug: get_trunks ==")
     print(tabulate(table, headers))
 
 def debug_get_interface_names(data_folder):
+    print("\n== Debug: get_interface_names ==")
     for f in config_files(data_folder):
         print(os.path.basename(f), '---> ', get_interface_names(f))
 
 def debug_get_vlans(data_folder):
+    print("\n== Debug: get_vlans ==")
     for f in config_files(data_folder):
         print(os.path.basename(f), '---> ', get_vlans(f))
 
 def debug_get_vlans_names(data_folder):
+    print("\n== Debug: get_vlans_names ==")
     for f in config_files(data_folder):
         print(os.path.basename(f), '---> ', get_vlans_names(f))
 
@@ -451,6 +474,7 @@ def debug_get_ip_address(data_folder):
     headers = ["File Name", "IP"]
     for f in config_files(data_folder):
         table.append([os.path.basename(f), get_ip_address(f)])
+    print("\n== Debug: get_ip_address ==")
     print(tabulate(table, headers))
 
 def debug_device_type(data_folder):
@@ -459,17 +483,25 @@ def debug_device_type(data_folder):
     for f in config_files(data_folder):
         hostname = get_hostname(f)
         table.append([hostname, device_type(hostname)])
+    print("\n== Debug: device_type ==")
     print(tabulate(table, headers))
 
 if __name__ == "__main__":
-    data_folder = main_folder + "/data/aruba-12-ports/"
+    #data_folder = main_folder + "/data/aruba-8-ports/"
+    #data_folder = main_folder + "/data/aruba-12-ports/"
+    #data_folder = main_folder + "/data/aruba-48-ports/"
+    #data_folder = main_folder + "/data/aruba-48-ports/"
+    #data_folder = main_folder + "/data/aruba-modular/"
+    #data_folder = main_folder + "/data/hpe-8-ports/"
+    data_folder = main_folder + "/data/hpe-48-ports/"
+    #data_folder = main_folder + "/data/procurve-single/"
 
     #debug_config_files(data_folder)
     #debug_convert_range()
     #debug_convert_interfaces_range()
-    #debug_get_hostname(data_folder)
-    #debug_get_site(data_folder)
-    #debug_get_device_role(data_folder)
+    debug_get_hostname(data_folder)
+    debug_get_device_role(data_folder)
+    debug_get_site(data_folder)
     #debug_get_trunks(data_folder)
     #debug_get_interface_names(data_folder)
     #debug_get_vlans(data_folder)
@@ -478,12 +510,14 @@ if __name__ == "__main__":
     #debug_get_ip_address(data_folder)
     #debug_device_type(data_folder)
 
-    print("\n=== Stacking ===\n")
-    data_folder = main_folder + "/data/procurve-modular-stack/"
+    print("\n=== Stacking ===")
+    data_folder = main_folder + "/data/aruba-stack/"
+    #data_folder = main_folder + "/data/hpe-stack/"
+    #data_folder = main_folder + "/data/aruba-modular-stack/"
 
-    #debug_get_hostname(data_folder)
-    debug_device_type(data_folder)
-
+    debug_get_hostname(data_folder)
+    debug_get_device_role(data_folder)
+    debug_get_site(data_folder)
 
     #files = config_files(data_folder)
     #device_type_slags = { 'J9729A': 'hpe-aruba-2920-48g-poep' }

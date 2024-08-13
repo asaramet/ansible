@@ -15,7 +15,9 @@ from std_functions import devices_json
 def stack(data_folder, output_file_path, device_type_slags, devices_tags):
     files = config_files(data_folder)
     with open(main_folder + output_file_path, 'w') as f:
+        yaml.dump({"modular": False}, f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
+        #yaml.dump(trunks_json(files), f)
 
 def stack_module(data_folder, output_file_path, device_type_slags, devices_tags):
     pass
@@ -27,7 +29,7 @@ def main():
 
     device_type_slags = {
         'JL256A_stack': "hpe-aruba-2930f-48g-poep-4sfpp",
-        'JL075A_stack': '',
+        'JL075A_stack': 'hpe-aruba-3810m-16sfpp-2-slot-switch',
         'JL693A_stack': "hpe-aruba-2930f-12g-poep-2sfpp"
     }
 
