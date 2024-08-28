@@ -3,7 +3,7 @@
   hosts: localhost
   gather_facts: false
   vars: 
-    netbox_version: 4.0.6
+    netbox_version: 4.0.9
     python_version: 3.11 # check if you have to activate the right python shell with 'pyenv shell 3.11.2' | show versions 'pyenv versions'
     inventory_dir: "{{ playbook_dir }}/.." # localhost doesn't have 'inventory_dir' global variable
     venv_path: "{{ inventory_dir }}/pip_packages" 

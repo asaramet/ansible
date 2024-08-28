@@ -20,6 +20,16 @@
   vars: 
     netbox_url: "https://{{ netbox_server }}"
   tasks:
+    - name: Include development server variables
+      tags: development
+      include_vars:
+        file: ../data/src/development_server.yaml
+
+    - name: Include production server variables
+      tags: production
+      include_vars:
+        file: ../data/src/production_server.yaml
+
     - name: Include data for ProCurve modular switches 
       tags: procurve_modular
       include_vars:
@@ -59,16 +69,6 @@
       tags: aruba_8
       include_vars:
         file: ../data/yaml/aruba_8_ports.yaml
-
-    - name: Include development server variables
-      tags: development
-      include_vars:
-        file: ../data/src/development_server.yaml
-
-    - name: Include production server variables
-      tags: production
-      include_vars:
-        file: ../data/src/production_server.yaml
 
     - name: Add switches
       tags: switches

@@ -105,6 +105,41 @@ def convert_interfaces_range(interfaces_string):
 
     return i_list
 
+# Convert and interfaces range string, such as '1/39-1/40,1/43-1/44,1/46-1/48,2/3,2/7,2/10,2/12,2/14-2/20,2/22,2/24-2/48'
+# to a valid list of interfaces
+def convert_stack_interfaces_range(interfaces_string):
+    i_list = []
+    stack_nr = None
+
+    for el in interfaces_string.split(","):
+
+        #if 'Trk' in el:
+            # get stack number for trunks
+        #    stack_nr = 22
+
+        if '-' in el:
+
+            # Split stack number and range
+            start, end = el.split('-')
+            if '/' in start:
+                s_nr, s_el = start.split('/')
+                e_nr, e_el = end.split('/')
+                stack_nr = s_nr if s_nr == e_nr else None
+                el = s_el + '-' + e_el
+
+            for interface in convert_range(el):
+                # convert range string to list interfaces list and save them
+                i_list.append((stack_nr, interface))
+            continue
+
+        if '/' in el:
+            stack_nr, el = el.split('/')
+
+
+        i_list.append((stack_nr,el))
+
+    return i_list
+
 # --- Get functions ---
 def get_hostname(t_file):
     hostname_line = search_line("hostname", t_file)
@@ -254,7 +289,8 @@ def device_type(hostname):
 # tags = "switch"
 # tags = ["switch", "modular_switch"]
 def devices_json(config_files, device_type_slags, tags):
-    data = {'devices':[]}
+    #data = {'devices':[]}
+    data = {'devices':[], 'chassis':[]}
     for t_file in config_files:
         hostname = get_hostname(t_file)
 
@@ -268,9 +304,16 @@ def devices_json(config_files, device_type_slags, tags):
         # update data for stacks 
         clean_name = hostname['1'][:-2]
         d_label = device_type_slags[device_type(clean_name)]
+        data['chassis'].append({'name': clean_name})
+
         for h_name in hostname.values(): 
+            vc_position = int(h_name[-1])
+            vc_priority = 255 if vc_position == 1 else 128
             data['devices'].append({'name': h_name, 'device_role': get_device_role(t_file, clean_name), 'device_type': d_label, 
-                'site': get_site(clean_name), 'tags': tags, 'serial':serial_numbers()[h_name]})
+                'site': get_site(clean_name), 'tags': tags, 'serial':serial_numbers()[h_name],
+                'virtual_chassis': clean_name, 'vc_position': vc_position, 'vc_priority': vc_priority
+            })
+        
 
     return data
 
@@ -282,15 +325,34 @@ def trunks_json(config_files):
         hostname = get_hostname(t_file)
         trk_lists = get_trunks(t_file)
 
+        # update data for single switches 
+        if isinstance(hostname, str):
+            for trunk in trk_lists:
+                if trunk == []: continue
+                trk_name = trunk['name'].title()
+                data['trunks'].append({'hostname': hostname, 'name': trk_name})
+
+                #there is always max 2 interfaces in a trunk, but sometimes they are created with '-' instead of ','
+                interfaces = trunk['interfaces'].replace('-', ',').split(',') 
+                for interface in interfaces:
+                    data['trunk_interfaces'].append({'hostname': hostname, 'interface': interface, 'trunk_name': trk_name})
+            continue
+
+        # update data for stacks 
+        clean_name = hostname['1'][:-2]
         for trunk in trk_lists:
             if trunk == []: continue
             trk_name = trunk['name'].title()
-            data['trunks'].append({'hostname': hostname, 'name': trk_name})
 
-            #there is always max 2 interfaces in a trunk, but sometimes they are created with '-' instead of ','
-            interfaces = trunk['interfaces'].replace('-', ',').split(',') 
-            for interface in interfaces:
-                data['trunk_interfaces'].append({'hostname': hostname, 'interface': interface, 'trunk_name': trk_name})
+            interfaces = trunk['interfaces'].replace('-', ',').split(',')
+            for stack_interface in interfaces:
+                stack_nr, interface = stack_interface.split('/')
+                stack_hostname = hostname[stack_nr]
+
+                if {'hostname': stack_hostname, 'name': trk_name} not in data['trunks']:
+                    data['trunks'].append({'hostname': stack_hostname, 'name': trk_name})
+
+                data['trunk_interfaces'].append({'hostname': stack_hostname, 'interface': interface, 'trunk_name': trk_name})
 
     return data
 
@@ -299,10 +361,24 @@ def interface_names_json(config_files):
 
     for t_file in config_files:
         hostname = get_hostname(t_file)
-        for i_tuple in get_interface_names(t_file):
-            interface, name = i_tuple
-            data['interface_names'].append({'hostname': hostname, 'interface': interface, 'name': name})
+
+        # update data for single switches 
+        if isinstance(hostname, str):
+            for i_tuple in get_interface_names(t_file):
+                interface, name = i_tuple
+                data['interface_names'].append({'hostname': hostname, 'interface': interface, 'name': name})
+            continue
     
+        # update data for stacks 
+        clean_name = hostname['1'][:-2]
+        for i_tuple in get_interface_names(t_file):
+            stack_interface, name = i_tuple
+            stack_nr, interface = stack_interface.split('/')
+            stack_hostname = hostname[stack_nr]
+
+            if {'hostname': stack_hostname, 'interface': interface, 'name': name} not in data['interface_names']:
+                data['interface_names'].append({'hostname': stack_hostname, 'interface': interface, 'name': name})
+
     return data
 
 def vlans_jason(config_files):
@@ -320,6 +396,16 @@ def vlans_jason(config_files):
 
     return data
 
+def get_trunk_stack(t_file):
+    trunks = []
+
+    for trunk_dict in get_trunks(t_file):
+        for interface in trunk_dict['interfaces'].split(','):
+            interface = interface.split('/')[0]
+            trunks.append((trunk_dict['name'].title(), interface))
+
+    return trunks
+
 def untagged_vlans_json(config_files):
     data = {'untagged_vlans':[]}
 
@@ -327,10 +413,34 @@ def untagged_vlans_json(config_files):
         hostname = get_hostname(t_file)
         vlan_sets = get_untagged_vlans(t_file)
         # ex: [('1', 'B10-B13,B15-B20,E2,E4,E6,E8,F2,F4,F6,F8'), ('50', 'A2-A24'), ('101', 'A1,B2,B9,B14,B21-B24,E5,E7,F5,F7,Trk1,Trk20-Trk24')]
+        # ex2: [('1', '2/49-2/50'), ('50', '1/2-1/6,1/8,1/10-1/12,1/15,1/19,1/22-1/24,1/27-1/28,1/30-1/32,1/35-1/36,1/39-1/40,1/43-1/44,1/46-1/48,2/3,2/7,2/10,2/12,2/14-2/20,2/22,2/24-2/48')]
+
+        # update data for single switches 
+        if isinstance(hostname, str):
+            for vlan_id, interfaces_range in vlan_sets:
+                vlan_name = get_vlans_names(t_file)[vlan_id]
+                for interface in convert_interfaces_range(interfaces_range):
+                    data['untagged_vlans'].append({'hostname': hostname, 'interface': interface,
+                        'vlan_id': vlan_id, 'vlan_name': vlan_name})
+                continue
+            continue
+        
+        # update data for stacks 
+        #clean_name = hostname['1'][:-2]
+        trunk_stacks = get_trunk_stack(t_file)
         for vlan_id, interfaces_range in vlan_sets:
             vlan_name = get_vlans_names(t_file)[vlan_id]
-            for interface in convert_interfaces_range(interfaces_range):
-                data['untagged_vlans'].append({'hostname': hostname, 'interface': interface,
+
+            for stack_nr, interface in convert_stack_interfaces_range(interfaces_range):
+
+                # Find stack number for Trunks
+                if not stack_nr: 
+                    for nr in range(1,20):
+                        if (interface, str(nr) ) in trunk_stacks:
+                            stack_nr = nr
+                            continue
+
+                data['untagged_vlans'].append({'hostname': hostname[str(stack_nr)], 'interface': interface,
                     'vlan_id': vlan_id, 'vlan_name': vlan_name})
             continue
 
@@ -499,9 +609,9 @@ if __name__ == "__main__":
     #debug_config_files(data_folder)
     #debug_convert_range()
     #debug_convert_interfaces_range()
-    debug_get_hostname(data_folder)
-    debug_get_device_role(data_folder)
-    debug_get_site(data_folder)
+    #debug_get_hostname(data_folder)
+    #debug_get_device_role(data_folder)
+    #debug_get_site(data_folder)
     #debug_get_trunks(data_folder)
     #debug_get_interface_names(data_folder)
     #debug_get_vlans(data_folder)
@@ -516,8 +626,9 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/aruba-modular-stack/"
 
     debug_get_hostname(data_folder)
-    debug_get_device_role(data_folder)
-    debug_get_site(data_folder)
+    #debug_get_device_role(data_folder)
+    #debug_get_site(data_folder)
+    debug_get_trunks(data_folder)
 
     #files = config_files(data_folder)
     #device_type_slags = { 'J9729A': 'hpe-aruba-2920-48g-poep' }

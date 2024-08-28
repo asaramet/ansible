@@ -38,3 +38,84 @@ Packages:
 - `pip_packages.yaml` - create a local python virtual environment and download required packages
 - `plugins.yaml` - install NetBox plugins on the remote server. You should then update the "PLUGINS" keyword in `configuration.py` and update NetBox by running the `install.yaml` playbook with `reboot: true` option.
 - `restore_sql.yaml` - Restore PostgreSQL database from a backup dump file and archived media.
+
+## Update NetBox
+
+As example will take NetBox version: `4.0.9`
+
+1. Check if requirements are updated or conformed in the corresponding file.
+
+    i.e:  `src/requirements-{version}.txt`
+    Ex:   `src/requirements-4.0.9.txt`
+
+2. Update/Download python packages.
+
+    Playbook: `playbooks/pip_packages.yaml`
+    Update variable in the playbook: `netbox_version`
+      Ex: `netbox_version: 4.0.9`
+
+    Run the script:
+
+    ```bash
+    pyenv shell 3.11.2
+    ansible-playbook playbooks/pip_packages.yaml 
+    ```
+
+3. Run the install script on development server
+
+    Playbook: `playbooks/install.yaml`
+    Update variable in the playbook: `netbox_version`
+      Ex: `netbox_version: &netbox_version 4.0.9`
+
+    Set development variables. Ex:
+
+    ```yaml
+    server: &server debian12-ansible
+    production: &production false
+    ```
+
+    Run the script:
+
+    ```bash
+    ansible-playbook playbooks/install.yaml
+    ```
+
+4. Backup production server database
+
+    Playbook: `playbooks/backup_sql.yaml`
+
+    Run the script (you'll have to authenticate several times):
+
+    ```bash
+    ansible-playbook playbooks/backup_sql.yaml
+    ```
+
+5. Update Linux packages
+
+    ```bash
+    ssh root@rzlx8750
+
+      apt update
+      apt upgrade
+      apt autoremove
+      reboot
+    ```
+
+6. Update the production server
+
+    Playbook: `playbooks/install.yaml`
+    Update variable in the playbook: `netbox_version`
+      Ex: `netbox_version: &netbox_version 4.0.9`
+
+    Set development variables. Ex:
+
+    ```yaml
+    server: &server hs_netbox 
+    production: &production true
+    ```
+
+    Run the script:
+
+    ```bash
+    ansible-playbook playbooks/install.yaml
+    ```

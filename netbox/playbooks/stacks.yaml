@@ -1,0 +1,191 @@
+---
+# Examples how to use:
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack_modular,production,switches
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack_modular,production,modules
+#
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,switches
+#
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,trunks
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,interfaces
+#
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,create_vlans
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,untagged_vlans
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,tagged_vlans
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,ip
+#
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,chassis
+
+
+- name: Add HP Switches from configuration files
+  hosts: localhost
+  gather_facts: false
+  vars: 
+    netbox_url: "https://{{ netbox_server }}"
+  tasks:
+    - name: Include development server variables
+      tags: development
+      include_vars:
+        file: ../data/src/development_server.yaml
+
+    - name: Include production server variables
+      tags: production
+      include_vars:
+        file: ../data/src/production_server.yaml
+
+    - name: Include data for HPE stacked switches
+      tags: aruba_stack
+      include_vars:
+        file: ../data/yaml/aruba_stack.yaml
+
+    - name: Add stacked switches
+      tags: switches
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          site: "{{ item.site }}"
+          device_type: "{{ item.device_type }}" 
+          device_role: "{{ item.device_role }}"
+          serial: "{{ item.serial }}"
+          tags: "{{ item.tags }}"
+          tenant: netzadmin
+        state: present
+      loop: "{{ devices }}"
+
+    - name: Delete virtual chassis 
+      tags: 
+        - delete_chassis
+        - trunks
+        - interfaces
+        - vlans
+        - untagged_vlans
+      netbox.netbox.netbox_virtual_chassis:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+        state: absent
+      loop: "{{ chassis }}"
+
+    - name: Create Trunk interfaces as LAG
+      tags:
+        - lags
+        - trunks
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: 
+            name: "{{ item.hostname }}"
+          name: "{{ item.name }}"
+          type: Link Aggregation Group (LAG)
+        update_vc_child: true
+        state: present
+      loop: "{{ trunks }}"
+
+    - name: Assign interfaces to Trunks
+      tags:
+        - trunk_interfaces
+        - trunks
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: 
+            name: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          lag:
+            name: "{{ item.trunk_name }}"
+        update_vc_child: true
+        state: present
+      loop: "{{ trunk_interfaces }}"
+
+    - name: Update interfaces description (here name)
+      tags:
+        - interfaces
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          description: "{{ item.name }}"
+        state: present
+      loop: "{{ interface_names }}"
+
+    - name: Create VLANs
+      tags:
+        - create_vlans
+        - vlans
+      netbox.netbox.netbox_vlan:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          vid: "{{ item.id }}"
+        state: present
+      loop: "{{ vlans }}"
+    
+    - name: Assign untagged vlans to interfaces
+      tags:
+        - untagged_vlans
+        - vlans
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          mode: Access
+          untagged_vlan: 
+            vlan_id: "{{ item.vlan_id }}"
+            name: "{{ item.vlan_name }}"
+      loop: "{{ untagged_vlans }}"
+
+    - name: Create virtual chassis 
+      tags: 
+        - create_chassis
+        - chassis
+      netbox.netbox.netbox_virtual_chassis:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          master: "{{ item.name }}-1"
+          tags:
+            - switch
+            - stack
+        state: present
+      loop: "{{ chassis }}"
+
+    - name: Assign switches to chassis
+      tags: 
+        - assign_switches
+        - chassis
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          site: "{{ item.site }}"
+          device_type: "{{ item.device_type }}" 
+          device_role: "{{ item.device_role }}"
+          serial: "{{ item.serial }}"
+          tags: "{{ item.tags }}"
+          tenant: netzadmin
+          virtual_chassis: "{{ item.virtual_chassis }}"
+          vc_position: "{{ item.vc_position }}"
+          vc_priority: "{{ item.vc_priority }}"
+        state: present
+        #state: absent
+      loop: "{{ devices }}"
