@@ -88,7 +88,7 @@ def convert_range(range_str):
         # Generate the list of elements
         return [f"{prefix_start}{num}" for num in range(num_start, num_end + 1)]
     
-    return [num for num in range(int(start), int(end))]
+    return [num for num in range(int(start), int(end)+1)]
 
 # Convert and interfaces range string, such as 'B10-B13,B15-B20,E2,E4,E6,E8,F2,F4,F6,F8'
 # to a valid list of interfaces
@@ -113,9 +113,9 @@ def convert_stack_interfaces_range(interfaces_string):
 
     for el in interfaces_string.split(","):
 
-        #if 'Trk' in el:
-            # get stack number for trunks
-        #    stack_nr = 22
+        # set None stack number for trunks
+        if 'Trk' in el:
+            stack_nr = None
 
         if '-' in el:
 
@@ -134,7 +134,6 @@ def convert_stack_interfaces_range(interfaces_string):
 
         if '/' in el:
             stack_nr, el = el.split('/')
-
 
         i_list.append((stack_nr,el))
 
@@ -198,6 +197,16 @@ def get_trunks(t_file):
     for line in recursive_search("trunk", text):
         line_data = line.split()
         trunks.append({"name": line_data[2], 'interfaces': line_data[1]})
+
+    return trunks
+
+def get_trunk_stack(t_file):
+    trunks = []
+
+    for trunk_dict in get_trunks(t_file):
+        for interface in trunk_dict['interfaces'].split(','):
+            interface = interface.split('/')[0]
+            trunks.append((trunk_dict['name'].title(), interface))
 
     return trunks
 
@@ -396,16 +405,6 @@ def vlans_jason(config_files):
 
     return data
 
-def get_trunk_stack(t_file):
-    trunks = []
-
-    for trunk_dict in get_trunks(t_file):
-        for interface in trunk_dict['interfaces'].split(','):
-            interface = interface.split('/')[0]
-            trunks.append((trunk_dict['name'].title(), interface))
-
-    return trunks
-
 def untagged_vlans_json(config_files):
     data = {'untagged_vlans':[]}
 
@@ -437,12 +436,13 @@ def untagged_vlans_json(config_files):
                 if not stack_nr: 
                     for nr in range(1,20):
                         if (interface, str(nr) ) in trunk_stacks:
-                            stack_nr = nr
+                            data['untagged_vlans'].append({'hostname': hostname[str(nr)], 'interface': interface,
+                                'vlan_id': vlan_id, 'vlan_name': vlan_name})
                             continue
+                    continue
 
                 data['untagged_vlans'].append({'hostname': hostname[str(stack_nr)], 'interface': interface,
                     'vlan_id': vlan_id, 'vlan_name': vlan_name})
-            continue
 
     return data
 
@@ -523,6 +523,21 @@ def debug_convert_interfaces_range():
         table.append([value, convert_interfaces_range(value)])
     print(tabulate(table, headers, "github"))
 
+def debug_convert_stack_interfaces_range():
+    print("\n== Converting interface ranges strings to list of interfaces ==")
+
+    i_strings = [
+        '1/2-1/12,1/16,2/1-2/12,2/16,3/9-3/10,3/15-3/16',
+        '1/1,Trk1-Trk2',
+        'Trk20-Trk23'
+    ] 
+
+    table = []
+    headers = ["String", "Converted"]
+    for value in i_strings:
+        table.append([value, convert_stack_interfaces_range(value)])
+    print(tabulate(table, headers, "github"))
+
 def debug_get_hostname(data_folder):
     table = []
     headers = ["File name", "Hostname"]
@@ -555,6 +570,14 @@ def debug_get_trunks(data_folder):
     headers = ["File Name", "Trunks"]
     for f in config_files(data_folder):
         table.append([os.path.basename(f), get_trunks(f)])
+    print("\n== Debug: get_trunks ==")
+    print(tabulate(table, headers))
+
+def debug_get_trunk_stack(data_folder):
+    table = []
+    headers = ["File Name", "Trunks sets"]
+    for f in config_files(data_folder):
+        table.append([os.path.basename(f), get_trunk_stack(f)])
     print("\n== Debug: get_trunks ==")
     print(tabulate(table, headers))
 
@@ -608,7 +631,6 @@ if __name__ == "__main__":
 
     #debug_config_files(data_folder)
     #debug_convert_range()
-    #debug_convert_interfaces_range()
     #debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_site(data_folder)
@@ -628,9 +650,14 @@ if __name__ == "__main__":
     debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_site(data_folder)
-    debug_get_trunks(data_folder)
+    #debug_get_trunks(data_folder)
+    debug_get_trunk_stack(data_folder)
 
     #files = config_files(data_folder)
     #device_type_slags = { 'J9729A': 'hpe-aruba-2920-48g-poep' }
     #devices_tags = ["switch", "stack"]
     #print(devices_json(files, device_type_slags, devices_tags))
+
+
+    #debug_convert_interfaces_range()
+    debug_convert_stack_interfaces_range()

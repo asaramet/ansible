@@ -187,5 +187,4 @@
           vc_position: "{{ item.vc_position }}"
           vc_priority: "{{ item.vc_priority }}"
         state: present
-        #state: absent
       loop: "{{ devices }}"
