@@ -5,6 +5,8 @@
 #
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,switches
 #
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,delete_chassis
+#
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,trunks
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,interfaces
 #
@@ -57,11 +59,6 @@
     - name: Delete virtual chassis 
       tags: 
         - delete_chassis
-        - trunks
-        - interfaces
-        - vlans
-        - untagged_vlans
-        - tagged_vlans
       netbox.netbox.netbox_virtual_chassis:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -166,6 +163,57 @@
           tagged_vlans: "{{ item.tagged_vlans }}"
       loop: "{{ tagged_vlans }}"
 
+    - name: Create VLAN interfaces for loopback IPs
+      tags:
+        - loopback
+        - vlans
+        - ip
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "vlan {{ item.vlan_id }}"
+          type: Virtual
+          description: "{{ item.vlan_name }}"
+        state: present
+      loop: "{{ ip_addresses }}"
+
+    - name: Assign IP to VLAN interfaces
+      tags:
+        - assign_ip
+        - vlans
+        - ip
+      netbox.netbox.netbox_ip_address:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          address: "{{ item.ip }}"
+          dns_name: "{{ item.hostname }}"
+          description: "VLAN {{ item.vlan_id }} ({{ item.vlan_name }})"
+          assigned_object:
+            device: "{{item.hostname }}"
+            name: "vlan {{ item.vlan_id }}"
+          role: Loopback
+          tenant: netzadmin
+        state: present
+      loop: "{{ ip_addresses }}"
+
+    - name: Assign IP addresses to devices
+      tags:
+        - ip_to_devices
+        - ip
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.hostname }}"
+          primary_ip4: "{{ item.ip }}"
+        state: present
+      loop: "{{ ip_addresses }}"
     - name: Create virtual chassis 
       tags: 
         - create_chassis

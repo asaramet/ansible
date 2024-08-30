@@ -524,6 +524,9 @@ def ip_addresses_json(config_files):
 
     for t_file in config_files:
         hostname = get_hostname(t_file)
+        if isinstance(hostname, dict):
+            hostname = hostname['1']
+
         vlan_id, vlan_name, ip = get_ip_address(t_file)
 
         data['ip_addresses'].append({'hostname': hostname, 'ip': ip, 'vlan_id': vlan_id, 'vlan_name': vlan_name})
