@@ -226,7 +226,6 @@
           name: "{{ item.name }}"
           master: "{{ item.name }}-1"
           tags:
-            - switch
             - stack
         state: present
       loop: "{{ chassis }}"
