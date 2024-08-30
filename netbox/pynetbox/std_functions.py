@@ -477,6 +477,48 @@ def tagged_vlans_json(config_files):
                     interface_exists = False
     return data
 
+def tagged_vlans_stack_json(config_files):
+    data = {'tagged_vlans':[]}
+
+    for t_file in config_files:
+        hostnames = get_hostname(t_file)
+
+        # get list of tagged vlan tuples like:
+        vlan_sets = get_untagged_vlans(t_file, 'tagged')
+
+        trunk_stacks = get_trunk_stack(t_file)
+        for vlan_id, interfaces_range in vlan_sets:
+            vlan_name = get_vlans_names(t_file)[vlan_id]
+
+            # iterate through all the interfaces that belong to a vlan
+            for stack_nr, interface in convert_stack_interfaces_range(interfaces_range):
+
+                # get the module hostname
+                modules_hostname = []
+                if not stack_nr: 
+                    for nr in range(1,20):
+                        if (interface, str(nr) ) in trunk_stacks: 
+                            modules_hostname.append(hostnames[str(nr)])
+                
+                else:
+                    modules_hostname.append(hostnames[stack_nr])
+
+                for hostname in modules_hostname:
+                    interface_exists = False # flag to notify that the interface exist in data['tagged_vlans'][hostname]
+                    for v_dict in data['tagged_vlans']:
+                        if v_dict['hostname'] == hostname and v_dict['interface'] == interface:
+                            # update the interface list with vlan data
+                            v_dict['tagged_vlans'].append({'name': vlan_name, 'vlan_id': vlan_id})
+                            interface_exists = True # update flag
+                            break # exit the loop with updated flag
+
+                    # create a new dictionary entry if the interface vlan list does not exists
+                    if not interface_exists:
+                        data['tagged_vlans'].append({ 'hostname': hostname, 'interface': interface, 
+                            'tagged_vlans': [{'name': vlan_name, 'vlan_id': vlan_id}] })
+                        interface_exists = False
+    return data
+
 def ip_addresses_json(config_files):
     data = {'ip_addresses':[]}
 
