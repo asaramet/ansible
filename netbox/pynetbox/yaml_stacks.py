@@ -51,6 +51,12 @@ def get_modules(t_file):
 
     return modules
 
+def assign_sfp_modules(t_file):
+    with open(main_folder + "/host_vars/99/sfp_modules.yaml", 'r' ) as f:
+        modules = yaml.safe_load(f)
+    print(modules)
+    return modules
+
 # return the modules json object
 def modules_json(config_files, module_types = {}):
     data = {'modules':[]}
@@ -113,7 +119,7 @@ def main():
 
     devices_tags = ["switch", "stack"]
 
-    stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
+    #stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba 2920 stacks with LWL modules
     data_folder = main_folder + "/data/aruba-stack-2920/"
@@ -125,6 +131,7 @@ def main():
 
     devices_tags = ["switch", "stack"]
 
+    assign_sfp_modules(data_folder)
     #stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba modular stacks

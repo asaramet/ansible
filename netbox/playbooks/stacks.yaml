@@ -273,6 +273,7 @@
           primary_ip4: "{{ item.ip }}"
         state: present
       loop: "{{ ip_addresses }}"
+
     - name: Create virtual chassis 
       tags: 
         - create_chassis
