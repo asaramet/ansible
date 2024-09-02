@@ -7,6 +7,8 @@
 #
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,delete_chassis
 #
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2930,development,modules
+
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,trunks
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,interfaces
 #
@@ -34,10 +36,15 @@
       include_vars:
         file: ../data/src/production_server.yaml
 
-    - name: Include data for HPE stacked switches
+    - name: Include data for Aruba stacked switches
       tags: aruba_stack
       include_vars:
         file: ../data/yaml/aruba_stack.yaml
+
+    - name: Include data for Aruba 2930 stacked switches with mini modules
+      tags: aruba_stack_2930
+      include_vars:
+        file: ../data/yaml/aruba_stack_2930.yaml
 
     - name: Add stacked switches
       tags: switches
@@ -67,6 +74,58 @@
           name: "{{ item.name }}"
         state: absent
       loop: "{{ chassis }}"
+
+    - name: Delete module bays
+      tags:
+        - delete_bays
+        - modules
+      netbox.netbox.netbox_module_bay:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.device }}"
+          name: "{{ item.name }}"
+          position: "{{ item.module_bay }}"
+        state: absent
+      loop: "{{ modules }}"
+      when: "{{ modular }}"
+
+    - name: Create module bays
+      tags:
+        - create_bays
+        - modules
+      netbox.netbox.netbox_module_bay:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.device }}"
+          name: "{{ item.device }}-{{ item.module_bay }}"
+          position: "{{ item.module_bay }}"
+          label: "{{ item.module_bay }}"
+          description: "{{ item.type }}"
+        state: present
+      loop: "{{ modules }}"
+      when: "{{ modular }}"
+
+    - name: Install modules
+      tags:
+        - install_modules
+        - modules
+      netbox.netbox.netbox_module:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.device }}"
+          module_bay: "{{ item.device }}-{{ item.module_bay }}"
+          module_type: "{{ item.type }}"
+          description: "{{ item.type }}"
+          status: active
+        state: present
+      loop: "{{ modules }}"
+      when: "{{ modular }}"
 
     - name: Create Trunk interfaces as LAG
       tags:

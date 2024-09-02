@@ -18,7 +18,7 @@ def search_line(expression, t_file):
 
     return None
     
-# search lines in a text recursively
+# search lines in a text recursively, when line start with a pattern
 def recursive_search(pattern, text):
     # base case
     if not text:

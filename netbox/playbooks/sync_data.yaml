@@ -77,20 +77,28 @@
       loop: "{{ JL322A_module }}"
       when: "{{ do_it }}"
 
-    - name: Sync HPE Modular stack switches config files from rhlx99
-      fetch:
-        src: "/tftpboot/{{ item }}/running-config"
-        dest: "{{ inventory_dir }}/data/hpe-stack/{{ item }}"
-        flat: yes
-      loop: "{{ J9729A_stack + JL322A_stack  }}"
-      when: "{{ do_it }}"
-
     - name: Sync Aruba stack switches config files from rhlx99
       fetch:
         src: "/tftpboot/{{ item }}/running-config"
         dest: "{{ inventory_dir }}/data/aruba-stack/{{ item }}"
         flat: yes
       loop: "{{ JL256A_stack + JL693A_stack }}"
+      when: "{{ do_it }}"
+
+    - name: Sync Aruba 2920 stack switches with mini modules config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/aruba-stack-2920/{{ item }}"
+        flat: yes
+      loop: "{{ J9729A_stack }}"
+      when: "{{ do_it }}"
+
+    - name: Sync Aruba 2930 stack switches with mini modules config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/aruba-stack-2930/{{ item }}"
+        flat: yes
+      loop: "{{ JL322A_stack  }}"
       when: "{{ do_it }}"
 
     - name: Sync Aruba modular stack switches config files from rhlx99
