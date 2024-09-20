@@ -284,7 +284,7 @@
         validate_certs: false
         data:
           name: "{{ item.name }}"
-          master: "{{ item.name }}-1"
+          master: "{{ item.name + '-1' | regex_replace('0') }}" 
           tags:
             - stack
         state: present

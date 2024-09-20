@@ -48,6 +48,8 @@ As example will take NetBox version: `4.0.9`
     i.e:  `src/requirements-{version}.txt`
     Ex:   `src/requirements-4.0.9.txt`
 
+   NB: Don't forget to add NetBox plugins into new `requirements-x.x.x.txt` file.
+
 2. Update/Download python packages.
 
     Playbook: `playbooks/pip_packages.yaml`
