@@ -1,0 +1,45 @@
+---
+# Examples how to use:
+# ansible-playbook playbooks/debug.yaml 
+
+- name: Debuging ansible
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Include extra variables
+      tags: 
+        - dictionary
+        - items
+        - select
+        - range
+        - add_range
+      include_vars:
+        file: ../data/yaml/aruba_stack.yaml
+
+    - name: Print the dictionary
+      tags: dictionary
+      debug:
+        msg: "{{ device_interfaces }}"
+
+    - name: Items in the dictionary
+      tags: items
+      debug:
+        msg: "{{ item }}"
+      loop: "{{ device_interfaces }}"
+
+    - name: Print interfaces range
+      tags: range
+      debug:
+        msg: "{{ range(1, item.nr_of_interfaces + 1) | list}}"
+      loop: "{{ device_interfaces }}"
+
+    - name: Select elements from a list of dicts with 'map'
+      tags: select
+      debug:
+        msg: "{{ device_interfaces | map(attribute='name') }}"
+
+    - name: Add interfaces from range
+      tags: add_range
+      debug:
+        msg: "{{ range(1, item.nr_of_interfaces + 1) | list | lists_mergeby(device_interfaces) }}"
+      loop: "{{ device_interfaces }}"

@@ -63,6 +63,37 @@
         state: present
       loop: "{{ devices }}"
 
+    - name: Delete default interfaces
+      tags: 
+        - delete_default_interfaces
+        - switches
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.name }}"
+          name: "{{ item.interface }}"
+        state: absent
+      loop: "{{ device_interfaces }}"
+
+    - name: Add stack interfaces
+      tags: 
+        - stack_interfaces
+        - switches
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.name }}"
+          name: "{{ item.stack_nr }}/{{ item.interface }}"
+          type: "{{ item.type }}"
+          poe_mode: "{{ item.poe_mode }}"
+          poe_type: "{{ item.poe_type }}"
+        state: present
+      loop: "{{ device_interfaces }}"
+
     - name: Delete virtual chassis 
       tags: 
         - delete_chassis
@@ -155,7 +186,7 @@
         data:
           device: 
             name: "{{ item.hostname }}"
-          name: "{{ item.interface }}"
+          name: "{{ item.stack_nr }}/{{ item.interface }}"
           lag:
             name: "{{ item.trunk_name }}"
         update_vc_child: true

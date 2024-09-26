@@ -7,7 +7,7 @@ from tabulate import tabulate
 from std_functions import this_folder, main_folder
 from std_functions import config_files
 from std_functions import devices_json, trunks_json, interface_names_json
-from std_functions import vlans_jason, untagged_vlans_json, tagged_vlans_json
+from std_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
 from std_functions import ip_addresses_json
 
 # Collect single switches data and saved it to a YAML file
@@ -18,7 +18,7 @@ def single(data_folder, output_file_path, device_type_slags, devices_tags):
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(trunks_json(files), f)
         yaml.dump(interface_names_json(files), f)
-        yaml.dump(vlans_jason(files), f)
+        yaml.dump(vlans_json(files), f)
         yaml.dump(untagged_vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)

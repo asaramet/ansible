@@ -82,7 +82,7 @@
         src: "/tftpboot/{{ item }}/running-config"
         dest: "{{ inventory_dir }}/data/aruba-stack/{{ item }}"
         flat: yes
-      loop: "{{ JL256A_stack + JL693A_stack }}"
+      loop: "{{ JL256A_stack + JL693A_stack + JL075A_stack }}"
       when: "{{ do_it }}"
 
     - name: Sync Aruba 2920 stack switches with mini modules config files from rhlx99

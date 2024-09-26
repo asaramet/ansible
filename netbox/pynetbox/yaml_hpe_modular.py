@@ -8,7 +8,7 @@ from std_functions import this_folder, main_folder
 from std_functions import config_files
 from std_functions import recursive_search, get_hostname
 from std_functions import devices_json, trunks_json, interface_names_json
-from std_functions import vlans_jason, untagged_vlans_json, tagged_vlans_json
+from std_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
 from std_functions import ip_addresses_json
 
 module_types = {
@@ -79,7 +79,7 @@ def modular(data_folder, output_file_path, device_type_slags, devices_tags, modu
         yaml.dump(modules_json(files, module_types), f)
         yaml.dump(trunks_json(files), f)
         yaml.dump(interface_names_json(files), f)
-        yaml.dump(vlans_jason(files), f)
+        yaml.dump(vlans_json(files), f)
         yaml.dump(untagged_vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)

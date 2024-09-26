@@ -5,9 +5,9 @@
 import re, os, yaml
 from tabulate import tabulate
 from std_functions import this_folder, main_folder
-from std_functions import config_files
+from std_functions import config_files, device_type
 from std_functions import devices_json, trunks_json, interface_names_json
-from std_functions import vlans_jason, untagged_vlans_json, tagged_vlans_stack_json
+from std_functions import vlans_json, untagged_vlans_json, tagged_vlans_stack_json
 from std_functions import ip_addresses_json
 from std_functions import get_hostname
 
@@ -54,7 +54,6 @@ def get_modules(t_file):
 def assign_sfp_modules(t_file):
     with open(main_folder + "/host_vars/99/sfp_modules.yaml", 'r' ) as f:
         modules = yaml.safe_load(f)
-    print(modules)
     return modules
 
 # return the modules json object
@@ -67,17 +66,68 @@ def modules_json(config_files, module_types = {}):
             data['modules'].append({'device': module['hostname'], 'name': module['name'], 'module_bay': module['module'], 'type': module_types[module['type'].lower()]})
     return data
 
+def device_interfaces_nr(config_files):
+    nr_of_interfaces = {
+        'JL256A_stack': (48, '1000base-t', 'pd', 'type2-ieee802.3at'),
+        'JL075A_stack': (16, '10gbase-x-sfpp', None, None),
+        'JL693A_stack': (12, '1000base-t', 'pd', 'type2-ieee802.3at')
+    }
+
+    uplink_interfaces = {
+        'JL693A_stack': ('13-14', '1000base-t', None, None)
+    }
+
+    sfp_interfaces = {
+        'JL256A_stack': ('49-52', '10gbase-x-sfpp', None, None),
+        'JL693A_stack': ('15-16', '10gbase-x-sfpp', None, None)
+    }
+
+    data = {'device_interfaces':[]}
+    for t_file in config_files:
+        hostname = get_hostname(t_file)
+
+        clean_name = hostname['1'][:-2]
+
+        type_key = device_type(clean_name)
+        nr_of_i, type_of_i, poe_mode, poe_type = nr_of_interfaces[type_key]
+
+        for stack_nr, h_name in hostname.items():
+            for nr in range(1, int(nr_of_i) + 1):
+                data['device_interfaces'].append({'name': h_name, 'stack_nr': stack_nr, 'interface': nr, 
+                    'type': type_of_i, 'poe_mode': poe_mode, 'poe_type': poe_type})
+
+        if type_key in uplink_interfaces.keys():
+            range_of_i, type_of_i, poe_mode, poe_type = uplink_interfaces[type_key]
+            start_i, end_i = range_of_i.split('-')
+
+            for stack_nr, h_name in hostname.items():
+                for nr in range(int(start_i), int(end_i) + 1, 1):
+                    data['device_interfaces'].append({'name': h_name, 'stack_nr': stack_nr, 'interface': nr, 
+                        'type': type_of_i, 'poe_mode': poe_mode, 'poe_type': poe_type})
+
+        if type_key in sfp_interfaces.keys():
+            range_of_i, type_of_i, poe_mode, poe_type = sfp_interfaces[type_key]
+            start_i, end_i = range_of_i.split('-')
+
+            for stack_nr, h_name in hostname.items():
+                for nr in range(int(start_i), int(end_i) + 1, 1):
+                    data['device_interfaces'].append({'name': h_name, 'stack_nr': stack_nr, 'interface': nr, 
+                        'type': type_of_i, 'poe_mode': poe_mode, 'poe_type': poe_type})
+
+    return data
+
 # Collect stack switches data to a YAML file
 def stack(data_folder, output_file_path, device_type_slags, devices_tags):
     files = config_files(data_folder)
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump({"modular": False}, f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
+        yaml.dump(device_interfaces_nr(files), f)
         yaml.dump(trunks_json(files), f)
         yaml.dump(interface_names_json(files), f)
-        yaml.dump(vlans_jason(files), f)
+        yaml.dump(vlans_json(files), f)
         yaml.dump(untagged_vlans_json(files), f)
-        yaml.dump(tagged_vlans_stack_json(files), f)
+        yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)
 
 def stack_module(data_folder, output_file_path, device_type_slags, devices_tags):
@@ -87,14 +137,23 @@ def stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(trunks_json(files), f)
         yaml.dump(interface_names_json(files), f)
-        yaml.dump(vlans_jason(files), f)
+        yaml.dump(vlans_json(files), f)
         yaml.dump(untagged_vlans_json(files), f)
-        yaml.dump(tagged_vlans_stack_json(files), f)
+        yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)
 
         yaml.dump(modules_json(files, module_types), f)
 
+#----- Debugging -------
+def debug_device_interfaces_nr(data_folder):
+    files = config_files(data_folder)
+    print(device_interfaces_nr(files))
+
 def main():
+    # Run Debugging
+    debug_data_folder = main_folder + "/data/aruba-stack/"
+    #debug_device_interfaces_nr(debug_data_folder)
+
     # Aruba stacks (no extra modules)
     data_folder = main_folder + "/data/aruba-stack/"
     output_file_path = "/data/yaml/aruba_stack.yaml"
