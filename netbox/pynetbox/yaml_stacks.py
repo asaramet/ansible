@@ -7,7 +7,7 @@ from tabulate import tabulate
 from std_functions import this_folder, main_folder
 from std_functions import config_files, device_type
 from std_functions import devices_json, trunks_json, interface_names_json
-from std_functions import vlans_json, untagged_vlans_json, tagged_vlans_stack_json
+from std_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
 from std_functions import ip_addresses_json
 from std_functions import get_hostname
 
@@ -63,14 +63,17 @@ def modules_json(config_files, module_types = {}):
         modules = get_modules(t_file)
 
         for module in modules:
-            data['modules'].append({'device': module['hostname'], 'name': module['name'], 'module_bay': module['module'], 'type': module_types[module['type'].lower()]})
+            _, stack_nr = module['hostname'].split('-')
+            new_position = stack_nr + '/' + module['module']
+            data['modules'].append({'device': module['hostname'], 'name': module['name'], 'module_bay': module['module'], 'new_position': new_position, 'type': module_types[module['type'].lower()]})
     return data
 
 def device_interfaces_nr(config_files):
     nr_of_interfaces = {
         'JL256A_stack': (48, '1000base-t', 'pd', 'type2-ieee802.3at'),
         'JL075A_stack': (16, '10gbase-x-sfpp', None, None),
-        'JL693A_stack': (12, '1000base-t', 'pd', 'type2-ieee802.3at')
+        'JL693A_stack': (12, '1000base-t', 'pd', 'type2-ieee802.3at'),
+        'JL322A_stack': (48, '1000base-t', 'pd', 'type2-ieee802.3at')
     }
 
     uplink_interfaces = {
@@ -79,7 +82,8 @@ def device_interfaces_nr(config_files):
 
     sfp_interfaces = {
         'JL256A_stack': ('49-52', '10gbase-x-sfpp', None, None),
-        'JL693A_stack': ('15-16', '10gbase-x-sfpp', None, None)
+        'JL693A_stack': ('15-16', '10gbase-x-sfpp', None, None),
+        #'JL322A_stack': ('A1-A4', '10gbase-x-sfpp', None, None)
     }
 
     data = {'device_interfaces':[]}
@@ -109,9 +113,21 @@ def device_interfaces_nr(config_files):
             range_of_i, type_of_i, poe_mode, poe_type = sfp_interfaces[type_key]
             start_i, end_i = range_of_i.split('-')
 
+            prefix_start = ''
+            if re.match(r'[^\d]+', start_i): 
+                prefix_start = re.match(r'[^\d]+', start_i).group()
+                prefix_end = re.match(r'[^\d]+', end_i).group()
+
+                # Ensure the prefixes are the same
+                if prefix_start != prefix_end:
+                    raise ValueError("Prefixes do not match")
+                
+                start_i = re.search(r'\d+', start_i).group()
+                end_i = re.search(r'\d+', end_i).group()
+
             for stack_nr, h_name in hostname.items():
                 for nr in range(int(start_i), int(end_i) + 1, 1):
-                    data['device_interfaces'].append({'name': h_name, 'stack_nr': stack_nr, 'interface': nr, 
+                    data['device_interfaces'].append({'name': h_name, 'stack_nr': stack_nr, 'interface': prefix_start + str(nr), 
                         'type': type_of_i, 'poe_mode': poe_mode, 'poe_type': poe_type})
 
     return data
@@ -135,6 +151,7 @@ def stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump({"modular": True}, f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
+        yaml.dump(device_interfaces_nr(files), f)
         yaml.dump(trunks_json(files), f)
         yaml.dump(interface_names_json(files), f)
         yaml.dump(vlans_json(files), f)
@@ -151,7 +168,8 @@ def debug_device_interfaces_nr(data_folder):
 
 def main():
     # Run Debugging
-    debug_data_folder = main_folder + "/data/aruba-stack/"
+    #debug_data_folder = main_folder + "/data/aruba-stack/"
+    debug_data_folder = main_folder + "/data/aruba-stack-2930/"
     #debug_device_interfaces_nr(debug_data_folder)
 
     # Aruba stacks (no extra modules)
@@ -178,7 +196,7 @@ def main():
 
     devices_tags = ["switch", "stack"]
 
-    #stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
+    stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba 2920 stacks with LWL modules
     data_folder = main_folder + "/data/aruba-stack-2920/"

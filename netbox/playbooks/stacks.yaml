@@ -133,8 +133,8 @@
         data:
           device: "{{ item.device }}"
           name: "{{ item.device }}-{{ item.module_bay }}"
-          position: "{{ item.module_bay }}"
-          label: "{{ item.module_bay }}"
+          position: "{{ item.new_position }}"
+          label: "{{ item.new_position }}"
           description: "{{ item.type }}"
         state: present
       loop: "{{ modules }}"
@@ -186,7 +186,7 @@
         data:
           device: 
             name: "{{ item.hostname }}"
-          name: "{{ item.stack_nr }}/{{ item.interface }}"
+          name: "{{ item.interface }}"
           lag:
             name: "{{ item.trunk_name }}"
         update_vc_child: true
@@ -229,6 +229,7 @@
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
+        update_vc_child: true
         data:
           device: "{{ item.hostname }}"
           name: "{{ item.interface }}"
@@ -246,6 +247,7 @@
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
+        update_vc_child: true
         data:
           device: "{{ item.hostname }}"
           name: "{{ item.interface }}"
@@ -316,6 +318,7 @@
         data:
           name: "{{ item.name }}"
           master: "{{ item.name + '-1' | regex_replace('0') }}" 
+          #master: "{{ item.master }}"
           tags:
             - stack
         state: present

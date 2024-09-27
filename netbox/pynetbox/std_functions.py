@@ -73,18 +73,18 @@ def convert_range(range_str):
     # Split the input string into the start and end parts
     start, end = range_str.split('-')
 
-    prefix_start = prefix_end = None
+    prefix_start = prefix_end = ""
 
     if '/' in start:
-        prefix_start, start = start.split('/')
-        prefix_end, end = end.split('/')
-        prefix_start += "/"
-        prefix_end += "/"
+        p_start, start = start.split('/')
+        p_end, end = end.split('/')
+        prefix_start += p_start + "/"
+        prefix_end += p_end + "/"
     
     # Extract the prefix and numeric parts of the start and end
     if re.match(r'[^\d]+', start): 
-        prefix_start = re.match(r'[^\d]+', start).group()
-        prefix_end = re.match(r'[^\d]+', end).group()
+        prefix_start += re.match(r'[^\d]+', start).group()
+        prefix_end += re.match(r'[^\d]+', end).group()
 
         # Ensure the prefixes are the same
         if prefix_start != prefix_end:
@@ -296,7 +296,10 @@ def devices_json(config_files, device_type_slags, tags):
         # update data for stacks 
         clean_name = hostname['1'][:-2]
         d_label = device_type_slags[device_type(clean_name)]
-        data['chassis'].append({'name': clean_name})
+
+        master = hostname['1']
+
+        data['chassis'].append({'name': clean_name, 'master': master})
 
         for h_name in hostname.values(): 
             vc_position = int(h_name[-1])
@@ -313,8 +316,13 @@ def trunks_json(config_files):
     data = {'trunks':[], 'trunk_interfaces':[]}
 
     for t_file in config_files:
-        hostname = get_hostname(t_file)
+        hostnames = get_hostname(t_file)
         trk_lists = get_trunks(t_file)
+
+        if '0' in hostnames.keys(): # single switch
+            hostname = hostnames['0']
+        else:
+            hostname = hostnames['1']
 
         for trunk in trk_lists:
             if trunk == []: continue
@@ -323,16 +331,10 @@ def trunks_json(config_files):
             interfaces = trunk['interfaces'].replace('-', ',').split(',')
 
             for interface in interfaces:
-                if '0' in hostname.keys(): # single switch
-                    stack_hostname = hostname['0']
-                else:
-                    stack_nr, _ = interface.split('/')
-                    stack_hostname = hostname[stack_nr]
+                if {'hostname': hostname, 'name': trk_name} not in data['trunks']:
+                    data['trunks'].append({'hostname': hostname, 'name': trk_name})
 
-                if {'hostname': stack_hostname, 'name': trk_name} not in data['trunks']:
-                    data['trunks'].append({'hostname': stack_hostname, 'name': trk_name})
-
-                data['trunk_interfaces'].append({'hostname': stack_hostname, 'interface': interface, 'trunk_name': trk_name})
+                data['trunk_interfaces'].append({'hostname': hostname, 'interface': interface, 'trunk_name': trk_name})
 
     return data
 
@@ -485,8 +487,10 @@ def debug_config_files(data_folder):
 def debug_convert_range():
     print("\n== Converting ranges to list of elements (convert_range) ==")
 
-    ranges = ['B10-B13', 'B15-B20', 
-        '1/1-1/14', '2/1-2/22'
+    ranges = [
+        'B10-B13', 'B15-B20', 
+        '1/1-1/14', '2/1-2/12',
+        '2/A2-2/A4'
     ]
 
     table = []
@@ -505,7 +509,8 @@ def debug_convert_interfaces_range():
         '16-26,28', '50,52,55', '50',
         '1/2-1/4,1/16,2/1-2/4,2/16',
         '1/1,Trk1-Trk2',
-        'Trk20-Trk23,1/1-1/4,Trk48'
+        'Trk20-Trk23,1/1-1/4,Trk48',
+        '2/A2-2/A4,5/A1-5/A3,6/A3,8/47-8/48'
     ] 
 
     table = []
@@ -602,7 +607,8 @@ def debug_devices_json(data_folder):
       'J9853A': 'hpe-aruba-2530-48g-poep-2sfpp',
       'JL256A_stack': "hpe-aruba-2930f-48g-poep-4sfpp",
       'JL075A_stack': 'hpe-aruba-3810m-16sfpp-2-slot-switch',
-      'JL693A_stack': "hpe-aruba-2930f-12g-poep-2sfpp"
+      'JL693A_stack': "hpe-aruba-2930f-12g-poep-2sfpp",
+      'JL322A_stack': 'hpe-aruba-2930m-48g-poep'
     }
 
     files = config_files(data_folder)
@@ -618,6 +624,14 @@ def debug_trunks_json(data_folder):
     output = yaml.dump(trunks_json(files))
 
     print("\n'trunks_json()' Output: for ", data_folder)
+    print(output)
+
+def debug_vlans_json(data_folder):
+    files = config_files(data_folder)
+    devices_tags = ["switch"]
+    output = yaml.dump(vlans_json(files))
+
+    print("\n'vlans_json()' Output: for ", data_folder)
     print(output)
 
 def debug_interface_names_json(data_folder):
@@ -685,7 +699,7 @@ if __name__ == "__main__":
     #debug_vlans_json(data_folder)
     #debug_untagged_vlans_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
-    debug_ip_addresses_json(data_folder)
+    #debug_ip_addresses_json(data_folder)
 
 
     print("\n=== Stacking ===")
@@ -701,7 +715,8 @@ if __name__ == "__main__":
 
     
     print("\n=== Stacking JSON ===")
-    data_folder = main_folder + "/data/aruba-stack/"
+    #data_folder = main_folder + "/data/aruba-stack/"
+    data_folder = main_folder + "/data/aruba-stack-2930/"
 
     #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
@@ -714,4 +729,3 @@ if __name__ == "__main__":
     print("\n=== No files functions ===")
     #debug_convert_range()
     #debug_convert_interfaces_range()
-    #debug_convert_stack_interfaces_range()

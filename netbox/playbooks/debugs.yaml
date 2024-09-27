@@ -43,3 +43,14 @@
       debug:
         msg: "{{ range(1, item.nr_of_interfaces + 1) | list | lists_mergeby(device_interfaces) }}"
       loop: "{{ device_interfaces }}"
+
+    - name: Regex in Ansible include yaml vars file
+      tags: regex
+      include_vars:
+        file: ../data/yaml/aruba_stack_2930.yaml
+
+    - name: Regex in Ansible
+      tags: regex
+      debug: 
+        msg: "{{ item.name + '-1' | regex_replace('0') }}" 
+      loop: "{{ chassis }}"
