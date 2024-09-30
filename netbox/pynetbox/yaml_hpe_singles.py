@@ -36,6 +36,7 @@ def main():
         'J9089A': 'hpe-procurve-2610-48-pwr'
     }
 
+    print("Update data for ProCurve Switches into the file: ", output_file_path) 
     single(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # HPE 8 Ports Switches
@@ -49,6 +50,7 @@ def main():
         'J9780A': 'hpe-aruba-2530-8-poep'
     }
 
+    print("Update data for HPE 8 port Switches into the file: ", output_file_path) 
     single(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # HPE 24 and 48 Ports Switches
@@ -61,6 +63,7 @@ def main():
       'J9853A': 'hpe-aruba-2530-48g-poep-2sfpp'
     }
 
+    print("Update data for HPE 24 and 48 port Switches into the file: ", output_file_path) 
     single(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba 24 and 48 Ports Switches
@@ -74,6 +77,7 @@ def main():
       'JL357A': "hpe-aruba-2540-48g-poep-4sfpp"
     }
 
+    print("Update data for Aruba 24 and 48 port Switches into the file: ", output_file_path) 
     single(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba 8 Ports Switches
@@ -84,6 +88,7 @@ def main():
         'JL258A': "hpe-aruba-2930f-8g-poep-2sfpp"
     }
 
+    print("Update data for Aruba 8 port Switches into the file: ", output_file_path) 
     single(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba 12 Ports Switches
@@ -94,6 +99,7 @@ def main():
         'JL693A': "hpe-aruba-2930f-12g-poep-2sfpp"
     }
 
+    print("Update data for Aruba 12 port Switches into the file: ", output_file_path) 
     single(data_folder, output_file_path, device_type_slags, devices_tags)
 
 if __name__ == "__main__":

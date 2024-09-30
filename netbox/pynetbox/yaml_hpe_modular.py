@@ -101,6 +101,7 @@ def main():
         'J9729A': 'hpe-aruba-2920-48g-poep'
     }
 
+    print("Update data for ProCurve modular Switches into the file: ", output_file_path) 
     modular(data_folder, output_file_path, device_type_slags, devices_tags, module_types)
 
     # Aruba Modular Switches
@@ -113,6 +114,7 @@ def main():
         'JL322A_module': "hpe-aruba-2930m-48g-poep"
     }
 
+    print("Update data for Aruba modular Switches into the file: ", output_file_path) 
     modular(data_folder, output_file_path, device_type_slags, devices_tags, module_types)
 
 #---- Debugging ----#

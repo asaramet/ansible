@@ -184,6 +184,7 @@ def main():
 
     devices_tags = ["switch", "stack"]
 
+    print("Update data for Aruba stacks into the file: ", output_file_path) 
     stack(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba 2930 stacks with LWL modules
@@ -196,6 +197,7 @@ def main():
 
     devices_tags = ["switch", "stack"]
 
+    print("Update data for Aruba 2930 stacks into the file: ", output_file_path) 
     stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba 2920 stacks with LWL modules
@@ -209,6 +211,8 @@ def main():
     devices_tags = ["switch", "stack"]
 
     assign_sfp_modules(data_folder)
+
+# TODO: print("Update data for Aruba 2920 stacks into the file: ", output_file_path) 
     #stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba modular stacks
@@ -221,6 +225,7 @@ def main():
 
     devices_tags = ["switch", "stack"]
 
+# TODO: print("Update data for Aruba modular stacks into the file: ", output_file_path) 
     #stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
 if __name__ == "__main__":

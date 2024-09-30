@@ -24,4 +24,4 @@ ansible-playbook playbooks/stacks.yaml --tags aruba_stack,production,trunks | te
 ansible-playbook playbooks/stacks.yaml --tags aruba_stack,production,create_vlans | tee -a ${logs_folder}/aruba_stack_ports.logs &&
 ansible-playbook playbooks/stacks.yaml --tags aruba_stack,production,untagged_vlans | tee -a ${logs_folder}/aruba_stack_ports.logs &&
 ansible-playbook playbooks/stacks.yaml --tags aruba_stack,production,tagged_vlans | tee -a ${logs_folder}/aruba_stack_ports.logs &&
-ansible-playbook playbooks/stacks.yaml --tags aruba_stack,production,ip | tee -a ${logs_folder}/aruba_stack_ports.logs &&
+ansible-playbook playbooks/stacks.yaml --tags aruba_stack,production,ip | tee -a ${logs_folder}/aruba_stack_ports.logs

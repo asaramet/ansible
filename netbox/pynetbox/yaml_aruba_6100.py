@@ -156,7 +156,7 @@ def aruba_6100_12g_json(config_files):
     rsm_vlans = ['102','202','302']
 
     for file in config_files:
-        name = get_hostname(file)
+        name = get_hostname(file)['0']
         location,room = get_location(file)
         site = get_site(location)
         location = get_room_location(location)
@@ -347,7 +347,7 @@ def ip_addressess_json(config_files):
     data = {"ip_addresses":[]}
 
     for config_file in config_files:
-        hostname = get_hostname(config_file)
+        hostname = get_hostname(config_file)['0']
 
         vlan_interface = get_vlan_interface(config_file)
 
@@ -360,7 +360,7 @@ def lags_json(config_files):
     data = {"lags":[], "lag_interfaces":[]}
 
     for config_file in config_files:
-        hostname = get_hostname(config_file)
+        hostname = get_hostname(config_file)['0']
 
         lag_interfaces = get_lag_interfaces(config_file).items()
         if not lag_interfaces:
@@ -398,7 +398,7 @@ def interfaces_json(config_files):
     data = {"interfaces":[], "interfaces_vlan":[]}
 
     for config_file in config_files:
-        hostname = get_hostname(config_file)
+        hostname = get_hostname(config_file)['0']
         interfaces = get_interfaces(config_file)
         vlan_names = get_vlan_names(config_file)
 
@@ -417,8 +417,10 @@ def interfaces_json(config_files):
 def main():
     # get data files
     files = config_files(data_folder)
+    output_file_path = "/data/yaml/aruba_6100.yaml"
 
-    with open(main_folder + "/data/yaml/aruba_6100.yaml", 'w') as f:
+    print("Update data for Aruba 6100 Switches into the file: /data/yaml/aruba_6100.yaml")
+    with open(main_folder + output_file_path, 'w') as f:
         yaml.dump(locations_json(files), f)
         yaml.dump(aruba_6100_12g_json(files), f)
         yaml.dump(ip_addressess_json(files), f)
@@ -508,7 +510,7 @@ def debug_get_uplink_vlan():
 if __name__ == "__main__":
     main()
     #debug_get_interfaces_config()
-    debug_ip_addresses_json()
+    #debug_ip_addresses_json()
     #debug_get_lag_interfaces()
     #debug_lags_json()
     #debug_get_vlans()
