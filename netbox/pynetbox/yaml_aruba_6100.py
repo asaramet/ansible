@@ -517,8 +517,24 @@ def debug_get_location(data_folder):
     print("\n== Debug: get_location() ==")
     print(tabulate(table, headers))
 
+def test_6100_yaml():
+    # Create test.yaml file from test folder
+    files = config_files(main_folder + "/data/test/")
+    output_file_path = "/data/yaml/test.yaml"
+
+    print("Update data for Aruba 6100 Switches into the file: " + output_file_path)
+    with open(main_folder + output_file_path, 'w') as f:
+        yaml.dump(locations_json(files), f)
+        yaml.dump(aruba_6100_12g_json(files), f)
+        yaml.dump(ip_addressess_json(files), f)
+        yaml.dump(lags_json(files), f)
+        yaml.dump(vlans_jason(files), f)
+        yaml.dump(interfaces_json(files), f)
+
 if __name__ == "__main__":
     main()
+
+    test_6100_yaml()
 
     #debug_get_interfaces_config()
     #debug_ip_addresses_json()
