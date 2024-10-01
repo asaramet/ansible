@@ -166,11 +166,27 @@ def debug_device_interfaces_nr(data_folder):
     files = config_files(data_folder)
     print(device_interfaces_nr(files))
 
+def test_stack_module_yaml():
+    # Create test.yaml file from test folder
+    data_folder = main_folder + "/data/test/"
+    output_file_path = "/data/yaml/test.yaml"
+
+    device_type_slags = {
+        'JL322A_stack': 'hpe-aruba-2930m-48g-poep'
+    }
+
+    devices_tags = ["switch", "stack"]
+
+    print("Update test file: ", output_file_path) 
+    stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
+
 def main():
     # Run Debugging
     #debug_data_folder = main_folder + "/data/aruba-stack/"
     debug_data_folder = main_folder + "/data/aruba-stack-2930/"
     #debug_device_interfaces_nr(debug_data_folder)
+
+    test_stack_module_yaml()
 
     # Aruba stacks (no extra modules)
     data_folder = main_folder + "/data/aruba-stack/"

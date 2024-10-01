@@ -46,6 +46,11 @@
       include_vars:
         file: ../data/yaml/aruba_stack_2930.yaml
 
+    - name: Include data for testing
+      tags: test
+      include_vars:
+        file: ../data/yaml/test.yaml
+
     - name: Add stacked switches
       tags: switches
       netbox.netbox.netbox_device:

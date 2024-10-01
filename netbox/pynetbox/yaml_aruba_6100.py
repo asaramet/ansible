@@ -3,6 +3,7 @@
 # Collect Aruba 6100 data and create a aruba_6100.yaml configs file 
 
 import re, os, yaml
+from tabulate import tabulate
 from std_functions import this_folder, main_folder
 from std_functions import config_files, search_line
 from std_functions import get_hostname
@@ -507,8 +508,18 @@ def debug_get_uplink_vlan():
         else:
             print("Access Switch - ", vlan)
 
+def debug_get_location(data_folder):
+    table = []
+    headers = ["File Name", "Location"]
+    for f in config_files(data_folder):
+        hostname = get_hostname(f)['0']
+        table.append([hostname, get_location(f)])
+    print("\n== Debug: get_location() ==")
+    print(tabulate(table, headers))
+
 if __name__ == "__main__":
     main()
+
     #debug_get_interfaces_config()
     #debug_ip_addresses_json()
     #debug_get_lag_interfaces()
@@ -517,3 +528,5 @@ if __name__ == "__main__":
     #debug_collect_vlans()
     #debug_get_interfaces()
     #debug_get_uplink_vlan()
+
+    #debug_get_location(data_folder)
