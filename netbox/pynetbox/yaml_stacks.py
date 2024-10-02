@@ -12,7 +12,9 @@ from std_functions import ip_addresses_json
 from std_functions import get_hostname
 
 module_types = {
-    'jl083a': 'Aruba 3810M/2930M 4SFP+ MACsec Module'
+    'jl083a': 'Aruba 3810M/2930M 4SFP+ MACsec Module',
+    'j9731a': 'Aruba 2920 2-Port 10GbE SFP+ Module',
+    'j9733a': 'Aruba 2920 2-Port Stacking Module'
 }
 
 # search lines in a text recursively
@@ -35,18 +37,42 @@ def get_modules(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
+    modules = []
+    hostnames = get_hostname(t_file)
+
+    # Modules for Aruba 2930 stacks
     names = {
         'A': 'Uplink'
     }
-
-    modules = []
-    hostnames = get_hostname(t_file)
 
     flexible_modules = recursive_search("flexible-module", text)
     if len(flexible_modules) > 0:
         for line in flexible_modules:
             m_list = line.split()
             modules.append({'hostname': hostnames[m_list[1]], 'module': m_list[3], 'type': m_list[5], 'name': names[m_list[3]]})
+        return modules
+
+    # Modules for Aruba 2930 stacks
+    module_2920 = {
+        'rsgw7009sp': [ ('1', 'A', 'j9731a'), ('1', 'B', 'j9731a') ],
+        'rsgw5313sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'A', 'j9731a'), ('3', 'STK', 'j9733a') ],
+        'rsgw10118sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ], 
+        'rsgw1u140sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
+        'rsgw12205sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
+        'rsgw2112sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'A', 'j9731a'), ('3', 'STK', 'j9733a') ],
+        'rsgw9108sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ]
+    }
+
+    names = {
+        'A': 'Module A',
+        'B': 'Module B',
+        'STK': 'Stacking Module'
+    }
+
+    clean_hostname, _ = hostnames['1'].split('-')
+    if clean_hostname in module_2920.keys():
+        for stack, module, m_type in module_2920[clean_hostname]:
+            modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': names[module]})
         return modules
 
     return modules
@@ -73,7 +99,8 @@ def device_interfaces_nr(config_files):
         'JL256A_stack': (48, '1000base-t', 'pd', 'type2-ieee802.3at'),
         'JL075A_stack': (16, '10gbase-x-sfpp', None, None),
         'JL693A_stack': (12, '1000base-t', 'pd', 'type2-ieee802.3at'),
-        'JL322A_stack': (48, '1000base-t', 'pd', 'type2-ieee802.3at')
+        'JL322A_stack': (48, '1000base-t', 'pd', 'type2-ieee802.3at'),
+        'J9729A_stack': (48, '1000base-t', 'pd', 'type2-ieee802.3at')
     }
 
     uplink_interfaces = {
@@ -166,13 +193,23 @@ def debug_device_interfaces_nr(data_folder):
     files = config_files(data_folder)
     print(device_interfaces_nr(files))
 
+def debug_get_modules(data_folder):
+    table = []
+    headers = ["File name", "Modules"]
+    for f in config_files(data_folder):
+        table.append([ os.path.basename(f), get_modules(f) ])
+    print("\n== Debug: get_modules ==")
+    print(tabulate(table, headers, "github"))
+
+
 def test_stack_module_yaml():
     # Create test.yaml file from test folder
     data_folder = main_folder + "/data/test/"
     output_file_path = "/data/yaml/test.yaml"
 
     device_type_slags = {
-        'JL322A_stack': 'hpe-aruba-2930m-48g-poep'
+        'JL322A_stack': 'hpe-aruba-2930m-48g-poep',
+        'J9729A_stack': 'hpe-aruba-2920-48g-poep'
     }
 
     devices_tags = ["switch", "stack"]
@@ -183,8 +220,10 @@ def test_stack_module_yaml():
 def main():
     # Run Debugging
     #debug_data_folder = main_folder + "/data/aruba-stack/"
-    debug_data_folder = main_folder + "/data/aruba-stack-2930/"
+    #debug_data_folder = main_folder + "/data/aruba-stack-2930/"
+    debug_data_folder = main_folder + "/data/aruba-stack-2920/"
     #debug_device_interfaces_nr(debug_data_folder)
+    debug_get_modules(debug_data_folder)
 
     test_stack_module_yaml()
 
@@ -228,8 +267,8 @@ def main():
 
     assign_sfp_modules(data_folder)
 
-# TODO: print("Update data for Aruba 2920 stacks into the file: ", output_file_path) 
-    #stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
+    print("Update data for Aruba 2920 stacks into the file: ", output_file_path)
+    stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba modular stacks
     data_folder = main_folder + "/data/aruba-modular-stack/"

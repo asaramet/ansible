@@ -5,19 +5,16 @@
 #
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,switches
 #
-# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,delete_chassis
-#
-# ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2930,development,modules
-
-# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,trunks
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,interfaces
 #
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,chassis
+#
+# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,trunks
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,create_vlans
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,untagged_vlans
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,tagged_vlans
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,ip
 #
-# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,chassis
 
 
 - name: Add HP Switches from configuration files
@@ -45,6 +42,11 @@
       tags: aruba_stack_2930
       include_vars:
         file: ../data/yaml/aruba_stack_2930.yaml
+
+    - name: Include data for Aruba 2920 stacked switches with mini modules
+      tags: aruba_stack_2920
+      include_vars:
+        file: ../data/yaml/aruba_stack_2920.yaml
 
     - name: Include data for testing
       tags: test
