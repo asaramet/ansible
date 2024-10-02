@@ -48,6 +48,11 @@
       include_vars:
         file: ../data/yaml/aruba_stack_2920.yaml
 
+    - name: Include data for Aruba modular stacked switches with mini modules
+      tags: aruba_modular_stack
+      include_vars:
+        file: ../data/yaml/aruba_modular_stack.yaml
+
     - name: Include data for testing
       tags: test
       include_vars:
@@ -100,6 +105,7 @@
           poe_type: "{{ item.poe_type }}"
         state: present
       loop: "{{ device_interfaces }}"
+      when: "{{ add_stack_interfaces }}"
 
     - name: Delete virtual chassis 
       tags: 
