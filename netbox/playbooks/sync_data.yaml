@@ -3,8 +3,8 @@
   hosts: rhlx99
   gather_facts: false
   vars:
-    #do_it: no
-    do_it: yes
+    do_it: no
+    #do_it: yes
   tasks:
     - name: Sync Aruba 6100 config files from rhlx99
       ansible.posix.synchronize:
@@ -108,6 +108,14 @@
         flat: yes
       loop: "{{ J9850A_stack }}"
       when: "{{ do_it }}"
+
+    - name: Sync Cisco config files from rhlx99
+      fetch:
+        src: "/tftpboot/{{ item }}/running-config"
+        dest: "{{ inventory_dir }}/data/cisco/{{ item }}"
+        flat: yes
+      loop: "{{ cisco }}"
+      #when: "{{ do_it }}"
 
     - name: Debug
       debug:

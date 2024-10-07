@@ -534,7 +534,7 @@ def test_6100_yaml():
 if __name__ == "__main__":
     main()
 
-    test_6100_yaml()
+    #test_6100_yaml()
 
     #debug_get_interfaces_config()
     #debug_ip_addresses_json()

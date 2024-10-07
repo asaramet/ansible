@@ -19,17 +19,23 @@ def search_line(expression, t_file):
     return None
     
 # search lines in a text recursively, when line start with a pattern
-def recursive_search(pattern, text):
+def recursive_search(pattern, text, start=False):
     # base case
     if not text:
         return []
 
     found_lines = []
     for i, line in enumerate(text):
-        if line.startswith(pattern):
+        if line.startswith(pattern) and start:
             found_lines.append(line.strip())
 
-            found_lines += recursive_search(pattern, text[i+1:])
+            found_lines += recursive_search(pattern, text[i+1:], True)
+            break 
+
+        if not start and pattern in line:
+            found_lines.append(line.strip())
+
+            found_lines += recursive_search(pattern, text[i+1:], False)
             break 
 
     return found_lines
@@ -139,7 +145,7 @@ def get_hostname(t_file):
         text.append(line.strip())
 
     stacks = set()
-    for line in recursive_search("member", text):
+    for line in recursive_search("member", text, True):
         line_data = line.split()
         stacks.add(line_data[1])
 
@@ -175,7 +181,7 @@ def get_trunks(t_file):
         text = f.readlines()
 
     trunks = []
-    for line in recursive_search("trunk", text):
+    for line in recursive_search("trunk", text, True):
         line_data = line.split()
         trunks.append({"name": line_data[2], 'interfaces': line_data[1]})
 
@@ -679,10 +685,10 @@ if __name__ == "__main__":
 
     #debug_config_files(data_folder)
     #debug_convert_range()
-    #debug_get_hostname(data_folder)
+    debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_site(data_folder)
-    #debug_get_trunks(data_folder)
+    debug_get_trunks(data_folder)
     #debug_get_interface_names(data_folder)
     #debug_get_vlans(data_folder)
     #debug_get_vlans_names(data_folder)
@@ -707,10 +713,10 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/hpe-stack/"
     #data_folder = main_folder + "/data/aruba-modular-stack/"
 
-    #debug_get_hostname(data_folder)
+    debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_site(data_folder)
-    #debug_get_trunks(data_folder)
+    debug_get_trunks(data_folder)
     #debug_get_trunk_stack(data_folder)
 
     
@@ -724,7 +730,7 @@ if __name__ == "__main__":
     #debug_vlans_json(data_folder)
     #debug_untagged_vlans_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
-    debug_ip_addresses_json(data_folder)
+    #debug_ip_addresses_json(data_folder)
 
     print("\n=== No files functions ===")
     #debug_convert_range()

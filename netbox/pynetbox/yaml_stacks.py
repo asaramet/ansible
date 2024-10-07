@@ -5,7 +5,7 @@
 import re, os, yaml
 from tabulate import tabulate
 from std_functions import this_folder, main_folder
-from std_functions import config_files, device_type
+from std_functions import config_files, device_type, recursive_search
 from std_functions import devices_json, trunks_json, interface_names_json
 from std_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
 from std_functions import ip_addresses_json
@@ -20,22 +20,6 @@ module_types = {
     'j9988a': 'Aruba J9988A',
     'j9996a': 'Aruba J9996A'
 }
-
-# search lines in a text recursively
-def recursive_search(pattern, text):
-    # base case
-    if not text:
-        return []
-
-    found_lines = []
-    for i, line in enumerate(text):
-        if pattern in line:
-            found_lines.append(line.strip())
-
-            found_lines += recursive_search(pattern, text[i+1:])
-            break 
-
-    return found_lines
 
 def get_modules(t_file):
     with open(t_file, "r") as f:
@@ -264,9 +248,9 @@ def main():
     debug_data_folder = main_folder + "/data/aruba-modular-stack/"
 
     #debug_device_interfaces_nr(debug_data_folder)
-    #debug_get_modules(debug_data_folder)
+    debug_get_modules(debug_data_folder)
 
-    test_stack_module_yaml()
+    #test_stack_module_yaml()
 
     # Aruba stacks (no extra modules)
     data_folder = main_folder + "/data/aruba-stack/"
