@@ -3,13 +3,13 @@
   hosts: rhlx99
   gather_facts: false
   vars:
-    do_it: no
-    #do_it: yes
+    #do_it: no
+    do_it: yes
   tasks:
-    - name: Sync Aruba 6100 config files from rhlx99
+    - name: Sync Aruba 6xxx config files from rhlx99
       ansible.posix.synchronize:
         mode: pull
-        src: /tftpboot/aruba_6100
+        src: "/tftpboot/aruba_6*"
         dest: "{{ inventory_dir }}/data/"
       when: "{{ do_it }}"
 
@@ -34,7 +34,7 @@
         src: "/tftpboot/{{ item }}/running-config"
         dest: "{{ inventory_dir }}/data/hpe-8-ports/{{ item }}"
         flat: yes
-      loop: "{{ J9562A + J9565A + J9774A + J9780A}}"
+      loop: "{{ J9562A + J9565A + J9774A + J9780A }}"
       when: "{{ do_it }}"
 
     - name: Sync HP 24+ ports switches config files from rhlx99
@@ -115,9 +115,20 @@
         dest: "{{ inventory_dir }}/data/cisco/{{ item }}"
         flat: yes
       loop: "{{ cisco }}"
-      #when: "{{ do_it }}"
+      when: "{{ do_it }}"
 
     - name: Debug
+      vars:
+        aruba_sws:
+          - aruba_6100
+          - aruba_6300
       debug:
-        msg: "{{ vars }}"
-      when: false
+        msg: |-
+          [
+            {% for item in aruba_sws %} 
+              "/tftpboot/{{ item }}",
+            {% endfor %}
+          ]
+      loop: "{{ aruba_sws }}"
+      #when: false
+      when: true

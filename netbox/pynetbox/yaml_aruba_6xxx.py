@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 
-# Collect Aruba 6100 data and create a aruba_6100.yaml configs file 
+# Collect Aruba 6xxx data and create a yaml configs file 
 
 import re, os, yaml
 from tabulate import tabulate
 from std_functions import this_folder, main_folder
 from std_functions import config_files, search_line
-from std_functions import get_hostname
-
-data_folder = main_folder + "/data/aruba_6100/"
+from std_functions import get_hostname, device_type
 
 def get_location(file):
     location_line = search_line("snmp-server system-location", file)
@@ -17,7 +15,10 @@ def get_location(file):
 
     location = location_line.split()[2]
 
-    (building, room) = location.split(".")
+    if location.split('.')[0] == 'V':
+        location = location[2:]
+
+    building, room = location.split(".", 1)
 
     building_nr = str(int(building[1:])) # convert "01" to "1", for example
     if len(building_nr) == 1:
@@ -130,45 +131,6 @@ def get_interfaces_config(config_file):
 # Get uplink vlan
 def get_uplink_vlan(config_file):
     return get_vlan_interface(config_file)[0]
-
-# create the loactions json objects list
-def locations_json(config_files):
-    data = {"locations":[]}
-    locations = set()
-    rooms = {}
-
-    for file in config_files:
-        location,room = get_location(file)
-        locations.add(location)
-        rooms.update({location:room})
-
-    for location in locations:
-        room = rooms[location]
-        building = location.split(".")[0]
-        flor_tuple = get_flor_name(room)
-
-        data["locations"].append({"name": building + "." + flor_tuple[0] + " - " + flor_tuple[1], "site": get_site(location), "parent_location": get_parent_location(location)})
-
-    return data
-
-# create aruba_6100_12g json objects list
-def aruba_6100_12g_json(config_files):
-    data = {"aruba_6100_12g":[]}
-    rsm_vlans = ['102','202','302']
-
-    for file in config_files:
-        name = get_hostname(file)['0']
-        location,room = get_location(file)
-        site = get_site(location)
-        location = get_room_location(location)
-
-        uplink_vlan = get_uplink_vlan(file)
-        
-        device_role = "bueroswitch" if uplink_vlan in rsm_vlans else "access-layer-switch"
-
-        data["aruba_6100_12g"].append({"name": name, "location": location, "site": site, "device_role": device_role})
-
-    return data
 
 # get vlan interface with IP loopback
 def get_vlan_interface(config_file):
@@ -343,6 +305,54 @@ def get_interfaces(config_file):
 
     return  get_interfaces_recursively(config_text_list)
 
+# create the loactions json objects list
+def locations_json(config_files):
+    data = {"locations":[]}
+    locations = set()
+    rooms = {}
+
+    for file in config_files:
+        location,room = get_location(file)
+        locations.add(location)
+        rooms.update({location:room})
+
+    for location in locations:
+        room = rooms[location]
+        building = location.split(".")[0]
+        flor_tuple = get_flor_name(room)
+
+        data["locations"].append({"name": building + "." + flor_tuple[0] + " - " + flor_tuple[1], "site": get_site(location), "parent_location": get_parent_location(location)})
+
+    return data
+
+# create devices json objects list
+def devices_json(config_files):
+    data = {"devices":[]}
+    rsm_vlans = ['102','202','302']
+
+    device_types = {
+        'JL679A': 'hpe-aruba-6100-12g-poe4-2sfpp',
+        'JL658A': 'hpe-aruba-6300m-24sfpp-4sfp56'
+    }
+
+    for file in config_files:
+
+        location,room = get_location(file)
+        site = get_site(location)
+        location = get_room_location(location)
+
+        uplink_vlan = get_uplink_vlan(file)
+        
+        device_role = "bueroswitch" if uplink_vlan in rsm_vlans else "access-layer-switch"
+
+        hostnames = get_hostname(file)
+        for key in hostnames.keys():
+            hostname = hostnames[key]
+            d_type = device_types[device_type(hostname)]
+            data["devices"].append({"name": hostname, "location": location, "site": site, "device_role": device_role, "device_type": d_type, "serial": None, "tags": None })
+
+    return data
+
 # create ip_addresses json objects list
 def ip_addressess_json(config_files):
     data = {"ip_addresses":[]}
@@ -415,19 +425,28 @@ def interfaces_json(config_files):
     return data
 
 # Collect all the data and saved it to a YAML file
-def main():
-    # get data files
+def to_yaml(data_folder, output_file_path):
     files = config_files(data_folder)
-    output_file_path = "/data/yaml/aruba_6100.yaml"
-
-    print("Update data for Aruba 6100 Switches into the file: /data/yaml/aruba_6100.yaml")
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump(locations_json(files), f)
-        yaml.dump(aruba_6100_12g_json(files), f)
+        yaml.dump(devices_json(files), f)
         yaml.dump(ip_addressess_json(files), f)
         yaml.dump(lags_json(files), f)
         yaml.dump(vlans_jason(files), f)
         yaml.dump(interfaces_json(files), f)
+
+def main():
+    data_folder = main_folder + "/data/aruba_6100/"
+    output_file_path = "/data/yaml/aruba_6100.yaml"
+
+    print("Update data for Aruba 6100 Switches into the file: ", output_file_path)
+    to_yaml(data_folder, output_file_path)
+
+    data_folder = main_folder + "/data/aruba_6300/"
+    output_file_path = "/data/yaml/aruba_6300.yaml"
+
+    print("Update data for Aruba 6300 Switches into the file: ", output_file_path)
+    to_yaml(data_folder, output_file_path)
 
 #---- Debugging ----#
 def debug_get_interfaces_config():
@@ -512,29 +531,31 @@ def debug_get_location(data_folder):
     table = []
     headers = ["File Name", "Location"]
     for f in config_files(data_folder):
-        hostname = get_hostname(f)['0']
-        table.append([hostname, get_location(f)])
+        table.append([os.path.basename(f), get_location(f)])
     print("\n== Debug: get_location() ==")
     print(tabulate(table, headers))
 
-def test_6100_yaml():
+def test_to_yaml(data_folder):
     # Create test.yaml file from test folder
-    files = config_files(main_folder + "/data/test/")
+
     output_file_path = "/data/yaml/test.yaml"
 
-    print("Update data for Aruba 6100 Switches into the file: " + output_file_path)
-    with open(main_folder + output_file_path, 'w') as f:
-        yaml.dump(locations_json(files), f)
-        yaml.dump(aruba_6100_12g_json(files), f)
-        yaml.dump(ip_addressess_json(files), f)
-        yaml.dump(lags_json(files), f)
-        yaml.dump(vlans_jason(files), f)
-        yaml.dump(interfaces_json(files), f)
+    print("Dump test data into the file: " + output_file_path)
+    to_yaml(data_folder, output_file_path)
+
+def debug_devices_json(data_folder):
+    print("Aruba....")
+
+    print(devices_json(config_files(data_folder)))
 
 if __name__ == "__main__":
-    main()
+    #main()
 
-    #test_6100_yaml()
+    data_folder = main_folder + "/data/aruba_6100/"
+    #data_folder = main_folder + "/data/aruba_6300/"
+
+    debug_devices_json(data_folder)
+    #test_to_yaml(data_folder)
 
     #debug_get_interfaces_config()
     #debug_ip_addresses_json()
@@ -546,3 +567,10 @@ if __name__ == "__main__":
     #debug_get_uplink_vlan()
 
     #debug_get_location(data_folder)
+
+    data_folder = main_folder + "/data/aruba_6300/"
+
+    debug_devices_json(data_folder)
+    #debug_get_location(data_folder)
+
+    #test_to_yaml(data_folder)

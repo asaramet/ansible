@@ -6,6 +6,13 @@
 # ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,vlans
 # ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,ip
 # ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,interfaces
+# 
+# ansible-playbook playbooks/aruba_6300.yaml --tags aruba_6300,production,location
+# ansible-playbook playbooks/aruba_6300.yaml --tags aruba_6300,production,switches
+# ansible-playbook playbooks/aruba_6300.yaml --tags aruba_6300,production,lags
+# ansible-playbook playbooks/aruba_6300.yaml --tags aruba_6300,production,vlans
+# ansible-playbook playbooks/aruba_6300.yaml --tags aruba_6300,production,ip
+# ansible-playbook playbooks/aruba_6300.yaml --tags aruba_6300,production,interfaces
 
 ---
 - name: Add Aruba 6100 Switches from configuration files
@@ -14,10 +21,15 @@
   vars: 
     netbox_url: "https://{{ netbox_server }}"
   tasks:
-    - name: Include locations vars
+    - name: Include locations vars vor Aruba 6100 switches
       tags: aruba_6100
       include_vars:
         file: ../data/yaml/aruba_6100.yaml
+
+    - name: Include locations vars vor Aruba 6300 switches
+      tags: aruba_6300
+      include_vars:
+        file: ../data/yaml/aruba_6300.yaml
 
     - name: Include test vars
       tags: test
@@ -47,7 +59,7 @@
         state: present
       loop: "{{ locations }}"
 
-    - name: Add Aruba 6100-12G-POE4-2SFP+ switches
+    - name: Add switches
       tags: switches
       netbox.netbox.netbox_device:
         netbox_url: "{{ netbox_url }}"
@@ -57,11 +69,13 @@
           name: "{{ item.name }}"
           location: "{{ item.location }}"
           site: "{{ item.site }}"
-          device_type: hpe-aruba-6100-12g-poe4-2sfpp
+          device_type: {{ item.device_type }}
           device_role: "{{ item.device_role }}"
+          serial: "{{ item.serial }}"
+          tags: "{{ item.tags }}"
           tenant: netzadmin
         state: present
-      loop: "{{ aruba_6100_12g }}"
+      loop: "{{ devices }}"
 
     - name: Create VLAN 1 interfaces
       tags: 
@@ -77,7 +91,7 @@
           name: "vlan 1"
           type: Virtual
         state: present
-      loop: "{{ aruba_6100_12g }}"
+      loop: "{{ devices }}"
 
     - name: Create VLAN interfaces
       tags: 

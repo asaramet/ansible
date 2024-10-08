@@ -688,7 +688,7 @@ if __name__ == "__main__":
     debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_site(data_folder)
-    debug_get_trunks(data_folder)
+    #debug_get_trunks(data_folder)
     #debug_get_interface_names(data_folder)
     #debug_get_vlans(data_folder)
     #debug_get_vlans_names(data_folder)
@@ -696,7 +696,7 @@ if __name__ == "__main__":
     #debug_get_ip_address(data_folder)
     #debug_device_type(data_folder)
 
-    print("\n=== Singles JSON ===")
+    #print("\n=== Singles JSON ===")
     data_folder = main_folder + "/data/hpe-48-ports/"
 
     #debug_devices_json(data_folder)
@@ -716,11 +716,11 @@ if __name__ == "__main__":
     debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_site(data_folder)
-    debug_get_trunks(data_folder)
+    #debug_get_trunks(data_folder)
     #debug_get_trunk_stack(data_folder)
 
     
-    print("\n=== Stacking JSON ===")
+    #print("\n=== Stacking JSON ===")
     #data_folder = main_folder + "/data/aruba-stack/"
     data_folder = main_folder + "/data/aruba-stack-2930/"
 
@@ -731,6 +731,12 @@ if __name__ == "__main__":
     #debug_untagged_vlans_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
     #debug_ip_addresses_json(data_folder)
+
+    print("\n=== Aruba 6xxx ===")
+    #data_folder = main_folder + "/data/aruba_6100/"
+    data_folder = main_folder + "/data/aruba_6300/"
+
+    debug_get_hostname(data_folder)
 
     print("\n=== No files functions ===")
     #debug_convert_range()
