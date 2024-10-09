@@ -4,12 +4,11 @@
 
 import re, os, yaml
 from tabulate import tabulate
-from std_functions import this_folder, main_folder
+from std_functions import this_folder, main_folder, get_hostname
 from std_functions import config_files, device_type, recursive_search
-from std_functions import devices_json, trunks_json, interface_names_json
-from std_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
-from std_functions import ip_addresses_json
-from std_functions import get_hostname
+from json_functions import devices_json, trunks_json, interface_names_json
+from json_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
+from json_functions import ip_addresses_json, locations_json
 
 module_types = {
     'jl083a': 'Aruba 3810M/2930M 4SFP+ MACsec Module',
@@ -179,6 +178,7 @@ def stack(data_folder, output_file_path, device_type_slags, devices_tags):
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump({"modular": False}, f)
         yaml.dump({"add_stack_interfaces": True}, f)
+        yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(device_interfaces_nr(files), f)
         yaml.dump(trunks_json(files), f)
@@ -199,6 +199,7 @@ def stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump({"modular": True}, f)
         yaml.dump({"add_stack_interfaces": add_stack_interfaces}, f)
+        yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(device_interfaces_nr(files), f)
         yaml.dump(trunks_json(files), f)

@@ -1,17 +1,98 @@
 #!/usr/bin/env python3
 
-# Collect Aruba 6xxx data and create a yaml configs file 
+# Extra reusable functions
 
 import re, os, yaml
 from tabulate import tabulate
 from std_functions import this_folder, main_folder
-from std_functions import config_files, search_line, device_type
-from std_functions import get_hostname
+from std_functions import config_files, search_line
+from std_functions import get_hostname, device_type
 
-from extra_functions import get_flor_name, get_parent_location
-from extra_functions import get_location, get_room_location
+def get_location(file):
+    location_line = search_line("location", file)
 
-from json_functions import locations_json, devices_json
+    if not location_line or location_line.isspace(): return None
+
+    location = location_line.split()[-1].strip('"')
+
+    if location.split('.')[0] == 'V':
+        location = location[2:]
+
+        rack_in_l = location.split('.') # Rack number specified in location
+        if len(rack_in_l) > 2:
+            location = rack_in_l[0] + '.' + rack_in_l[1]
+
+    building, room = location.split(".", 1)
+
+    building_nr = str(int(building[1:])) # convert "01" to "1", for example
+    if len(building_nr) == 1:
+        # add "0" to single digit buildings
+        building_nr = "0" + building_nr
+
+    location = building[0] + building_nr + "." + room
+
+    return (location, room)
+
+# get flor number from room number
+def get_flor_nr(room_nr):
+    if not room_nr: return None
+
+    if room_nr[0] == 'u':
+        room_nr = '-' + room_nr[1:]
+
+    flor = room_nr[0]
+    flor = int(room_nr[:2]) if flor == '-' else int(flor)
+
+    return str(flor)
+
+# get flor name from room number
+def get_flor_name(room_nr):
+    flor_name = {
+        "-2": "Untergeschoss 2",
+        "-1": "Untergeschoss",
+        "0": "Erdgeschoss"
+    }
+
+    flor = get_flor_nr(room_nr)
+    if int(flor) < 1:
+        return (flor, flor_name[flor])
+
+    return (flor, "Etage " + flor)
+
+# get location's parent
+def get_parent_location(location):
+    prefixes = {
+        "F": "fl",
+        "G": "gp",
+        "S": "sm",
+        "W": "ws"
+    }
+
+    building = location.split(".")[0]
+    return prefixes[building[0]] + "-" + "gebude" + "-" + building[1:]
+
+# get room location
+def get_room_location(location): 
+    if not location: return None
+
+    # s01-2-etage-2
+    flor_tags = {
+        "-2": "untergeschoss-2",
+        "-1": "untergeschoss",
+        "0": "erdgeschoss"
+    }
+    building, room_nr = location.split(".", 1)
+    flor = get_flor_nr(room_nr)
+    flor_fx = str(abs(int(flor))) # string to use in the label
+    flor_tag = flor_tags[flor] if int(flor) < 1 else "etage-" + flor
+
+    return building.lower() + "-" + flor_fx + "-" + flor_tag
+    
+
+
+
+
+
 
 # get the interfaces configuration from an Aruba 6100 config file
 def get_interfaces_config(config_file):
@@ -231,143 +312,51 @@ def get_interfaces(config_file):
 
     return  get_interfaces_recursively(config_text_list)
 
-# create devices json objects list
-#def devices_json(config_files):
-#    data = {"devices":[]}
-#    rsm_vlans = ['102','202','302']
-
-#    device_types = {
-#        'JL679A': 'hpe-aruba-6100-12g-poe4-2sfpp',
-#        'JL658A': 'hpe-aruba-6300m-24sfpp-4sfp56'
-#    }
-
-#    for file in config_files:
-
-#        location,room = get_location(file)
-#        location = get_room_location(location)
-
-#        uplink_vlan = get_uplink_vlan(file)
-        
-#        device_role = "bueroswitch" if uplink_vlan in rsm_vlans else "access-layer-switch"
-
-#        hostnames = get_hostname(file)
-#        for key in hostnames.keys():
-#            hostname = hostnames[key]
-#            d_type = device_types[device_type(hostname)]
-#            data["devices"].append({"name": hostname, "location": location, "site": get_site(hostname), "device_role": device_role, "device_type": d_type, "serial": None, "tags": None })
-
-#    return data
-
-# create ip_addresses json objects list
-def ip_addressess_json(config_files):
-    data = {"ip_addresses":[]}
-
-    for config_file in config_files:
-        hostname = get_hostname(config_file)['0']
-
-        vlan_interface = get_vlan_interface(config_file)
-
-        data["ip_addresses"].append({"hostname": hostname, "ip": vlan_interface[1], "vlan_nr": vlan_interface[0], "vlan_name": vlan_interface[2]})
-
-    return data
-
-# create lags json objects list
-def lags_json(config_files):
-    data = {"lags":[], "lag_interfaces":[]}
-
-    for config_file in config_files:
-        hostname = get_hostname(config_file)['0']
-
-        lag_interfaces = get_lag_interfaces(config_file).items()
-        if not lag_interfaces:
-            continue
-        for lag, interfaces in lag_interfaces:
-            data["lags"].append({"hostname": hostname, "lag_id": lag})
-            for interface in interfaces:
-                data["lag_interfaces"].append({"hostname": hostname, "lag_id": lag, "interface": interface})
-
-    return data
-
-# collect all the vlans from the config files
-def collect_vlans(config_files):
-    vlans = {}
-    for config_file in config_files:
-        vlan_ids = vlans.keys()
-        #print(vlan_ids)
-        collected_vlans = get_vlans(config_file)
-        for vlan_id in collected_vlans:
-            if vlan_id not in vlan_ids:
-                vlans[vlan_id] = collected_vlans[vlan_id]
-    return vlans
-
-def vlans_jason(config_files):
-    data = {'vlans':[]}
-
-    collected_vlans = collect_vlans(config_files)
-    for vlan_id in collected_vlans:
-        name = str(collected_vlans[vlan_id]["name"])
-        data['vlans'].append({'vlan_id': vlan_id, 'name': name})
-
-    return data
-
-def interfaces_json(config_files):
-    data = {"interfaces":[], "interfaces_vlan":[]}
-
-    for config_file in config_files:
-        hostname = get_hostname(config_file)['0']
-        interfaces = get_interfaces(config_file)
-        vlan_names = get_vlan_names(config_file)
-
-        for interface in interfaces:
-            description = interface["description"]
-            vlan = interface["vlan"]
-            if description:
-                data["interfaces"].append({"hostname":hostname, "interface":interface["name"], "description":description})
-
-            if vlan:
-                data["interfaces_vlan"].append({"hostname":hostname, "interface":interface["name"], "vlan_id":vlan, 
-                    "vlan_name":vlan_names[vlan], "vlan_mode":interface["vlan_mode"]})
-    return data
-
-# Collect all the data and saved it to a YAML file
-def to_yaml(data_folder, output_file_path, device_type_slags, devices_tags):
-    files = config_files(data_folder)
-    with open(main_folder + output_file_path, 'w') as f:
-        yaml.dump(locations_json(files), f)
-        yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
-        yaml.dump(ip_addressess_json(files), f)
-        yaml.dump(lags_json(files), f)
-        yaml.dump(vlans_jason(files), f)
-        yaml.dump(interfaces_json(files), f)
-
-def main():
-    print("Update data for Aruba 6100 Switches into the file: ", output_file_path)
-
-    data_folder = main_folder + "/data/aruba_6100/"
-    output_file_path = "/data/yaml/aruba_6100.yaml"
-
-    device_type_slags = {
-        "JL679A": "hpe-aruba-6100-12g-poe4-2sfpp"
-    }
-
-    devices_tags = ["switch"]
-
-    to_yaml(data_folder, output_file_path, device_type_slags, devices_tags)
-
-    print("Update data for Aruba 6300 Switches into the file: ", output_file_path)
-
-    data_folder = main_folder + "/data/aruba_6300/"
-    output_file_path = "/data/yaml/aruba_6300.yaml"
-
-    device_type_slags = {
-        "JL658A_stack": "hpe-aruba-6300m-24sfpp-4sfp56"
-    }
-
-    devices_tags = ["switch", "stack"]
-
-    to_yaml(data_folder, output_file_path, device_type_slags, devices_tags)
-
 #---- Debugging ----#
+def debug_get_location(data_folder):
+    table = []
+    headers = ["File Name", "Location"]
+    for f in config_files(data_folder):
+        table.append([os.path.basename(f), get_location(f)])
+    print("\n== Debug: get_location() ==")
+    print(tabulate(table, headers))
+
+def debug_get_room_location(data_folder):
+    table = []
+    headers = ["File Name", "Room Location"]
+
+    for f in config_files(data_folder):
+        location = get_location(f)
+
+        if location:
+            location, _ = location
+
+        table.append([os.path.basename(f), get_room_location(location)])
+    print("\n== Debug: get_room_location() ==")
+    print(tabulate(table, headers))
+
+def debug_get_flor_nr(data_folder):
+    table = []
+    headers = ["File Name", "Location", "Flor number"]
+
+    for f in config_files(data_folder):
+        location = get_location(f)
+        room = None
+
+        if location:
+            location , room = location
+
+        table.append([os.path.basename(f), location, get_flor_nr(room)])
+    print("\n== Debug: get_flor_nr() ==")
+    print(tabulate(table, headers))
+
+
+
+
+#---- Debugging JSON ----#
+
+
+#--- Redundant ---#
 def debug_get_interfaces_config():
     # print some collected or parsed data
     config_file = data_folder + "rggw1018bp"
@@ -383,13 +372,6 @@ def debug_get_interfaces_config():
                 print(f"    {line}")
             print()
 
-def debug_ip_addresses_json():
-    files = os.listdir(data_folder)
-    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
-
-    for dict in ip_addressess_json(files)['ip_addresses']:
-        print(dict)
-
 def debug_get_lag_interfaces():
     file = data_folder + "rggw1018bp"
     lag_interfaces = get_lag_interfaces(file)
@@ -397,11 +379,6 @@ def debug_get_lag_interfaces():
         print(f"LAG {lag}: {interfaces}")
 
     print(lag_interfaces)
-
-def debug_lags_json():
-    files = os.listdir(data_folder)
-    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
-    print(lags_json(files))
 
 def debug_get_vlans():
     file = data_folder + "rggw1018bp"
@@ -446,43 +423,11 @@ def debug_get_uplink_vlan():
         else:
             print("Access Switch - ", vlan)
 
-def debug_get_location(data_folder):
-    table = []
-    headers = ["File Name", "Location"]
-    for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_location(f)])
-    print("\n== Debug: get_location() ==")
-    print(tabulate(table, headers))
-
-def debug_get_room_location(data_folder):
-    table = []
-    headers = ["File Name", "Room Location"]
-    for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_room_location(f)])
-    print("\n== Debug: get_room_location() ==")
-    print(tabulate(table, headers))
-
-def test_to_yaml(data_folder):
-    # Create test.yaml file from test folder
-
-    output_file_path = "/data/yaml/test.yaml"
-
-    slags = {
-        "JL679A": "hpe-aruba-6100-12g-poe4-2sfpp",
-        "JL658A_stack": "hpe-aruba-6300m-24sfpp-4sfp56"
-    }
-
-    print("Dump test data into the file: " + output_file_path)
-    to_yaml(data_folder, output_file_path, slags, ["switch"])
-
 if __name__ == "__main__":
     #main()
 
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
-    #data_folder = main_folder + "/data/aruba_6300/"
-
-    test_to_yaml(data_folder)
 
     #debug_get_interfaces_config()
     #debug_ip_addresses_json()
@@ -493,10 +438,42 @@ if __name__ == "__main__":
     #debug_get_interfaces()
     #debug_get_uplink_vlan()
 
+    #debug_get_location(data_folder)
+    #debug_get_room_location(data_folder)
+    debug_get_flor_nr(data_folder)
+
+    #debug_locations_json(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
+    #debug_get_location(data_folder)
+    #debug_get_room_location(data_folder)
 
-    #debug_devices_json(data_folder)
-    #test_to_yaml(data_folder)
+    print("\n=== HPE Singles ===")
+    data_folder = main_folder + "/data/hpe-8-ports/"
+
+    debug_get_location(data_folder)
+    debug_get_room_location(data_folder)
+
+    print("\n=== HPE Stacking ===")
+    #data_folder = main_folder + "/data/aruba-stack/"
+    data_folder = main_folder + "/data/aruba-stack-2930/"
+
+    debug_get_location(data_folder)
+    debug_get_room_location(data_folder)
+
+    print("\n=== ProCurve Modular ===")
+    data_folder = main_folder + "/data/procurve-modular/"
+
+    #debug_get_location(data_folder)
+    #debug_get_room_location(data_folder)
+
+    print("\n=== ProCurve Single ===")
+    data_folder = main_folder + "/data/procurve-single/"
+
+    #debug_get_location(data_folder)
+    debug_get_room_location(data_folder)
+    #debug_get_flor_nr(data_folder)
+
+    #debug_locations_json(data_folder)

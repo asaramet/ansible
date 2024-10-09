@@ -70,14 +70,33 @@
       include_vars:
         file: ../data/yaml/aruba_8_ports.yaml
 
+    - name: Create a Room (location)
+      tags: 
+        - location
+        - add_switches
+        - switches
+      netbox.netbox.netbox_location:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          site: "{{ item.site }}"
+          parent_location: "{{ item.parent_location }}"
+        state: present
+      loop: "{{ locations }}"
+
     - name: Add switches
-      tags: switches
+      tags: 
+        - add_switches
+        - switches
       netbox.netbox.netbox_device:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
         data:
           name: "{{ item.name }}"
+          location: "{{ item.location }}"
           site: "{{ item.site }}"
           device_type: "{{ item.device_type }}" 
           device_role: "{{ item.device_role }}"

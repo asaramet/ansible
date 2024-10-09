@@ -4,12 +4,12 @@
 
 import re, os, yaml
 from tabulate import tabulate
-from std_functions import this_folder, main_folder
-from std_functions import config_files
+from std_functions import this_folder, main_folder, config_files
 from std_functions import recursive_search, get_hostname
-from std_functions import devices_json, trunks_json, interface_names_json
-from std_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
-from std_functions import ip_addresses_json
+
+from json_functions import devices_json, trunks_json, interface_names_json
+from json_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
+from json_functions import ip_addresses_json, locations_json
 
 module_types = {
     "j8702a": "ProCurve 24-port 10/100/1000Base-T PoE Switch Module",
@@ -51,7 +51,7 @@ def get_modules(t_file):
             modules.append({'module': m_list[1], 'type': m_list[3]})
         return modules
 
-    for line in recursive_search("module", text):
+    for line in recursive_search("module", text, True):
         m_list = line.split()
         name = m_list[1]
         if name in names.keys():
@@ -64,7 +64,9 @@ def modules_json(config_files, module_types = {}):
     data = {'modules':[]}
     for t_file in config_files:
         modules = get_modules(t_file)
-        device = get_hostname(t_file)
+        hostnames = get_hostname(t_file)
+
+        device = hostnames['0']
 
         for module in modules:
             data['modules'].append({'device': device, 'module_bay': module['module'], 'type': module_types[module['type'].lower()]})
@@ -75,6 +77,7 @@ def modular(data_folder, output_file_path, device_type_slags, devices_tags, modu
     files = config_files(data_folder)
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump({"modular": True}, f)
+        yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(modules_json(files, module_types), f)
         yaml.dump(trunks_json(files), f)
@@ -132,6 +135,6 @@ def debug_get_modules(data_folder):
 if __name__ == "__main__":
     main()
 
-    #data_folder = main_folder + "/data/procurve-modular/"
+    data_folder = main_folder + "/data/procurve-modular/"
     #data_folder = main_folder + "/data/aruba-modular/"
     #debug_get_modules(data_folder)
