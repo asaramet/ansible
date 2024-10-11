@@ -78,6 +78,7 @@ def devices_json(config_files, device_type_slags, tags):
             hostname = hostname['0']
 
             d_label = device_type_slags[device_type(hostname)]
+
             data['devices'].append({'name': hostname, "location": location, 'device_role': get_device_role(t_file, hostname), 'device_type': d_label,
                 'site': get_site(hostname), 'tags': tags, 'serial':serial_numbers()[hostname]})
             continue
@@ -279,7 +280,9 @@ def debug_devices_json(data_folder):
       'JL256A_stack': "hpe-aruba-2930f-48g-poep-4sfpp",
       'JL075A_stack': 'hpe-aruba-3810m-16sfpp-2-slot-switch',
       'JL693A_stack': "hpe-aruba-2930f-12g-poep-2sfpp",
-      'JL322A_stack': 'hpe-aruba-2930m-48g-poep'
+      'JL322A_stack': 'hpe-aruba-2930m-48g-poep',
+      "JL679A": "hpe-aruba-6100-12g-poe4-2sfpp",
+      "JL658A_stack": "hpe-aruba-6300m-24sfpp-4sfp56"
     }
 
     files = config_files(data_folder)
@@ -341,8 +344,8 @@ if __name__ == "__main__":
     print("\n=== Singles JSON ===")
     data_folder = main_folder + "/data/hpe-48-ports/"
 
-    debug_locations_json(data_folder)
-    #debug_devices_json(data_folder)
+    #debug_locations_json(data_folder)
+    debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
     #debug_interface_names_json(data_folder)
     #debug_vlans_json(data_folder)

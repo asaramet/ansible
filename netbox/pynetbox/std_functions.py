@@ -233,6 +233,7 @@ def get_ip_address(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
+    print(t_file, recursive_section_search(text, 'vlan', 'ip address')[0])
     vlan_id, ip_string = recursive_section_search(text, 'vlan', 'ip address')[0]
     vlan_name = get_vlans_names(t_file)[vlan_id]
 
@@ -410,7 +411,7 @@ if __name__ == "__main__":
 
     #debug_config_files(data_folder)
     #debug_convert_range()
-    debug_get_hostname(data_folder)
+    #debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_site(data_folder)
     #debug_get_trunks(data_folder)
@@ -418,7 +419,7 @@ if __name__ == "__main__":
     #debug_get_vlans(data_folder)
     #debug_get_vlans_names(data_folder)
     #debug_get_untagged_vlans(data_folder)
-    #debug_get_ip_address(data_folder)
+    debug_get_ip_address(data_folder)
     #debug_device_type(data_folder)
 
     print("\n=== Stacking ===")
@@ -427,7 +428,7 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/aruba-modular-stack/"
     data_folder = main_folder + "/data/aruba-stack-2930/"
 
-    debug_get_hostname(data_folder)
+    #debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_site(data_folder)
     #debug_get_trunks(data_folder)
@@ -437,13 +438,13 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/aruba_6100/"
     data_folder = main_folder + "/data/aruba_6100/"
 
-    debug_get_hostname(data_folder)
+    #debug_get_hostname(data_folder)
 
     print("\n=== Aruba 6300 ===")
     #data_folder = main_folder + "/data/aruba_6100/"
     data_folder = main_folder + "/data/aruba_6300/"
 
-    debug_get_hostname(data_folder)
+    #debug_get_hostname(data_folder)
 
     print("\n=== No files functions ===")
     #debug_convert_range()

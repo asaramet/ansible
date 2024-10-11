@@ -4,18 +4,19 @@
 
 import re, os, yaml
 from tabulate import tabulate
-from std_functions import this_folder, main_folder
-from std_functions import config_files, search_line, device_type
-from std_functions import get_hostname
+from std_functions import this_folder, main_folder, config_files
+from std_functions import search_line, device_type, serial_numbers
+from std_functions import get_hostname, get_site
 
 from extra_functions import get_flor_name, get_parent_location
 from extra_functions import get_location, get_room_location
 
-from json_functions import locations_json, devices_json
+from json_functions import locations_json
 
-# get the interfaces configuration from an Aruba 6100 config file
+# get the interfaces configuration from a config file
 def get_interfaces_config(config_file):
     interface_configs = {
+        'mgmt': {},
         'vlan': {},
         'lag': {},
         'physical': {}
@@ -33,6 +34,8 @@ def get_interfaces_config(config_file):
             current_interface = line
             if 'vlan' in current_interface:
                 interface_type = 'vlan'
+            elif 'mgmt' in current_interface:
+                interface_type = 'mgmt'
             elif 'lag' in current_interface:
                 interface_type = 'lag'
             else:
@@ -54,26 +57,47 @@ def get_interfaces_config(config_file):
 
     return interface_configs
 
-# Get uplink vlan
-def get_uplink_vlan(config_file):
-    return get_vlan_interface(config_file)[0]
-
 # get vlan interface with IP loopback
-def get_vlan_interface(config_file):
-    vlan_interfaces = get_interfaces_config(config_file)['vlan']
+def get_looback_interface(config_file):
+    interfaces = get_interfaces_config(config_file)
 
-    vlan = list(vlan_interfaces.keys())[1:]
+    #loopback_int = interfaces['mgmt'] if 'mgmt' in interfaces.keys() else interfaces['vlan']
+    if 'mgmt' in interfaces.keys():
+        mgmt = interfaces['mgmt'] 
+        
+    if 'vlan' in interfaces.keys():
+        vlans = interfaces['vlan']
+
+    if mgmt: # managment interface
+        mgmt = mgmt.values()
+        if len(mgmt) != 1: return # skip if too much interfaces
+
+        mgmt = list(mgmt)[0][1].strip()
+        ip = mgmt.split()[2]
+
+        return 'mgmt', ip
+
+    vlan = list(vlans.keys())[1:]
+
     if len(vlan) != 1: # more or none interface vlans
-        return 
+        return
 
     vlan = vlan[0].split()[2]
 
-    [description, ip] = list(vlan_interfaces.values())[1]
+    [description, ip] = list(vlans.values())[1]
 
     ip = ip.split()[2]
     description = description.split()[1]
 
     return vlan, ip, description
+
+# Get uplink vlan
+def get_uplink_vlan(config_file):
+    return get_looback_interface(config_file)[0]
+
+
+
+
 
 def get_lag_interfaces(config_file):
     """
@@ -232,31 +256,42 @@ def get_interfaces(config_file):
     return  get_interfaces_recursively(config_text_list)
 
 # create devices json objects list
-#def devices_json(config_files):
-#    data = {"devices":[]}
-#    rsm_vlans = ['102','202','302']
+def devices_json(config_files, type_slags, tags):
+    data = {"devices":[], "chassis":[]}
+    rsm_vlans = ['102','202','302']
 
-#    device_types = {
-#        'JL679A': 'hpe-aruba-6100-12g-poe4-2sfpp',
-#        'JL658A': 'hpe-aruba-6300m-24sfpp-4sfp56'
-#    }
+    for file in config_files:
 
-#    for file in config_files:
+        location,room = get_location(file)
+        location = get_room_location(location)
 
-#        location,room = get_location(file)
-#        location = get_room_location(location)
-
-#        uplink_vlan = get_uplink_vlan(file)
+        uplink_vlan = get_uplink_vlan(file)
         
-#        device_role = "bueroswitch" if uplink_vlan in rsm_vlans else "access-layer-switch"
+        device_role = "bueroswitch" if uplink_vlan in rsm_vlans else "access-layer-switch"
 
-#        hostnames = get_hostname(file)
-#        for key in hostnames.keys():
-#            hostname = hostnames[key]
-#            d_type = device_types[device_type(hostname)]
-#            data["devices"].append({"name": hostname, "location": location, "site": get_site(hostname), "device_role": device_role, "device_type": d_type, "serial": None, "tags": None })
+        hostnames = get_hostname(file)
+        clean_name = None
 
-#    return data
+        if '0' not in hostnames.keys():
+            hostname = hostnames['1']
+            clean_name = hostname[:-2]
+            data['chassis'].append({'master': hostname, 'name': clean_name})
+
+        for key in hostnames.keys():
+            hostname = hostnames[key]
+
+            if not clean_name:
+                clean_name = hostname
+
+            if hostname[2:4] == "cs":
+                device_role = "distribution-layer-switch"
+
+            d_type = type_slags[device_type(clean_name)]
+
+            data["devices"].append({"name": hostname, "location": location, "site": get_site(clean_name), "device_role": device_role, 
+                "device_type": d_type, "serial": serial_numbers()[hostname], "tags": tags })
+
+    return data
 
 # create ip_addresses json objects list
 def ip_addressess_json(config_files):
@@ -265,7 +300,7 @@ def ip_addressess_json(config_files):
     for config_file in config_files:
         hostname = get_hostname(config_file)['0']
 
-        vlan_interface = get_vlan_interface(config_file)
+        vlan_interface = get_looback_interface(config_file)
 
         data["ip_addresses"].append({"hostname": hostname, "ip": vlan_interface[1], "vlan_nr": vlan_interface[0], "vlan_name": vlan_interface[2]})
 
@@ -368,9 +403,8 @@ def main():
     to_yaml(data_folder, output_file_path, device_type_slags, devices_tags)
 
 #---- Debugging ----#
-def debug_get_interfaces_config():
+def debug_get_interfaces_config(config_file):
     # print some collected or parsed data
-    config_file = data_folder + "rggw1018bp"
 
     interfaces_config = get_interfaces_config(config_file)
 
@@ -382,6 +416,27 @@ def debug_get_interfaces_config():
             for line in config:
                 print(f"    {line}")
             print()
+
+
+def debug_get_looback_interface(data_folder):
+    table = []
+    headers = ["File Name", "VLAN interface"]
+    for f in config_files(data_folder):
+        table.append([os.path.basename(f), get_looback_interface(f)])
+    print("\n== Debug: get_looback_interface ==")
+    print(tabulate(table, headers))
+
+def debug_get_uplink_vlan(data_folder):
+    table = []
+    headers = ["File Name", "Uplink VLAN"]
+    for f in config_files(data_folder):
+        table.append([os.path.basename(f), get_uplink_vlan(f)])
+    print("\n== Debug: get_uplink_vlan ==")
+    print(tabulate(table, headers))
+
+
+
+
 
 def debug_ip_addresses_json():
     files = os.listdir(data_folder)
@@ -434,18 +489,6 @@ def debug_get_interfaces():
             print(f"VLAN Mode: {interface['vlan_mode']}")
             print()    
 
-def debug_get_uplink_vlan():
-    files = os.listdir(data_folder)
-    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
-
-    rsm_vlans = ['102','202','302']
-    for f in files:
-        vlan = get_uplink_vlan(f)
-        if vlan in rsm_vlans:
-            print("Bueroswitch - ", vlan)
-        else:
-            print("Access Switch - ", vlan)
-
 def debug_get_location(data_folder):
     table = []
     headers = ["File Name", "Location"]
@@ -461,6 +504,19 @@ def debug_get_room_location(data_folder):
         table.append([os.path.basename(f), get_room_location(f)])
     print("\n== Debug: get_room_location() ==")
     print(tabulate(table, headers))
+
+def debug_devices_json(data_folder):
+    device_type_slags = {
+      "JL679A": "hpe-aruba-6100-12g-poe4-2sfpp",
+      "JL658A_stack": "hpe-aruba-6300m-24sfpp-4sfp56"
+    }
+
+    files = config_files(data_folder)
+    devices_tags = ["switch"]
+    output = yaml.dump(devices_json(files, device_type_slags, devices_tags))
+
+    print("\n'device_json()' Output: for ", data_folder)
+    print(output)
 
 def test_to_yaml(data_folder):
     # Create test.yaml file from test folder
@@ -482,21 +538,30 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/aruba_6100/"
     #data_folder = main_folder + "/data/aruba_6300/"
 
-    test_to_yaml(data_folder)
+    config_file = data_folder + "rggw1018bp"
+    #debug_get_interfaces_config(config_file)
 
-    #debug_get_interfaces_config()
+    #debug_get_looback_interface(data_folder)
+    #debug_get_uplink_vlan(data_folder)
+
     #debug_ip_addresses_json()
     #debug_get_lag_interfaces()
     #debug_lags_json()
     #debug_get_vlans()
     #debug_collect_vlans()
     #debug_get_interfaces()
-    #debug_get_uplink_vlan()
 
+    debug_devices_json(data_folder)
+    #test_to_yaml(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
+    config_file = data_folder + "rgcs0006"
+    #debug_get_interfaces_config(config_file)
 
-    #debug_devices_json(data_folder)
+    #debug_get_looback_interface(data_folder)
+    #debug_get_uplink_vlan(data_folder)
+
+    debug_devices_json(data_folder)
     #test_to_yaml(data_folder)
