@@ -159,7 +159,6 @@ def get_hostname(t_file):
 
     return hostnames
 
-
 def get_site(hostname):
     campuses = {
         "h": "flandernstrasse",
