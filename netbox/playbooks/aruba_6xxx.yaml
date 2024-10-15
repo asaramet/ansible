@@ -1,18 +1,22 @@
 # Examples production flow 
 #
-# ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,location
-# ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,switches
-# ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,lags
-# ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,vlans
-# ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,ip
-# ansible-playbook playbooks/aruba_6100.yaml --tags aruba_6100,development,interfaces
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,development,location
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,development,switches
+
+
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,development,lags
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,development,vlans
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,development,ip
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,development,interfaces
 # 
-# ansible-playbook playbooks/aruba_6300.yaml --tags aruba_6300,production,location
-# ansible-playbook playbooks/aruba_6300.yaml --tags aruba_6300,production,switches
-# ansible-playbook playbooks/aruba_6300.yaml --tags aruba_6300,production,lags
-# ansible-playbook playbooks/aruba_6300.yaml --tags aruba_6300,production,vlans
-# ansible-playbook playbooks/aruba_6300.yaml --tags aruba_6300,production,ip
-# ansible-playbook playbooks/aruba_6300.yaml --tags aruba_6300,production,interfaces
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,location
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,switches
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,development,chassis
+
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,lags
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,vlans
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,ip
+# ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,interfaces
 
 ---
 - name: Add Aruba 6100 Switches from configuration files
@@ -81,6 +85,96 @@
           tenant: netzadmin
         state: present
       loop: "{{ devices }}"
+
+    - name: Delete default interfaces
+      tags: 
+        - delete_default_interfaces
+        - switches
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.device }}"
+          name: "{{ '1' + item.interface[1:] }}" # delete '1/x/x' interfaces
+        state: absent
+      loop: "{{ device_interfaces }}"
+      when: "{{ chassis }}" # if chassis is not an empty list
+      when: "{{ item.device[-1:] != '1' }}" # ignore first stack
+
+    - name: Add stack interfaces
+      tags: 
+        - stack_interfaces
+        - switches
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.device }}"
+          name: "{{ item.interface }}"
+          type: "{{ item.type }}"
+          poe_mode: "{{ item.poe_mode }}"
+          poe_type: "{{ item.poe_type }}"
+        state: present
+      loop: "{{ device_interfaces }}"
+      when: "{{ chassis }}"
+      when: "{{ item.device[-1:] != '1' }}"
+
+    - name: Delete virtual chassis 
+      tags: 
+        - delete_chassis
+      netbox.netbox.netbox_virtual_chassis:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+        state: absent
+      loop: "{{ chassis }}"
+
+    - name: Create virtual chassis 
+      tags: 
+        - create_chassis
+        - chassis
+      netbox.netbox.netbox_virtual_chassis:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          master: "{{ item.name + '-1' | regex_replace('0') }}" 
+          tags:
+            - stack
+        state: present
+      loop: "{{ chassis }}"
+      when: "{{ chassis }}" # if chassis is not an empty list
+
+    - name: Assign switches to chassis
+      tags: 
+        - assign_switches
+        - chassis
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          site: "{{ item.site }}"
+          device_type: "{{ item.device_type }}" 
+          device_role: "{{ item.device_role }}"
+          serial: "{{ item.serial }}"
+          tags: "{{ item.tags }}"
+          tenant: netzadmin
+          virtual_chassis: "{{ item.name[:-2] }}"
+          vc_position: "{{ item.name[-1:] }}"
+          vc_priority: "{{ '255' if item.name[-1:] == '1' else '128' }}"
+        state: present
+      loop: "{{ devices }}"
+      when: "{{ chassis }}" # if chassis is not an empty list
+
+
+
 
     - name: Create VLAN 1 interfaces
       tags: 

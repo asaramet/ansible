@@ -8,7 +8,7 @@ from std_functions import main_folder, config_files
 
 from json_functions import locations_json
 
-from json_functions_os_cx import devices_json
+from json_functions_os_cx import devices_json, device_interfaces_json
 
 #from std_functions import get_hostname, get_site
 
@@ -108,74 +108,6 @@ def get_vlan_names(config_file):
     
     return vlans
 
-def get_interfaces_recursively(config_text_list, interfaces = None, current_interface = None, found_interface_flag = False):
-    # initialize interfaces properly if not provided
-    if not interfaces:
-        interfaces = []
-
-    if not config_text_list:
-        # Append the last interface if the recursion is terminating and an interface was being processed
-        if found_interface_flag and current_interface is not None:
-            interfaces.append(current_interface)
-        return interfaces # Terminate recursion
-
-    line = config_text_list[0] # get a line
-
-    # Find interface and save it to current_interface they start recursively from the next line
-    if line.startswith('interface ') and not found_interface_flag: 
-        name = " ".join(line.split()[1:])
-        current_interface = {'name': name, 'description': None, 'vlan': None, 'vlan_mode': None} 
-
-        return get_interfaces_recursively(config_text_list[1:], interfaces, current_interface, True)
-
-    # if the line starts with a word and the flag is True, switch the flag to False and append the current interface
-    if not re.match(r'\s', line) and found_interface_flag:
-        found_interface_flag = False
-        interfaces.append(current_interface)
-        return get_interfaces_recursively(config_text_list, interfaces, current_interface, found_interface_flag)
-
-    # Remove spaces
-    line = line.strip()
-
-    # Match vlan access
-    if line.startswith('description') and found_interface_flag: 
-        description = " ".join(line.split()[1:])
-        current_interface['description'] = description
-
-    # Match vlan access
-    elif 'vlan access' in line:
-        vlan_id = line.split()[-1]
-        current_interface['vlan'] = vlan_id
-        current_interface['vlan_mode'] = "access"
-        
-    # Match vlan trunk
-    elif 'vlan trunk' in line:
-        mode = line.split()[2]
-        vlan_id = line.split()[-1]
-        current_interface['vlan_mode'] = "tagged-all"
-        if mode == 'native':
-            current_interface['vlan'] = vlan_id
-
-    return get_interfaces_recursively(config_text_list[1:], interfaces, current_interface, found_interface_flag)
-
-def get_interfaces(config_file):
-    """
-    Parse a configuration file and extract interface names, descriptions, and VLAN assignments.
-
-    Args:
-    - config_file (str): The path to the configuration file to parse.
-
-    Returns:
-    - list of dicts: A list of dictionaries, each representing an interface with keys:
-                     'name' (str): Interface name
-                     'description' (str): Interface description or "none" if not provided
-                     'vlan' (str): Native/untagged VLAN ID assigned to the interface
-    """
-    with open(config_file, 'r') as f:
-        config_text_list = f.readlines()
-
-    return  get_interfaces_recursively(config_text_list)
-
 # create ip_addresses json objects list
 def ip_addressess_json(config_files):
     data = {"ip_addresses":[]}
@@ -253,16 +185,16 @@ def to_yaml(data_folder, output_file_path, device_type_slags, devices_tags):
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
-        yaml.dump(ip_addressess_json(files), f)
-        yaml.dump(lags_json(files), f)
-        yaml.dump(vlans_jason(files), f)
-        yaml.dump(interfaces_json(files), f)
+#        yaml.dump(ip_addressess_json(files), f)
+#        yaml.dump(lags_json(files), f)
+#        yaml.dump(vlans_jason(files), f)
+#        yaml.dump(interfaces_json(files), f)
 
 def main():
-    print("Update data for Aruba 6100 Switches into the file: ", output_file_path)
-
+    #--- 6100 ---
     data_folder = main_folder + "/data/aruba_6100/"
     output_file_path = "/data/yaml/aruba_6100.yaml"
+    print("Update data for Aruba 6100 Switches into the file: ", output_file_path)
 
     device_type_slags = {
         "JL679A": "hpe-aruba-6100-12g-poe4-2sfpp"
@@ -272,10 +204,10 @@ def main():
 
     to_yaml(data_folder, output_file_path, device_type_slags, devices_tags)
 
-    print("Update data for Aruba 6300 Switches into the file: ", output_file_path)
-
+    #--- 6300 ---
     data_folder = main_folder + "/data/aruba_6300/"
     output_file_path = "/data/yaml/aruba_6300.yaml"
+    print("Update data for Aruba 6300 Switches into the file: ", output_file_path)
 
     device_type_slags = {
         "JL658A_stack": "hpe-aruba-6300m-24sfpp-4sfp56"
@@ -284,6 +216,10 @@ def main():
     devices_tags = ["switch", "stack"]
 
     to_yaml(data_folder, output_file_path, device_type_slags, devices_tags)
+
+    files = config_files(data_folder)
+    with open(main_folder + output_file_path, 'a') as f:
+        yaml.dump(device_interfaces_json(files), f)
 
 #---- Debugging ----#
 def debug_ip_addresses_json():
@@ -320,38 +256,6 @@ def debug_collect_vlans():
     for vlan_id in info:
         print(f"VLAN ID: {vlan_id}, Name: {info[vlan_id]['name']}, Description: {info[vlan_id]['description']}")
 
-def debug_get_interfaces():
-    config_files = [data_folder + "rsgw7203p"]
-    config_files.append(data_folder + "rggw1018bp")
-
-    for config_file in config_files:
-        interfaces = get_interfaces(config_file)
-
-        print("Interfaces List:", interfaces)
-
-        # Print out the extracted interfaces
-        for interface in interfaces:
-            print(f"Interface Name: {interface['name']}")
-            print(f"Description: {interface['description']}")
-            print(f"VLAN: {interface['vlan']}")
-            print(f"VLAN Mode: {interface['vlan_mode']}")
-            print()    
-
-def debug_get_location(data_folder):
-    table = []
-    headers = ["File Name", "Location"]
-    for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_location(f)])
-    print("\n== Debug: get_location() ==")
-    print(tabulate(table, headers))
-
-def debug_get_room_location(data_folder):
-    table = []
-    headers = ["File Name", "Room Location"]
-    for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_room_location(f)])
-    print("\n== Debug: get_room_location() ==")
-    print(tabulate(table, headers))
 
 
 
@@ -370,24 +274,24 @@ def test_to_yaml(data_folder):
     to_yaml(data_folder, output_file_path, slags, ["switch"])
 
 if __name__ == "__main__":
-    #main()
+    main()
 
-    print("\n=== Aruba 6100 ===")
+    print("\n=== Debugging Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
     #data_folder = main_folder + "/data/aruba_6300/"
 
     config_file = data_folder + "rggw1018bp"
 
-    debug_ip_addresses_json()
+    #debug_ip_addresses_json()
+
     #debug_get_lag_interfaces()
     #debug_lags_json()
     #debug_get_vlans()
     #debug_collect_vlans()
-    #debug_get_interfaces()
 
     #test_to_yaml(data_folder)
 
-    print("\n=== Aruba 6300 ===")
+    print("\n=== Debugging Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
     config_file = data_folder + "rgcs0006"

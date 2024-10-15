@@ -3,13 +3,12 @@
 #----- Return JSON Objects for Aruba OS-CX -----#
 
 import re, os, yaml
-from std_functions import main_folder, config_files
+from std_functions import main_folder, config_files, convert_range
 from std_functions import device_type, serial_numbers
 from std_functions import get_hostname, get_site
 
 from extra_functions import get_location, get_room_location
-
-from std_functions_os_cx import get_uplink_vlan
+from extra_functions import get_uplink_vlan, get_interfaces_config
 
 
 # create devices json objects list
@@ -50,7 +49,82 @@ def devices_json(config_files, type_slags, tags):
 
     return data
 
+def device_interfaces_json(config_files):
+    data = {"device_interfaces":[]}
 
+    types = {
+        "JL658A": {
+            "1-24": "10gbase-x-sfpp",
+            "25-28": "25gbase-x-sfp28"
+        },
+        "JL679A": {
+            "1-14": "1000base-t",
+            "15-16": "10gbase-x-sfpp"
+        }
+    }
+    poe_types = {
+        "JL679A": {
+            "1-14": "type2-ieee802.3at",
+            "15-16": None
+        }
+    }
+    poe_modes = {
+        "JL679A": {
+            "1-14": "pd",
+            "15-16": None
+        }
+    }
+
+    poe_type = poe_mode = None
+
+    for f in config_files:
+        interfaces = get_interfaces_config(f)["physical"].keys()
+
+        hostnames = get_hostname(f)
+
+        if '0' in hostnames.keys():
+            clean_name = hostnames['1'] = hostnames['0']
+        else:
+            clean_name = hostnames['1'][:-2]
+
+        d_type = device_type(clean_name).split('_')[0]
+
+        # create interface type dictionary
+        i_types = {}
+        if d_type in types:
+            for key, value in types[d_type].items():
+                for i_nr in convert_range(key):
+                    i_types[str(i_nr)] = value
+
+        # create poe interface dictionaries
+        i_poe_types = {} 
+        if d_type in poe_types:
+            for key, value in poe_types[d_type].items():
+                for i_nr in convert_range(key):
+                    i_poe_types[str(i_nr)] = value
+
+        i_poe_modes = {}
+        if d_type in poe_modes:
+            for key, value in poe_modes[d_type].items():
+                for i_nr in convert_range(key):
+                    i_poe_modes[str(i_nr)] = value
+
+        for value in interfaces:
+            _, interface = value.split()
+
+            stack_nr, _, pos_nr = interface.split('/')
+
+            poe_mode = i_poe_modes[pos_nr] if i_poe_modes else None
+            poe_type = i_poe_types[pos_nr] if i_poe_types else None
+            
+            data["device_interfaces"].append({
+                'device': hostnames[stack_nr], 'type': i_types[pos_nr],
+                'interface': interface, 'stack_nr': stack_nr, 
+                'poe_mode': poe_mode, 'poe_type': poe_type })
+
+    return data
+
+#==== Debug functions ====
 def debug_devices_json(data_folder):
     device_type_slags = {
       "JL679A": "hpe-aruba-6100-12g-poe4-2sfpp",
@@ -64,17 +138,26 @@ def debug_devices_json(data_folder):
     print("\n'device_json()' Output: for ", data_folder)
     print(output)
 
+def debug_device_interfaces_json(data_folder):
+    files = config_files(data_folder)
+    output = yaml.dump(device_interfaces_json(files))
+
+    print("\n'device_json()' Output: for ", data_folder)
+    print(output)
+
 if __name__ == "__main__":
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
 
     config_file = data_folder + "rggw1018bp"
 
-    debug_devices_json(data_folder)
+    #debug_devices_json(data_folder)
+    debug_device_interfaces_json(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
     config_file = data_folder + "rgcs0006"
 
-    debug_devices_json(data_folder)
+    #debug_devices_json(data_folder)
+    debug_device_interfaces_json(data_folder)

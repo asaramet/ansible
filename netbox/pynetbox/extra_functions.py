@@ -4,9 +4,7 @@
 
 import re, os, yaml
 from tabulate import tabulate
-from std_functions import this_folder, main_folder
-from std_functions import config_files, search_line
-from std_functions import get_hostname, device_type
+from std_functions import main_folder, config_files, search_line
 
 def get_location(file):
     location_line = search_line("location", file)
@@ -88,15 +86,10 @@ def get_room_location(location):
 
     return building.lower() + "-" + flor_fx + "-" + flor_tag
     
-
-
-
-
-
-
-# get the interfaces configuration from an Aruba 6100 config file
+# get the interfaces configuration from a config file
 def get_interfaces_config(config_file):
     interface_configs = {
+        'mgmt': {},
         'vlan': {},
         'lag': {},
         'physical': {}
@@ -114,6 +107,8 @@ def get_interfaces_config(config_file):
             current_interface = line
             if 'vlan' in current_interface:
                 interface_type = 'vlan'
+            elif 'mgmt' in current_interface:
+                interface_type = 'mgmt'
             elif 'lag' in current_interface:
                 interface_type = 'lag'
             else:
@@ -135,114 +130,43 @@ def get_interfaces_config(config_file):
 
     return interface_configs
 
-# Get uplink vlan
-def get_uplink_vlan(config_file):
-    return get_vlan_interface(config_file)[0]
-
 # get vlan interface with IP loopback
-def get_vlan_interface(config_file):
-    vlan_interfaces = get_interfaces_config(config_file)['vlan']
+def get_looback_interface(config_file):
+    interfaces = get_interfaces_config(config_file)
 
-    vlan = list(vlan_interfaces.keys())[1:]
+    #loopback_int = interfaces['mgmt'] if 'mgmt' in interfaces.keys() else interfaces['vlan']
+    if 'mgmt' in interfaces.keys():
+        mgmt = interfaces['mgmt'] 
+        
+    if 'vlan' in interfaces.keys():
+        vlans = interfaces['vlan']
+
+    if mgmt: # managment interface
+        mgmt = mgmt.values()
+        if len(mgmt) != 1: return # skip if too much interfaces
+
+        mgmt = list(mgmt)[0][1].strip()
+        ip = mgmt.split()[2]
+
+        return 'mgmt', ip
+
+    vlan = list(vlans.keys())[1:]
+
     if len(vlan) != 1: # more or none interface vlans
-        return 
+        return
 
     vlan = vlan[0].split()[2]
 
-    [description, ip] = list(vlan_interfaces.values())[1]
+    [description, ip] = list(vlans.values())[1]
 
     ip = ip.split()[2]
     description = description.split()[1]
 
     return vlan, ip, description
 
-def get_lag_interfaces(config_file):
-    """
-    Extracts LAG information from the interfaces dictionary.
-    
-    Args:
-        config_file (text file): Aruba 6100 switch configuration file containing interface configurations.
-    
-    Returns:
-        dict: A dictionary where keys are LAG IDs and values are lists of interfaces belonging to each LAG.
-    """
-    lag_interfaces = {}
-    
-    interfaces_dict = get_interfaces_config(config_file)['physical']
-    for interface, configs in interfaces_dict.items():
-        for config in configs:
-            config = config.strip()
-            if config.startswith('lag'):
-                lag_id = config.split()[1]
-                if lag_id not in lag_interfaces:
-                    lag_interfaces[lag_id] = []
-
-                interface = interface.split()[1]
-                lag_interfaces[lag_id].append(interface)
-                break
-    
-    return lag_interfaces
-
-def get_vlans(config_file):
-    """
-    Parses VLAN information from a given configuration file content.
-
-    Args:
-        file_content (str): The content of the configuration file as a string.
-
-    Returns:
-        dict: A dictionary where each key is a VLAN ID (str) and the value is another
-              dictionary with keys 'name' and 'description'. If a VLAN does not have a
-              name or description, the corresponding value will be None.
-    """
-
-    with open(config_file, "r") as f:
-        config_text = f.readlines()
-
-    vlans = {}
-    vlan_pattern = re.compile(r"vlan (\d+)")
-    name_pattern = re.compile(r"\s+name (.+)")
-    description_pattern = re.compile(r"\s+description (.+)")
-    current_vlan = None
-
-    for line in config_text:
-        vlan_match = vlan_pattern.match(line)
-        name_match = name_pattern.match(line)
-        description_match = description_pattern.match(line)
-
-        if vlan_match:
-            current_vlan = vlan_match.group(1)
-            vlans[current_vlan] = {'name': 'default', 'description': 'default'}
-        elif name_match and current_vlan:
-            vlans[current_vlan]['name'] = name_match.group(1)
-        elif description_match and current_vlan:
-            vlans[current_vlan]['description'] = description_match.group(1)
-
-    return vlans
-
-def get_vlan_names(config_file):
-    with open(config_file, "r") as f:
-        lines = f.readlines()
-
-    # vlans dictionary in form of {'vlan_id': 'vlan_name'}
-    vlans = {}
-
-    current_vlan = None
-    for line in lines:
-        line = line.strip()
-        
-        if line.startswith("vlan "):
-            current_vlan = line.split()[1]
-        elif line.startswith("name ") and current_vlan is not None:
-            vlan_name = line.split(" ", 1)[1]
-            vlans[current_vlan] = vlan_name
-            current_vlan = None
-
-        if current_vlan == "1":
-            vlans["1"] = "default"
-            current_vlan = None
-    
-    return vlans
+# Get uplink vlan
+def get_uplink_vlan(config_file):
+    return get_looback_interface(config_file)[0]
 
 def get_interfaces_recursively(config_text_list, interfaces = None, current_interface = None, found_interface_flag = False):
     # initialize interfaces properly if not provided
@@ -312,6 +236,11 @@ def get_interfaces(config_file):
 
     return  get_interfaces_recursively(config_text_list)
 
+
+
+
+
+
 #---- Debugging ----#
 def debug_get_location(data_folder):
     table = []
@@ -350,16 +279,8 @@ def debug_get_flor_nr(data_folder):
     print("\n== Debug: get_flor_nr() ==")
     print(tabulate(table, headers))
 
-
-
-
-#---- Debugging JSON ----#
-
-
-#--- Redundant ---#
-def debug_get_interfaces_config():
+def debug_get_interfaces_config(config_file):
     # print some collected or parsed data
-    config_file = data_folder + "rggw1018bp"
 
     interfaces_config = get_interfaces_config(config_file)
 
@@ -372,33 +293,24 @@ def debug_get_interfaces_config():
                 print(f"    {line}")
             print()
 
-def debug_get_lag_interfaces():
-    file = data_folder + "rggw1018bp"
-    lag_interfaces = get_lag_interfaces(file)
-    for lag, interfaces in lag_interfaces.items():
-        print(f"LAG {lag}: {interfaces}")
+def debug_get_looback_interface(data_folder):
+    table = []
+    headers = ["File Name", "VLAN interface"]
+    for f in config_files(data_folder):
+        table.append([os.path.basename(f), get_looback_interface(f)])
+    print("\n== Debug: get_looback_interface ==")
+    print(tabulate(table, headers))
 
-    print(lag_interfaces)
+def debug_get_uplink_vlan(data_folder):
+    table = []
+    headers = ["File Name", "Uplink VLAN"]
+    for f in config_files(data_folder):
+        table.append([os.path.basename(f), get_uplink_vlan(f)])
+    print("\n== Debug: get_uplink_vlan ==")
+    print(tabulate(table, headers))
 
-def debug_get_vlans():
-    file = data_folder + "rggw1018bp"
-    vlans = get_vlans(file)
-    print(vlans)
-    for vlan_id, info in vlans.items():
-        print(f"VLAN ID: {vlan_id}, Name: {info['name']}, Description: {info['description']}")
-
-def debug_collect_vlans():
-    files = os.listdir(data_folder)
-    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
-    info = collect_vlans(files)
-    for vlan_id in info:
-        print(f"VLAN ID: {vlan_id}, Name: {info[vlan_id]['name']}, Description: {info[vlan_id]['description']}")
-
-def debug_get_interfaces():
-    config_files = [data_folder + "rsgw7203p"]
-    config_files.append(data_folder + "rggw1018bp")
-
-    for config_file in config_files:
+def debug_get_interfaces(data_folder):
+    for config_file in config_files(data_folder):
         interfaces = get_interfaces(config_file)
 
         print("Interfaces List:", interfaces)
@@ -411,57 +323,50 @@ def debug_get_interfaces():
             print(f"VLAN Mode: {interface['vlan_mode']}")
             print()    
 
-def debug_get_uplink_vlan():
-    files = os.listdir(data_folder)
-    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
 
-    rsm_vlans = ['102','202','302']
-    for f in files:
-        vlan = get_uplink_vlan(f)
-        if vlan in rsm_vlans:
-            print("Bueroswitch - ", vlan)
-        else:
-            print("Access Switch - ", vlan)
+
 
 if __name__ == "__main__":
     #main()
 
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
-
-    #debug_get_interfaces_config()
-    #debug_ip_addresses_json()
-    #debug_get_lag_interfaces()
-    #debug_lags_json()
-    #debug_get_vlans()
-    #debug_collect_vlans()
-    #debug_get_interfaces()
-    #debug_get_uplink_vlan()
+    config_file = data_folder + "rggw1018bp"
 
     #debug_get_location(data_folder)
     #debug_get_room_location(data_folder)
-    debug_get_flor_nr(data_folder)
+    #debug_get_flor_nr(data_folder)
 
-    #debug_locations_json(data_folder)
+    #debug_get_interfaces_config(config_file)
+    #debug_get_looback_interface(data_folder)
+    #debug_get_uplink_vlan(data_folder)
+    #debug_get_interfaces(data_folder)
+
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
+    config_file = data_folder + "rgcs0006"
 
     #debug_get_location(data_folder)
     #debug_get_room_location(data_folder)
+
+    #debug_get_interfaces_config(config_file)
+    #debug_get_looback_interface(data_folder)
+    #debug_get_uplink_vlan(data_folder)
+    debug_get_interfaces(data_folder)
 
     print("\n=== HPE Singles ===")
     data_folder = main_folder + "/data/hpe-8-ports/"
 
-    debug_get_location(data_folder)
-    debug_get_room_location(data_folder)
+    #debug_get_location(data_folder)
+    #debug_get_room_location(data_folder)
 
     print("\n=== HPE Stacking ===")
     #data_folder = main_folder + "/data/aruba-stack/"
     data_folder = main_folder + "/data/aruba-stack-2930/"
 
-    debug_get_location(data_folder)
-    debug_get_room_location(data_folder)
+    #debug_get_location(data_folder)
+    #debug_get_room_location(data_folder)
 
     print("\n=== ProCurve Modular ===")
     data_folder = main_folder + "/data/procurve-modular/"
@@ -473,7 +378,5 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/procurve-single/"
 
     #debug_get_location(data_folder)
-    debug_get_room_location(data_folder)
+    #debug_get_room_location(data_folder)
     #debug_get_flor_nr(data_folder)
-
-    #debug_locations_json(data_folder)

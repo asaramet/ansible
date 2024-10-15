@@ -54,3 +54,36 @@
       debug: 
         msg: "{{ item.name + '-1' | regex_replace('0') }}" 
       loop: "{{ chassis }}"
+
+    - name: Include vars for Chassis
+      tags: 
+        - chassis
+        - list
+      include_vars:
+        file: ../data/yaml/aruba_6300.yaml
+        #file: ../data/yaml/aruba_6100.yaml
+
+    - name: Display chassis vars
+      tags: chassis
+      vars:
+        data:
+          name: "{{ item.name }}"
+          site: "{{ item.site }}"
+          device_type: "{{ item.device_type }}" 
+          device_role: "{{ item.device_role }}"
+          serial: "{{ item.serial }}"
+          tags: "{{ item.tags }}"
+          tenant: netzadmin
+          virtual_chassis: "{{ item.name[:-2] }}"
+          vc_position: "{{ item.name[-1:] }}"
+          vc_priority: "{{ '256' if item.name[-1:] == '1' else '128' }}"
+      debug:
+        msg: "{{ data }}"
+      loop: "{{ devices }}"
+      when: "{{ chassis }}"
+      when: "{{ item.name[-1:] != '1' }}"
+
+    - name: Empty list
+      tags: list
+      debug:
+        msg: "{{ 'yes' if chassis else 'no' }}"
