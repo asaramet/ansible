@@ -9,6 +9,7 @@ from std_functions import get_hostname, get_site
 
 from extra_functions import get_location, get_room_location
 from extra_functions import get_uplink_vlan, get_interfaces_config
+from extra_functions import get_looback_interface
 
 
 # create devices json objects list
@@ -124,6 +125,26 @@ def device_interfaces_json(config_files):
 
     return data
 
+# create ip_addresses json objects list
+def ip_addresses_json(config_files):
+    data = {"ip_addresses":[]}
+
+    for config_file in config_files:
+        hostnames = get_hostname(config_file)
+        loopback_interface = get_looback_interface(config_file)
+
+        vlan = True # Flag that shows that loopback interface is a vlan
+        if len(loopback_interface) == 2:
+            vlan = False
+
+        hostname = hostnames['0'] if '0' in hostnames.keys() else hostnames['1']
+        name = "vlan " + loopback_interface[0] if vlan else loopback_interface[0]
+        description = loopback_interface[2] if vlan else loopback_interface[0]
+
+        data["ip_addresses"].append({"hostname": hostname, "vlan": vlan, "ip": loopback_interface[1], "name": name, "description": description })
+
+    return data
+
 #==== Debug functions ====
 def debug_devices_json(data_folder):
     device_type_slags = {
@@ -142,7 +163,14 @@ def debug_device_interfaces_json(data_folder):
     files = config_files(data_folder)
     output = yaml.dump(device_interfaces_json(files))
 
-    print("\n'device_json()' Output: for ", data_folder)
+    print("\n'device_interfaces_json()' Output: for ", data_folder)
+    print(output)
+
+def debug_ip_addresses_json(data_folder):
+    files = config_files(data_folder)
+    output = yaml.dump(ip_addresses_json(files))
+
+    print("\n'ip_addreses_json()' Output: for ", data_folder)
     print(output)
 
 if __name__ == "__main__":
@@ -152,7 +180,8 @@ if __name__ == "__main__":
     config_file = data_folder + "rggw1018bp"
 
     #debug_devices_json(data_folder)
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
+    debug_ip_addresses_json(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
@@ -160,4 +189,5 @@ if __name__ == "__main__":
     config_file = data_folder + "rgcs0006"
 
     #debug_devices_json(data_folder)
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
+    debug_ip_addresses_json(data_folder)

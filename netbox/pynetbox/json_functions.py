@@ -334,24 +334,23 @@ def debug_tagged_vlans_json(data_folder):
 
 def debug_ip_addresses_json(data_folder):
     files = config_files(data_folder)
-    devices_tags = ["switch"]
-    output = yaml.dump(ip_addresses_json(files))
 
     print("\n'ip_addresses_json()' Output: for ", data_folder)
-    print(output)
+    for dict in ip_addresses_json(files)['ip_addresses']:
+        print(dict)
 
 if __name__ == "__main__":
     print("\n=== Singles JSON ===")
     data_folder = main_folder + "/data/hpe-48-ports/"
 
     #debug_locations_json(data_folder)
-    debug_devices_json(data_folder)
+    #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
     #debug_interface_names_json(data_folder)
     #debug_vlans_json(data_folder)
     #debug_untagged_vlans_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
-    #debug_ip_addresses_json(data_folder)
+    debug_ip_addresses_json(data_folder)
 
     print("\n=== Stacking JSON ===")
     #data_folder = main_folder + "/data/aruba-stack/"

@@ -173,9 +173,6 @@
       loop: "{{ devices }}"
       when: "{{ chassis }}" # if chassis is not an empty list
 
-
-
-
     - name: Create VLAN 1 interfaces
       tags: 
         - vlan_1
@@ -185,12 +182,13 @@
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
+        update_vc_child: true
         data:
-          device: "{{ item.name }}"
+          device: "{{ item.hostname }}"
           name: "vlan 1"
           type: Virtual
         state: present
-      loop: "{{ devices }}"
+      loop: "{{ ip_addresses }}"
 
     - name: Create VLAN interfaces
       tags: 
@@ -200,12 +198,14 @@
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
+        update_vc_child: true
         data:
           device: "{{ item.hostname }}"
-          name: "vlan {{ item.vlan_nr }}"
+          name: "{{ item.name }}"
           type: Virtual
-          description: "{{ item.vlan_name }}"
+          description: "{{ item.description }}"
         state: present
+      when: "{{ item.vlan }}"
       loop: "{{ ip_addresses }}"
 
     - name: Assign IP to VLAN interface
@@ -219,10 +219,10 @@
         data:
           address: "{{ item.ip }}"
           dns_name: "{{ item.hostname }}"
-          description: "VLAN {{ item.vlan_nr }} ({{ item.vlan_name }})"
+          description: "{{ item.description }}"
           assigned_object:
             device: "{{item.hostname }}"
-            name: "vlan {{ item.vlan_nr }}"
+            name: "{{ item.name }}"
           role: Loopback
           tenant: netzadmin
         state: present
@@ -241,6 +241,11 @@
           primary_ip4: "{{ item.ip }}"
         state: present
       loop: "{{ ip_addresses }}"
+
+
+
+
+
 
     - name: Create LAG interfaces
       tags:

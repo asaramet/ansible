@@ -9,11 +9,14 @@ from std_functions import main_folder, config_files
 from json_functions import locations_json
 
 from json_functions_os_cx import devices_json, device_interfaces_json
+from json_functions_os_cx import ip_addresses_json
 
 #from std_functions import get_hostname, get_site
+#from std_functions import get_hostname
 
 #from extra_functions import get_flor_name, get_parent_location
 #from extra_functions import get_location, get_room_location
+#from extra_functions import get_looback_interface
 
 
 
@@ -108,19 +111,6 @@ def get_vlan_names(config_file):
     
     return vlans
 
-# create ip_addresses json objects list
-def ip_addressess_json(config_files):
-    data = {"ip_addresses":[]}
-
-    for config_file in config_files:
-        hostname = get_hostname(config_file)['0']
-
-        vlan_interface = get_looback_interface(config_file)
-
-        data["ip_addresses"].append({"hostname": hostname, "ip": vlan_interface[1], "vlan_nr": vlan_interface[0], "vlan_name": vlan_interface[2]})
-
-    return data
-
 # create lags json objects list
 def lags_json(config_files):
     data = {"lags":[], "lag_interfaces":[]}
@@ -185,7 +175,7 @@ def to_yaml(data_folder, output_file_path, device_type_slags, devices_tags):
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
-#        yaml.dump(ip_addressess_json(files), f)
+        yaml.dump(ip_addresses_json(files), f)
 #        yaml.dump(lags_json(files), f)
 #        yaml.dump(vlans_jason(files), f)
 #        yaml.dump(interfaces_json(files), f)
@@ -222,13 +212,6 @@ def main():
         yaml.dump(device_interfaces_json(files), f)
 
 #---- Debugging ----#
-def debug_ip_addresses_json():
-    files = os.listdir(data_folder)
-    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
-
-    for dict in ip_addressess_json(files)['ip_addresses']:
-        print(dict)
-
 def debug_get_lag_interfaces():
     file = data_folder + "rggw1018bp"
     lag_interfaces = get_lag_interfaces(file)
@@ -281,8 +264,6 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/aruba_6300/"
 
     config_file = data_folder + "rggw1018bp"
-
-    #debug_ip_addresses_json()
 
     #debug_get_lag_interfaces()
     #debug_lags_json()

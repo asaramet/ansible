@@ -295,7 +295,7 @@ def debug_get_interfaces_config(config_file):
 
 def debug_get_looback_interface(data_folder):
     table = []
-    headers = ["File Name", "VLAN interface"]
+    headers = ["File Name", "Loopback interface"]
     for f in config_files(data_folder):
         table.append([os.path.basename(f), get_looback_interface(f)])
     print("\n== Debug: get_looback_interface ==")
@@ -338,7 +338,7 @@ if __name__ == "__main__":
     #debug_get_flor_nr(data_folder)
 
     #debug_get_interfaces_config(config_file)
-    #debug_get_looback_interface(data_folder)
+    debug_get_looback_interface(data_folder)
     #debug_get_uplink_vlan(data_folder)
     #debug_get_interfaces(data_folder)
 
@@ -351,9 +351,9 @@ if __name__ == "__main__":
     #debug_get_room_location(data_folder)
 
     #debug_get_interfaces_config(config_file)
-    #debug_get_looback_interface(data_folder)
+    debug_get_looback_interface(data_folder)
     #debug_get_uplink_vlan(data_folder)
-    debug_get_interfaces(data_folder)
+    #debug_get_interfaces(data_folder)
 
     print("\n=== HPE Singles ===")
     data_folder = main_folder + "/data/hpe-8-ports/"
