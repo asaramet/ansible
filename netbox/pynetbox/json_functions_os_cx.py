@@ -9,7 +9,7 @@ from std_functions import get_hostname, get_site
 
 from extra_functions import get_location, get_room_location
 from extra_functions import get_uplink_vlan, get_interfaces_config
-from extra_functions import get_looback_interface
+from extra_functions import get_looback_interface, get_lag_interfaces
 
 
 # create devices json objects list
@@ -65,14 +65,14 @@ def device_interfaces_json(config_files):
     }
     poe_types = {
         "JL679A": {
-            "1-14": "type2-ieee802.3at",
-            "15-16": None
+            "1-12": "type2-ieee802.3at",
+            "13-16": None
         }
     }
     poe_modes = {
         "JL679A": {
-            "1-14": "pd",
-            "15-16": None
+            "1-12": "pd",
+            "13-16": None
         }
     }
 
@@ -145,6 +145,25 @@ def ip_addresses_json(config_files):
 
     return data
 
+# create lags json objects list
+def lags_json(config_files):
+    data = {"lags":[], "lag_interfaces":[]}
+
+    for config_file in config_files:
+
+        hostnames = get_hostname(config_file)
+        hostname = hostnames['0'] if '0' in hostnames.keys() else hostnames['1']
+
+        lag_interfaces = get_lag_interfaces(config_file).items()
+        if not lag_interfaces:
+            continue
+        for lag, interfaces in lag_interfaces:
+            data["lags"].append({"hostname": hostname, "lag_id": lag})
+            for interface in interfaces:
+                data["lag_interfaces"].append({"hostname": hostname, "lag_id": lag, "interface": interface})
+
+    return data
+
 #==== Debug functions ====
 def debug_devices_json(data_folder):
     device_type_slags = {
@@ -173,6 +192,13 @@ def debug_ip_addresses_json(data_folder):
     print("\n'ip_addreses_json()' Output: for ", data_folder)
     print(output)
 
+def debug_lags_json(data_folder):
+    files = config_files(data_folder)
+    output = yaml.dump(lags_json(files))
+
+    print("\n'lags_json()' Output: for ", data_folder)
+    print(output)
+
 if __name__ == "__main__":
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
@@ -181,7 +207,8 @@ if __name__ == "__main__":
 
     #debug_devices_json(data_folder)
     #debug_device_interfaces_json(data_folder)
-    debug_ip_addresses_json(data_folder)
+    #debug_ip_addresses_json(data_folder)
+    debug_lags_json(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
@@ -190,4 +217,5 @@ if __name__ == "__main__":
 
     #debug_devices_json(data_folder)
     #debug_device_interfaces_json(data_folder)
-    debug_ip_addresses_json(data_folder)
+    #debug_ip_addresses_json(data_folder)
+    debug_lags_json(data_folder)

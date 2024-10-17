@@ -94,13 +94,14 @@
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
+        update_vc_child: true
         data:
           device: "{{ item.device }}"
           name: "{{ '1' + item.interface[1:] }}" # delete '1/x/x' interfaces
         state: absent
       loop: "{{ device_interfaces }}"
       when: "{{ chassis }}" # if chassis is not an empty list
-      when: "{{ item.device[-1:] != '1' }}" # ignore first stack
+      when: "{{ item.stack_nr != '1' }}"
 
     - name: Add stack interfaces
       tags: 
@@ -110,6 +111,7 @@
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
+        update_vc_child: true
         data:
           device: "{{ item.device }}"
           name: "{{ item.interface }}"
@@ -119,7 +121,7 @@
         state: present
       loop: "{{ device_interfaces }}"
       when: "{{ chassis }}"
-      when: "{{ item.device[-1:] != '1' }}"
+      when: "{{ item.stack_nr != '1' }}"
 
     - name: Delete virtual chassis 
       tags: 
@@ -242,11 +244,6 @@
         state: present
       loop: "{{ ip_addresses }}"
 
-
-
-
-
-
     - name: Create LAG interfaces
       tags:
         - create_lags
@@ -270,6 +267,7 @@
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
+        update_vc_child: true
         data:
           device: "{{ item.hostname }}"
           name: "{{ item.interface }}"
@@ -288,9 +286,14 @@
         validate_certs: false
         data:
           name: "{{ item.name }}"
-          vid: "{{ item.vlan_id }}"
+          vid: "{{ item.id }}"
         state: present
       loop: "{{ vlans }}"
+
+
+
+
+
 
     - name: Update interfaces description
       tags:

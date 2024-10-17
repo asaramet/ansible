@@ -55,7 +55,7 @@ def recursive_section_search(text, section, value):
 
             # Collect lines until 'exit' is found
             j = i + 1
-            while j < len(text) and not text[j].strip().startswith('exit'):
+            while j < len(text) and not (text[j].strip().startswith('exit') or text[j].strip().startswith(section)):
                 next_line = text[j].strip()
                 if next_line.startswith(value):
                     found_value = next_line.split(' ', 1)[1].strip('"')
@@ -63,7 +63,7 @@ def recursive_section_search(text, section, value):
                 j += 1
 
             # Recur from the line after the 'exit' line
-            names_tuple += recursive_section_search(text[j + 1:], section, value)
+            names_tuple += recursive_section_search(text[i + 1:], section, value)
             break
 
     return names_tuple
@@ -211,7 +211,7 @@ def get_vlans(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    return recursive_section_search(text, 'vlan', 'name')
+    return recursive_section_search(text, 'vlan', 'name ')
 
 def get_vlans_names(t_file):
     with open(t_file, "r") as f:
@@ -414,10 +414,10 @@ if __name__ == "__main__":
     #debug_get_site(data_folder)
     #debug_get_trunks(data_folder)
     #debug_get_interface_names(data_folder)
-    #debug_get_vlans(data_folder)
+    debug_get_vlans(data_folder)
     #debug_get_vlans_names(data_folder)
     #debug_get_untagged_vlans(data_folder)
-    debug_get_ip_address(data_folder)
+    #debug_get_ip_address(data_folder)
     #debug_device_type(data_folder)
 
     print("\n=== Stacking ===")
@@ -437,13 +437,15 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/aruba_6100/"
 
     #debug_get_hostname(data_folder)
-    debug_get_ip_address(data_folder)
+    #debug_get_ip_address(data_folder)
+    debug_get_vlans(data_folder)
 
     print("\n=== Aruba 6300 ===")
     #data_folder = main_folder + "/data/aruba_6100/"
     data_folder = main_folder + "/data/aruba_6300/"
 
     #debug_get_hostname(data_folder)
+    debug_get_vlans(data_folder)
 
     print("\n=== No files functions ===")
     #debug_convert_range()

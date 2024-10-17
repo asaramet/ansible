@@ -347,10 +347,10 @@ if __name__ == "__main__":
     #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
     #debug_interface_names_json(data_folder)
-    #debug_vlans_json(data_folder)
+    debug_vlans_json(data_folder)
     #debug_untagged_vlans_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
-    debug_ip_addresses_json(data_folder)
+    #debug_ip_addresses_json(data_folder)
 
     print("\n=== Stacking JSON ===")
     #data_folder = main_folder + "/data/aruba-stack/"
@@ -368,6 +368,10 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/aruba_6100/"
     data_folder = main_folder + "/data/aruba_6100/"
 
+    debug_vlans_json(data_folder)
+
     print("\n=== Aruba 6300 ===")
     #data_folder = main_folder + "/data/aruba_6100/"
     data_folder = main_folder + "/data/aruba_6300/"
+
+    debug_vlans_json(data_folder)
