@@ -10,7 +10,7 @@ from std_functions import get_hostname, get_site
 from extra_functions import get_location, get_room_location
 from extra_functions import get_uplink_vlan, get_interfaces_config
 from extra_functions import get_looback_interface, get_lag_interfaces
-
+from extra_functions import get_interfaces, get_vlan_names, interfaces_types
 
 # create devices json objects list
 def devices_json(config_files, type_slags, tags):
@@ -53,73 +53,25 @@ def devices_json(config_files, type_slags, tags):
 def device_interfaces_json(config_files):
     data = {"device_interfaces":[]}
 
-    types = {
-        "JL658A": {
-            "1-24": "10gbase-x-sfpp",
-            "25-28": "25gbase-x-sfp28"
-        },
-        "JL679A": {
-            "1-14": "1000base-t",
-            "15-16": "10gbase-x-sfpp"
-        }
-    }
-    poe_types = {
-        "JL679A": {
-            "1-12": "type2-ieee802.3at",
-            "13-16": None
-        }
-    }
-    poe_modes = {
-        "JL679A": {
-            "1-12": "pd",
-            "13-16": None
-        }
-    }
-
-    poe_type = poe_mode = None
-
     for f in config_files:
         interfaces = get_interfaces_config(f)["physical"].keys()
 
         hostnames = get_hostname(f)
-
         if '0' in hostnames.keys():
-            clean_name = hostnames['1'] = hostnames['0']
-        else:
-            clean_name = hostnames['1'][:-2]
+            hostnames['1'] = hostnames['0']
 
-        d_type = device_type(clean_name).split('_')[0]
-
-        # create interface type dictionary
-        i_types = {}
-        if d_type in types:
-            for key, value in types[d_type].items():
-                for i_nr in convert_range(key):
-                    i_types[str(i_nr)] = value
-
-        # create poe interface dictionaries
-        i_poe_types = {} 
-        if d_type in poe_types:
-            for key, value in poe_types[d_type].items():
-                for i_nr in convert_range(key):
-                    i_poe_types[str(i_nr)] = value
-
-        i_poe_modes = {}
-        if d_type in poe_modes:
-            for key, value in poe_modes[d_type].items():
-                for i_nr in convert_range(key):
-                    i_poe_modes[str(i_nr)] = value
+        i_types = interfaces_types(f)
 
         for value in interfaces:
             _, interface = value.split()
 
             stack_nr, _, pos_nr = interface.split('/')
 
-            poe_mode = i_poe_modes[pos_nr] if i_poe_modes else None
-            poe_type = i_poe_types[pos_nr] if i_poe_types else None
+            poe_mode = i_types['poe_mode'][pos_nr] if i_types['poe_mode'] else None
+            poe_type = i_types['poe_type'][pos_nr] if i_types['poe_type'] else None
             
             data["device_interfaces"].append({
-                'device': hostnames[stack_nr], 'type': i_types[pos_nr],
+                'device': hostnames[stack_nr], 'type': i_types['type'][pos_nr],
                 'interface': interface, 'stack_nr': stack_nr, 
                 'poe_mode': poe_mode, 'poe_type': poe_type })
 
@@ -164,6 +116,43 @@ def lags_json(config_files):
 
     return data
 
+def interfaces_json(config_files):
+    data = {"interfaces":[], "interfaces_vlan":[]}
+
+    for config_file in config_files:
+        hostnames = get_hostname(config_file)
+        interfaces = get_interfaces(config_file)
+        vlan_names = get_vlan_names(config_file)
+
+        hostname = hostnames['0'] if '0' in hostnames.keys() else hostnames['1']
+
+        i_types = interfaces_types(config_file)
+
+        for interface in interfaces:
+            name = interface["name"]
+            description = interface["description"]
+            vlan = interface["vlan"]
+
+            i_type = None
+
+            if 'lag' in name:
+                i_type = 'lag'
+
+            if 'vlan' in name:
+                i_type = 'virtual'
+
+            if '/' in name:
+                _, _, i_pos = name.split('/')
+                i_type = i_types["type"][i_pos] 
+
+            if description:
+                data["interfaces"].append({"hostname":hostname, "interface":name, "description":description, "type": i_type})
+
+            if vlan:
+                data["interfaces_vlan"].append({"hostname":hostname, "interface":interface["name"], "vlan_id":vlan, 
+                    "vlan_name":vlan_names[vlan], "vlan_mode":interface["vlan_mode"], "type": i_type})
+    return data
+
 #==== Debug functions ====
 def debug_devices_json(data_folder):
     device_type_slags = {
@@ -199,6 +188,13 @@ def debug_lags_json(data_folder):
     print("\n'lags_json()' Output: for ", data_folder)
     print(output)
 
+def debug_interfaces_json(data_folder):
+    files = config_files(data_folder)
+    output = yaml.dump(interfaces_json(files))
+
+    print("\n'interfaces_json()' Output: for ", data_folder)
+    print(output)
+
 if __name__ == "__main__":
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
@@ -208,7 +204,8 @@ if __name__ == "__main__":
     #debug_devices_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     #debug_ip_addresses_json(data_folder)
-    debug_lags_json(data_folder)
+    #debug_lags_json(data_folder)
+    debug_interfaces_json(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
@@ -218,4 +215,5 @@ if __name__ == "__main__":
     #debug_devices_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     #debug_ip_addresses_json(data_folder)
-    debug_lags_json(data_folder)
+    #debug_lags_json(data_folder)
+    debug_interfaces_json(data_folder)

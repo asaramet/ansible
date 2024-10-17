@@ -3,7 +3,6 @@
 # ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,development,location
 # ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,development,switches
 
-
 # ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,development,lags
 # ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,development,vlans
 # ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,development,ip
@@ -19,7 +18,7 @@
 # ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,interfaces
 
 ---
-- name: Add Aruba 6100 Switches from configuration files
+- name: Add Aruba 6xxx Switches from configuration files
   hosts: localhost
   gather_facts: false
   vars: 
@@ -290,11 +289,6 @@
         state: present
       loop: "{{ vlans }}"
 
-
-
-
-
-
     - name: Update interfaces description
       tags:
         - interface_description
@@ -303,10 +297,12 @@
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
+        update_vc_child: true
         data:
           device: "{{ item.hostname }}"
           name: "{{ item.interface }}"
           description: "{{ item.description }}"
+          type: "{{ item.type }}"
         state: present
       loop: "{{ interfaces }}"
 
@@ -318,10 +314,12 @@
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
+        update_vc_child: true
         data:
           device: "{{ item.hostname }}"
           name: "{{ item.interface }}"
           mode: "{{ item.vlan_mode }}"
+          type: "{{ item.type }}"
           untagged_vlan: 
             vlan_id: "{{ item.vlan_id }}"
             name: "{{ item.vlan_name }}"

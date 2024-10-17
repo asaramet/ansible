@@ -5,6 +5,8 @@
 import re, os, yaml
 from tabulate import tabulate
 from std_functions import main_folder, config_files, search_line
+from std_functions import convert_range
+from std_functions import device_type, get_hostname
 
 def get_location(file):
     location_line = search_line("location", file)
@@ -263,43 +265,6 @@ def get_lag_interfaces(config_file):
     
     return lag_interfaces
 
-def get_vlans(config_file):
-    """
-    Parses VLAN information from a given configuration file content.
-
-    Args:
-        file_content (str): The content of the configuration file as a string.
-
-    Returns:
-        dict: A dictionary where each key is a VLAN ID (str) and the value is another
-              dictionary with keys 'name' and 'description'. If a VLAN does not have a
-              name or description, the corresponding value will be None.
-    """
-
-    with open(config_file, "r") as f:
-        config_text = f.readlines()
-
-    vlans = {}
-    vlan_pattern = re.compile(r"vlan (\d+)")
-    name_pattern = re.compile(r"\s+name (.+)")
-    description_pattern = re.compile(r"\s+description (.+)")
-    current_vlan = None
-
-    for line in config_text:
-        vlan_match = vlan_pattern.match(line)
-        name_match = name_pattern.match(line)
-        description_match = description_pattern.match(line)
-
-        if vlan_match:
-            current_vlan = vlan_match.group(1)
-            vlans[current_vlan] = {'name': 'default', 'description': 'default'}
-        elif name_match and current_vlan:
-            vlans[current_vlan]['name'] = name_match.group(1)
-        elif description_match and current_vlan:
-            vlans[current_vlan]['description'] = description_match.group(1)
-
-    return vlans
-
 def get_vlan_names(config_file):
     with open(config_file, "r") as f:
         lines = f.readlines()
@@ -324,9 +289,57 @@ def get_vlan_names(config_file):
     
     return vlans
 
+def interfaces_types(config_file):
+    data = {'type': {}, 'poe_type': {}, 'poe_mode': {}}
 
+    types = {
+        "JL658A": {
+            "1-24": "10gbase-x-sfpp",
+            "25-28": "25gbase-x-sfp28"
+        },
+        "JL679A": {
+            "1-14": "1000base-t",
+            "15-16": "10gbase-x-sfpp"
+        }
+    }
+    poe_types = {
+        "JL679A": {
+            "1-12": "type2-ieee802.3at",
+            "13-16": None
+        }
+    }
+    poe_modes = {
+        "JL679A": {
+            "1-12": "pd",
+            "13-16": None
+        }
+    }
 
+    poe_type = poe_mode = None
 
+    hostnames = get_hostname(config_file)
+    hostname = hostnames['0'] if '0' in hostnames.keys() else hostnames['1'][:-2]
+
+    d_type = device_type(hostname).split('_')[0]
+
+    # create interface type dictionary
+    if d_type in types:
+        for key, value in types[d_type].items():
+            for i_nr in convert_range(key):
+                data['type'][str(i_nr)] = value
+
+    # create poe interface dictionaries
+    if d_type in poe_types:
+        for key, value in poe_types[d_type].items():
+            for i_nr in convert_range(key):
+                data['poe_type'][str(i_nr)] = value
+
+    if d_type in poe_modes:
+        for key, value in poe_modes[d_type].items():
+            for i_nr in convert_range(key):
+                data['poe_mode'][str(i_nr)] = value
+
+    return data
 
 
 #---- Debugging ----#
@@ -419,18 +432,15 @@ def debug_get_lag_interfaces(data_folder):
 
         print(os.path.basename(f), get_lag_interfaces(f))
 
-def debug_get_vlans(data_folder):
-    print("\n== Debug: get_vlans ==")
-    for f in config_files(data_folder):
-        print(os.path.basename(f), '---> ', get_vlans(f))
-
 def debug_get_vlan_names(data_folder):
     print("\n== Debug: get_vlan_names ==")
     for f in config_files(data_folder):
         print(os.path.basename(f), '---> ', get_vlan_names(f))
 
-
-
+def debug_interfaces_types(data_folder):
+    print("\n== Debug: interfaces_types ==")
+    for f in config_files(data_folder):
+        print(os.path.basename(f), '---> ', interfaces_types(f))
 
 
 if __name__ == "__main__":
@@ -449,8 +459,8 @@ if __name__ == "__main__":
     #debug_get_uplink_vlan(data_folder)
     #debug_get_interfaces(data_folder)
     #debug_get_lag_interfaces(data_folder)
-    debug_get_vlans(data_folder)
     #debug_get_vlan_names(data_folder)
+    debug_interfaces_types(data_folder)
 
     #debug_get_interfaces_config(config_file)
 
@@ -466,8 +476,8 @@ if __name__ == "__main__":
     #debug_get_uplink_vlan(data_folder)
     #debug_get_interfaces(data_folder)
     #debug_get_lag_interfaces(data_folder)
-    debug_get_vlans(data_folder)
     #debug_get_vlan_names(data_folder)
+    debug_interfaces_types(data_folder)
 
     #debug_get_interfaces_config(config_file)
 

@@ -24,6 +24,7 @@ ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6100,production,interfac
 
 ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,location | tee ${logs_folder}/aruba_6300.logs &&
 ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,switches | tee ${logs_folder}/aruba_6300.logs &&
+ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,chassis | tee ${logs_folder}/aruba_6300.logs &&
 ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,lags | tee ${logs_folder}/aruba_6300.logs &&
 ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,vlans | tee ${logs_folder}/aruba_6300.logs &&
 ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,ip | tee ${logs_folder}/aruba_6300.logs &&
