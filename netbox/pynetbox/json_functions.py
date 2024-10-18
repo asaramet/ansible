@@ -12,15 +12,15 @@ from std_functions import get_trunks, get_interface_names, get_vlans
 from std_functions import get_untagged_vlans, get_vlans_names, get_trunk_stack
 from std_functions import get_ip_address
 
-from extra_functions import get_location, get_room_location, get_flor_name
-from extra_functions import get_parent_location
+from std_functions import get_location, get_room_location, get_flor_name
+from std_functions import get_parent_location
 
 # create the loactions json objects list
 def locations_json(config_files):
     data = {"locations":[]}
     locations = set()
     rooms = {}
-    hostnames = {}
+    sites = {}
 
     for file in config_files:
         location = get_location(file)
@@ -29,18 +29,14 @@ def locations_json(config_files):
         location,room = location
         locations.add(location)
         rooms.update({location: room})
-
-        h_names = get_hostname(file)
-        hostname = h_names['0'] if '0' in h_names.keys() else h_names['1']
-        hostnames.update({location: hostname})
-
+        sites.update({location: get_site(file)})
 
     for location in locations:
         room = rooms[location]
         building = location.split(".")[0]
         flor_tuple = get_flor_name(room)
 
-        site = get_site(hostnames[location])
+        site = sites[location]
 
         data["locations"].append({"name": building + "." + flor_tuple[0] + " - " + flor_tuple[1], "site": site, "parent_location": get_parent_location(location)})
 
@@ -68,6 +64,7 @@ def devices_json(config_files, device_type_slags, tags):
 
         # get room location
         location = get_location(t_file)
+        site = get_site(t_file)
 
         if location: # Not None
             location, _ = location # ignore room
@@ -80,7 +77,7 @@ def devices_json(config_files, device_type_slags, tags):
             d_label = device_type_slags[device_type(hostname)]
 
             data['devices'].append({'name': hostname, "location": location, 'device_role': get_device_role(t_file, hostname), 'device_type': d_label,
-                'site': get_site(hostname), 'tags': tags, 'serial':serial_numbers()[hostname]})
+                'site': site, 'tags': tags, 'serial':serial_numbers()[hostname]})
             continue
 
         # update data for stacks 
@@ -95,7 +92,7 @@ def devices_json(config_files, device_type_slags, tags):
             vc_position = int(h_name[-1])
             vc_priority = 255 if vc_position == 1 else 128
             data['devices'].append({'name': h_name, "location": location, 'device_role': get_device_role(t_file, clean_name), 'device_type': d_label, 
-                'site': get_site(clean_name), 'tags': tags, 'serial':serial_numbers()[h_name],
+                'site': site, 'tags': tags, 'serial':serial_numbers()[h_name],
                 'virtual_chassis': clean_name, 'vc_position': vc_position, 'vc_priority': vc_priority
             })
 
@@ -270,7 +267,7 @@ def ip_addresses_json(config_files):
 def debug_locations_json(data_folder):
     print("\n== Debug: locations_json ==")
 
-    print(locations_json(config_files(data_folder)))
+    print(yaml.dump(locations_json(config_files(data_folder))))
 
 def debug_devices_json(data_folder):
     device_type_slags = {
@@ -341,13 +338,14 @@ def debug_ip_addresses_json(data_folder):
 
 if __name__ == "__main__":
     print("\n=== Singles JSON ===")
-    data_folder = main_folder + "/data/hpe-48-ports/"
+    #data_folder = main_folder + "/data/hpe-48-ports/"
+    data_folder = main_folder + "/data/hpe-8-ports/"
 
-    #debug_locations_json(data_folder)
+    debug_locations_json(data_folder)
     #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
     #debug_interface_names_json(data_folder)
-    debug_vlans_json(data_folder)
+    #debug_vlans_json(data_folder)
     #debug_untagged_vlans_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
     #debug_ip_addresses_json(data_folder)
@@ -364,14 +362,17 @@ if __name__ == "__main__":
     #debug_tagged_vlans_json(data_folder)
     #debug_ip_addresses_json(data_folder)
 
+    print("\n=== ProCurve Modular JSON ===")
+    data_folder = main_folder + "/data/procurve-modular/"
+
+    debug_locations_json(data_folder)
+
     print("\n=== Aruba 6100 ===")
-    #data_folder = main_folder + "/data/aruba_6100/"
     data_folder = main_folder + "/data/aruba_6100/"
 
-    debug_vlans_json(data_folder)
+    #debug_vlans_json(data_folder)
 
     print("\n=== Aruba 6300 ===")
-    #data_folder = main_folder + "/data/aruba_6100/"
     data_folder = main_folder + "/data/aruba_6300/"
 
-    debug_vlans_json(data_folder)
+    #debug_vlans_json(data_folder)

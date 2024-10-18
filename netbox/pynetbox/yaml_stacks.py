@@ -242,17 +242,6 @@ def test_stack_module_yaml():
     stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
 def main():
-    # Run Debugging
-    #debug_data_folder = main_folder + "/data/aruba-stack/"
-    #debug_data_folder = main_folder + "/data/aruba-stack-2930/"
-    #debug_data_folder = main_folder + "/data/aruba-stack-2920/"
-    debug_data_folder = main_folder + "/data/aruba-modular-stack/"
-
-    #debug_device_interfaces_nr(debug_data_folder)
-    debug_get_modules(debug_data_folder)
-
-    #test_stack_module_yaml()
-
     # Aruba stacks (no extra modules)
     data_folder = main_folder + "/data/aruba-stack/"
     output_file_path = "/data/yaml/aruba_stack.yaml"
@@ -311,3 +300,14 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    # Run Debugging
+    #debug_data_folder = main_folder + "/data/aruba-stack/"
+    #debug_data_folder = main_folder + "/data/aruba-stack-2930/"
+    #debug_data_folder = main_folder + "/data/aruba-stack-2920/"
+    debug_data_folder = main_folder + "/data/aruba-modular-stack/"
+
+    #debug_device_interfaces_nr(debug_data_folder)
+    #debug_get_modules(debug_data_folder)
+
+    #test_stack_module_yaml()

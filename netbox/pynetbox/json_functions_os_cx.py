@@ -6,8 +6,8 @@ import re, os, yaml
 from std_functions import main_folder, config_files, convert_range
 from std_functions import device_type, serial_numbers
 from std_functions import get_hostname, get_site
+from std_functions import get_location, get_room_location
 
-from extra_functions import get_location, get_room_location
 from extra_functions import get_uplink_vlan, get_interfaces_config
 from extra_functions import get_looback_interface, get_lag_interfaces
 from extra_functions import get_interfaces, get_vlan_names, interfaces_types
@@ -21,7 +21,8 @@ def devices_json(config_files, type_slags, tags):
 
         location,room = get_location(file)
         location = get_room_location(location)
-
+        
+        site = get_site(file)
         uplink_vlan = get_uplink_vlan(file)
         
         device_role = "bueroswitch" if uplink_vlan in rsm_vlans else "access-layer-switch"
@@ -45,7 +46,7 @@ def devices_json(config_files, type_slags, tags):
 
             d_type = type_slags[device_type(clean_name)]
 
-            data["devices"].append({"name": hostname, "location": location, "site": get_site(clean_name), "device_role": device_role, 
+            data["devices"].append({"name": hostname, "location": location, "site": site, "device_role": device_role, 
                 "device_type": d_type, "serial": serial_numbers()[hostname], "tags": tags })
 
     return data
@@ -201,19 +202,19 @@ if __name__ == "__main__":
 
     config_file = data_folder + "rggw1018bp"
 
-    #debug_devices_json(data_folder)
+    debug_devices_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     #debug_ip_addresses_json(data_folder)
     #debug_lags_json(data_folder)
-    debug_interfaces_json(data_folder)
+    #debug_interfaces_json(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
     config_file = data_folder + "rgcs0006"
 
-    #debug_devices_json(data_folder)
+    debug_devices_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     #debug_ip_addresses_json(data_folder)
     #debug_lags_json(data_folder)
-    debug_interfaces_json(data_folder)
+    #debug_interfaces_json(data_folder)

@@ -159,15 +159,108 @@ def get_hostname(t_file):
 
     return hostnames
 
-def get_site(hostname):
+def get_site(t_file):
+
+    hostnames = get_hostname(t_file)
+    hostname = hostnames['0'] if '0' in hostnames.keys() else hostnames['1']
+
     campuses = {
         "h": "flandernstrasse",
         "g": "gppingen",
         "s": "stadtmitte",
         "w": "weststadt"
     }
+
+    location = get_location(t_file)
+    if location:
+        location, _ = location
+        location, _ = location.split('.', 1)
+
+    if location == 'W20':
+        return "hengstenbergareal"
+
     return "campus-" + campuses[hostname[1]]
 
+def get_location(file):
+    location_line = search_line("location", file)
+
+    if not location_line or location_line.isspace(): return None
+
+    location = location_line.split()[-1].strip('"')
+
+    if location.split('.')[0] == 'V':
+        location = location[2:]
+
+        rack_in_l = location.split('.') # Rack number specified in location
+        if len(rack_in_l) > 2:
+            location = rack_in_l[0] + '.' + rack_in_l[1]
+
+    building, room = location.split(".", 1)
+
+    building_nr = str(int(building[1:])) # convert "01" to "1", for example
+    if len(building_nr) == 1:
+        # add "0" to single digit buildings
+        building_nr = "0" + building_nr
+
+    location = building[0] + building_nr + "." + room
+
+    return (location, room)
+
+# get flor number from room number
+def get_flor_nr(room_nr):
+    if not room_nr: return None
+
+    if room_nr[0] == 'u':
+        room_nr = '-' + room_nr[1:]
+
+    flor = room_nr[0]
+    flor = int(room_nr[:2]) if flor == '-' else int(flor)
+
+    return str(flor)
+
+# get flor name from room number
+def get_flor_name(room_nr):
+    flor_name = {
+        "-2": "Untergeschoss 2",
+        "-1": "Untergeschoss",
+        "0": "Erdgeschoss"
+    }
+
+    flor = get_flor_nr(room_nr)
+    if int(flor) < 1:
+        return (flor, flor_name[flor])
+
+    return (flor, "Etage " + flor)
+
+# get location's parent
+def get_parent_location(location):
+    prefixes = {
+        "F": "fl",
+        "G": "gp",
+        "S": "sm",
+        "W": "ws"
+    }
+
+    building = location.split(".")[0]
+    return prefixes[building[0]] + "-" + "gebude" + "-" + building[1:]
+
+# get room location
+def get_room_location(location): 
+    if not location: return None
+
+    # s01-2-etage-2
+    flor_tags = {
+        "-2": "untergeschoss-2",
+        "-1": "untergeschoss",
+        "0": "erdgeschoss"
+    }
+    building, room_nr = location.split(".", 1)
+    flor = get_flor_nr(room_nr)
+    flor_fx = str(abs(int(flor))) # string to use in the label
+    flor_tag = flor_tags[flor] if int(flor) < 1 else "etage-" + flor
+
+    return building.lower() + "-" + flor_fx + "-" + flor_tag
+    
 def get_device_role(t_file, hostname):
     role_code = hostname[2:4]
     if role_code == "cs":
@@ -325,12 +418,49 @@ def debug_get_hostname(data_folder):
 
 def debug_get_site(data_folder):
     table = []
-    headers = ["File Name", "Location"]
+    headers = ["File Name", "Location", "Site"]
     for f in config_files(data_folder):
         hostname = os.path.basename(f)
-        table.append([ hostname, get_site(hostname) ])
+        table.append([ hostname, get_location(f), get_site(f) ])
     print("\n== Debug: get_site ==")
     print(tabulate(table, headers, "github"))
+
+def debug_get_location(data_folder):
+    table = []
+    headers = ["File Name", "Location"]
+    for f in config_files(data_folder):
+        table.append([os.path.basename(f), get_location(f)])
+    print("\n== Debug: get_location() ==")
+    print(tabulate(table, headers))
+
+def debug_get_room_location(data_folder):
+    table = []
+    headers = ["File Name", "Room Location"]
+
+    for f in config_files(data_folder):
+        location = get_location(f)
+
+        if location:
+            location, _ = location
+
+        table.append([os.path.basename(f), get_room_location(location)])
+    print("\n== Debug: get_room_location() ==")
+    print(tabulate(table, headers))
+
+def debug_get_flor_nr(data_folder):
+    table = []
+    headers = ["File Name", "Location", "Flor number"]
+
+    for f in config_files(data_folder):
+        location = get_location(f)
+        room = None
+
+        if location:
+            location , room = location
+
+        table.append([os.path.basename(f), location, get_flor_nr(room)])
+    print("\n== Debug: get_flor_nr() ==")
+    print(tabulate(table, headers))
 
 def debug_get_device_role(data_folder):
     table = []
@@ -403,10 +533,11 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/aruba-48-ports/"
     #data_folder = main_folder + "/data/aruba-48-ports/"
     #data_folder = main_folder + "/data/aruba-modular/"
-    #data_folder = main_folder + "/data/hpe-8-ports/"
-    data_folder = main_folder + "/data/hpe-48-ports/"
+    data_folder = main_folder + "/data/hpe-8-ports/"
+    #data_folder = main_folder + "/data/hpe-48-ports/"
     #data_folder = main_folder + "/data/procurve-single/"
 
+    debug_get_site(data_folder)
     #debug_config_files(data_folder)
     #debug_convert_range()
     #debug_get_hostname(data_folder)
@@ -414,7 +545,7 @@ if __name__ == "__main__":
     #debug_get_site(data_folder)
     #debug_get_trunks(data_folder)
     #debug_get_interface_names(data_folder)
-    debug_get_vlans(data_folder)
+    #debug_get_vlans(data_folder)
     #debug_get_vlans_names(data_folder)
     #debug_get_untagged_vlans(data_folder)
     #debug_get_ip_address(data_folder)
@@ -426,26 +557,42 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/aruba-modular-stack/"
     data_folder = main_folder + "/data/aruba-stack-2930/"
 
+    #debug_get_location(data_folder)
+    #debug_get_room_location(data_folder)
+    #debug_get_flor_nr(data_folder)
+    #debug_get_site(data_folder)
+
     #debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
-    #debug_get_site(data_folder)
     #debug_get_trunks(data_folder)
     #debug_get_trunk_stack(data_folder)
 
+    print("\n=== ProCurve Modular ===")
+    data_folder = main_folder + "/data/procurve-modular/"
+
+    #debug_get_location(data_folder)
+    #debug_get_room_location(data_folder)
+    #debug_get_flor_nr(data_folder)
+    debug_get_site(data_folder)
+
     print("\n=== Aruba 6100 ===")
-    #data_folder = main_folder + "/data/aruba_6100/"
     data_folder = main_folder + "/data/aruba_6100/"
+
+    #debug_get_location(data_folder)
+    #debug_get_room_location(data_folder)
+    #debug_get_flor_nr(data_folder)
+    #debug_get_site(data_folder)
 
     #debug_get_hostname(data_folder)
     #debug_get_ip_address(data_folder)
-    debug_get_vlans(data_folder)
+    #debug_get_vlans(data_folder)
+
 
     print("\n=== Aruba 6300 ===")
-    #data_folder = main_folder + "/data/aruba_6100/"
     data_folder = main_folder + "/data/aruba_6300/"
 
     #debug_get_hostname(data_folder)
-    debug_get_vlans(data_folder)
+    #debug_get_vlans(data_folder)
 
     print("\n=== No files functions ===")
     #debug_convert_range()
