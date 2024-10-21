@@ -39,6 +39,15 @@ Packages:
 - `plugins.yaml` - install NetBox plugins on the remote server. You should then update the "PLUGINS" keyword in `configuration.py` and update NetBox by running the `install.yaml` playbook with `reboot: true` option.
 - `restore_sql.yaml` - Restore PostgreSQL database from a backup dump file and archived media.
 
+## Download a release
+
+  [Netbox Releases](https://github.com/netbox-community/netbox/releases)
+
+  ```bash
+  cd <FOLDER>/ansible/servers/netbox/src/
+  wget https://github.com/netbox-community/netbox/archive/refs/tags/v<NEW_VERSION>.tar.gz
+  ```
+  
 ## Update NetBox
 
 As example will take NetBox version: `4.0.9`

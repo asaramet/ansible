@@ -4,13 +4,13 @@
   gather_facts: false
   tags: global
   vars: 
-    netbox_version: &netbox_version 4.1.1
+    netbox_version: &netbox_version 4.1.4
     sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
 
-    server: &server debian12-ansible
-    production: &production false
-    #server: &server hs_netbox 
-    #production: &production true
+    #server: &server debian12-ansible
+    #production: &production false
+    server: &server hs_netbox 
+    production: &production true
     reboot: &reboot false
 
 - name: Install packages and dependencies for NetBox
@@ -147,7 +147,7 @@
       args:
         executable: /usr/bin/bash
         chdir: /opt/netbox
-      when: no
+      #when: no
 
 - name: Link local postgresql folders
   hosts: *server 
