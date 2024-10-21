@@ -202,8 +202,8 @@ if __name__ == "__main__":
 
     config_file = data_folder + "rggw1018bp"
 
-    debug_devices_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
+    #debug_devices_json(data_folder)
+    debug_device_interfaces_json(data_folder)
     #debug_ip_addresses_json(data_folder)
     #debug_lags_json(data_folder)
     #debug_interfaces_json(data_folder)
@@ -213,8 +213,8 @@ if __name__ == "__main__":
 
     config_file = data_folder + "rgcs0006"
 
-    debug_devices_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
+    #debug_devices_json(data_folder)
+    debug_device_interfaces_json(data_folder)
     #debug_ip_addresses_json(data_folder)
     #debug_lags_json(data_folder)
     #debug_interfaces_json(data_folder)

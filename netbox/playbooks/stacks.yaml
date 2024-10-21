@@ -225,7 +225,7 @@
         state: present
       loop: "{{ trunk_interfaces }}"
 
-    - name: Update interfaces description (here name)
+    - name: Update device interfaces
       tags:
         - interfaces
       netbox.netbox.netbox_device_interface:
@@ -236,8 +236,11 @@
           device: "{{ item.hostname }}"
           name: "{{ item.interface }}"
           description: "{{ item.name }}"
+          type: "{{ item.type }}"
+          poe_mode: "{{ item.poe_mode }}"
+          poe_type: "{{ item.poe_type }}"
         state: present
-      loop: "{{ interface_names }}"
+      loop: "{{ device_interfaces }}"
 
     - name: Create VLANs
       tags:

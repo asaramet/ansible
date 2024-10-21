@@ -125,9 +125,10 @@ def trunks_json(config_files):
 
     return data
 
-def interface_names_json(config_files):
-    data = {'interface_names':[]}
+def device_interfaces_json(config_files):
+    data = {'device_interfaces':[]}
 
+    i_type = i_poe_mode = i_poe_type = None
     for t_file in config_files:
         hostname = get_hostname(t_file)
 
@@ -138,11 +139,13 @@ def interface_names_json(config_files):
                 stack_hostname = hostname['0']
 
             else:
-                stack_nr, _ = interface.split('/')
+                stack_nr, _ = interface.split('/', 1)
                 stack_hostname = hostname[stack_nr]
 
-            if {'hostname': stack_hostname, 'interface': interface, 'name': name} not in data['interface_names']:
-                data['interface_names'].append({'hostname': stack_hostname, 'interface': interface, 'name': name})
+            if {'hostname': stack_hostname, 'interface': interface, 'name': name} not in data['device_interfaces']:
+                data['device_interfaces'].append({'hostname': stack_hostname, 'interface': interface, 'name': name,
+                    'type': i_type, 'poe_mode': i_poe_mode, 'poe_type': i_poe_type
+                })
 
     return data
 
@@ -305,12 +308,12 @@ def debug_vlans_json(data_folder):
     print("\n'vlans_json()' Output: for ", data_folder)
     print(output)
 
-def debug_interface_names_json(data_folder):
+def debug_device_interfaces_json(data_folder):
     files = config_files(data_folder)
     devices_tags = ["switch"]
-    output = yaml.dump(interface_names_json(files))
+    output = yaml.dump(device_interfaces_json(files))
 
-    print("\n'interface_names_json()' Output: for ", data_folder)
+    print("\n'device_interfaces_json()' Output: for ", data_folder)
     print(output)
 
 def debug_untagged_vlans_json(data_folder):
@@ -341,10 +344,10 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/hpe-48-ports/"
     data_folder = main_folder + "/data/hpe-8-ports/"
 
-    debug_locations_json(data_folder)
+    #debug_locations_json(data_folder)
     #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
-    #debug_interface_names_json(data_folder)
+    debug_device_interfaces_json(data_folder)
     #debug_vlans_json(data_folder)
     #debug_untagged_vlans_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
@@ -356,7 +359,7 @@ if __name__ == "__main__":
 
     #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
-    #debug_interface_names_json(data_folder)
+    debug_device_interfaces_json(data_folder)
     #debug_vlans_json(data_folder)
     #debug_untagged_vlans_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
@@ -365,7 +368,8 @@ if __name__ == "__main__":
     print("\n=== ProCurve Modular JSON ===")
     data_folder = main_folder + "/data/procurve-modular/"
 
-    debug_locations_json(data_folder)
+    #debug_locations_json(data_folder)
+    debug_device_interfaces_json(data_folder)
 
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
