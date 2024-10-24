@@ -335,6 +335,55 @@ def get_ip_address(t_file):
 
     return vlan_id, vlan_name, ip + '/' + str(ip_bits)
 
+def get_modules(t_file):
+    modules = []
+
+    stacks_dict = {
+        '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E', '6': 'F',
+        '7': 'G', '8': 'H', '9': 'I', '10': 'J', '11': 'K', '12': 'L'
+    }
+
+    with open(t_file, "r") as f:
+        text = f.readlines()
+
+    flexible_modules = recursive_search("flexible-module", text)
+    if len(flexible_modules) > 0:
+        hostnames = get_hostname(t_file)
+
+        for line in flexible_modules:
+            m_list = line.split()
+
+            module = m_list[1] if len(m_list) == 4 else m_list[3]
+            m_type = m_list[-1]
+
+            stack = m_list[1]
+            if stack in stacks_dict.values():
+                stack = '1'
+
+            if '0' in hostnames.keys():
+                stack = '0'
+
+            modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': 'Uplink'})
+        return modules
+
+    for line in recursive_search("module", text, True):
+        m_list = line.split()
+
+        module = m_list[1]
+        hostnames = get_hostname(t_file)
+
+        stack = '0' if '0' in hostnames else module
+
+        if '/' in stack:
+            stack, module = stack.split('/')
+
+        if module in stacks_dict.keys():
+            module = stacks_dict[module]
+
+        modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_list[3]})
+
+    return modules
+
 # --- Additional function ---
 # Return a list of devices serial numbers from the yaml file
 def serial_numbers():
@@ -362,6 +411,15 @@ def device_type(hostname):
     for device_type, d_list in devices().items():
         if hostname in d_list:
             return device_type
+
+    return None
+
+# Return a interfaces dictionary from a yaml file
+def interfaces_dict():
+    yaml_file = main_folder + "/data/src/interfaces.yaml"
+
+    with open(yaml_file, 'r') as f:
+        return yaml.safe_load(f)
 
     return None
 
@@ -517,6 +575,14 @@ def debug_get_ip_address(data_folder):
     print("\n== Debug: get_ip_address ==")
     print(tabulate(table, headers))
 
+def debug_get_modules(data_folder):
+    table = []
+    headers = ["File Name", "Modules"]
+    for f in config_files(data_folder):
+        table.append([os.path.basename(f), get_modules(f)])
+    print("\n== Debug: get_modules ==")
+    print(tabulate(table, headers))
+
 def debug_device_type(data_folder):
     table = []
     headers = ["File Name", "Device Type"]
@@ -537,7 +603,7 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/hpe-48-ports/"
     #data_folder = main_folder + "/data/procurve-single/"
 
-    debug_get_site(data_folder)
+    #debug_get_site(data_folder)
     #debug_config_files(data_folder)
     #debug_convert_range()
     #debug_get_hostname(data_folder)
@@ -550,12 +616,14 @@ if __name__ == "__main__":
     #debug_get_untagged_vlans(data_folder)
     #debug_get_ip_address(data_folder)
     #debug_device_type(data_folder)
+    debug_get_modules(data_folder)
 
     print("\n=== Stacking ===")
     #data_folder = main_folder + "/data/aruba-stack/"
     #data_folder = main_folder + "/data/hpe-stack/"
     #data_folder = main_folder + "/data/aruba-modular-stack/"
     data_folder = main_folder + "/data/aruba-stack-2930/"
+    print("\nData folder: ", data_folder)
 
     #debug_get_location(data_folder)
     #debug_get_room_location(data_folder)
@@ -566,14 +634,33 @@ if __name__ == "__main__":
     #debug_get_device_role(data_folder)
     #debug_get_trunks(data_folder)
     #debug_get_trunk_stack(data_folder)
+    debug_get_modules(data_folder)
+
+    data_folder = main_folder + "/data/aruba-stack-2920/"
+    print("\nData folder: ", data_folder)
+
+    debug_get_modules(data_folder)
+
+    data_folder = main_folder + "/data/aruba-modular-stack/"
+    print("\nData folder: ", data_folder)
+
+    debug_get_modules(data_folder)
+
+    data_folder = main_folder + "/data/aruba-modular/"
+    print("\nData folder: ", data_folder)
+
+    debug_get_modules(data_folder)
+
 
     print("\n=== ProCurve Modular ===")
     data_folder = main_folder + "/data/procurve-modular/"
+    print("\nData folder: ", data_folder)
 
     #debug_get_location(data_folder)
     #debug_get_room_location(data_folder)
     #debug_get_flor_nr(data_folder)
-    debug_get_site(data_folder)
+    #debug_get_site(data_folder)
+    debug_get_modules(data_folder)
 
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
@@ -586,14 +673,17 @@ if __name__ == "__main__":
     #debug_get_hostname(data_folder)
     #debug_get_ip_address(data_folder)
     #debug_get_vlans(data_folder)
-
+    debug_get_modules(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
     #debug_get_hostname(data_folder)
     #debug_get_vlans(data_folder)
+    debug_get_modules(data_folder)
 
     print("\n=== No files functions ===")
     #debug_convert_range()
     #debug_convert_interfaces_range()
+
+    #print(yaml.dump(interfaces_dict()))

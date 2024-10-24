@@ -49,7 +49,7 @@
         file: ../data/yaml/aruba_stack_2920.yaml
 
     - name: Include data for Aruba modular stacked switches with mini modules
-      tags: aruba_modular_stack
+      tags: aruba_stack_modular
       include_vars:
         file: ../data/yaml/aruba_modular_stack.yaml
 
@@ -103,7 +103,7 @@
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
         data:
-          device: "{{ item.name }}"
+          device: "{{ item.hostname }}"
           name: "{{ item.interface }}"
         state: absent
       loop: "{{ device_interfaces }}"
@@ -117,8 +117,9 @@
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
         data:
-          device: "{{ item.name }}"
-          name: "{{ item.stack_nr }}/{{ item.interface }}"
+          device: "{{ item.hostname }}"
+          #name: "{{ item.stack_nr }}/{{ item.interface }}"
+          name: "{{ item.interface }}"
           type: "{{ item.type }}"
           poe_mode: "{{ item.poe_mode }}"
           poe_type: "{{ item.poe_type }}"

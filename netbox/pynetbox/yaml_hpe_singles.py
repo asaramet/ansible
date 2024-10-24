@@ -6,7 +6,7 @@ import re, os, yaml
 from tabulate import tabulate
 
 from std_functions import this_folder, main_folder, config_files
-from json_functions import devices_json, trunks_json, interface_names_json
+from json_functions import devices_json, trunks_json, device_interfaces_json
 from json_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
 from json_functions import ip_addresses_json, locations_json
 
@@ -18,7 +18,7 @@ def single(data_folder, output_file_path, device_type_slags, devices_tags):
         yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(trunks_json(files), f)
-        yaml.dump(interface_names_json(files), f)
+        yaml.dump(device_interfaces_json(files), f)
         yaml.dump(vlans_json(files), f)
         yaml.dump(untagged_vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)

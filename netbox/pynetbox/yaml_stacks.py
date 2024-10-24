@@ -6,7 +6,7 @@ import re, os, yaml
 from tabulate import tabulate
 from std_functions import this_folder, main_folder, get_hostname
 from std_functions import config_files, device_type, recursive_search
-from json_functions import devices_json, trunks_json
+from json_functions import devices_json, trunks_json, device_interfaces_json
 from json_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
 from json_functions import ip_addresses_json, locations_json
 
@@ -95,7 +95,7 @@ def modules_json(config_files, module_types = {}):
             data['modules'].append({'device': module['hostname'], 'name': module['name'], 'module_bay': module['module'], 'new_position': new_position, 'type': module_types[module['type'].lower()]})
     return data
 
-def device_interfaces(config_files):
+def device_interfaces_old(config_files):
     nr_of_interfaces = {
         'JL256A_stack': (48, '1000base-t', 'pd', 'type2-ieee802.3at'),
         'JL075A_stack': (16, '10gbase-x-sfpp', None, None),
@@ -136,7 +136,7 @@ def device_interfaces(config_files):
             if not nr_of_i: continue
 
             for nr in range(1, int(nr_of_i) + 1):
-                data['device_interfaces'].append({'name': h_name, 'stack_nr': stack_nr, 'interface': nr, 
+                data['device_interfaces'].append({'hostname': h_name, 'stack_nr': stack_nr, 'interface': nr, 
                     'type': type_of_i, 'poe_mode': poe_mode, 'poe_type': poe_type})
 
         if type_key in uplink_interfaces.keys():
@@ -145,7 +145,7 @@ def device_interfaces(config_files):
 
             for stack_nr, h_name in hostname.items():
                 for nr in range(int(start_i), int(end_i) + 1, 1):
-                    data['device_interfaces'].append({'name': h_name, 'stack_nr': stack_nr, 'interface': nr, 
+                    data['device_interfaces'].append({'hostname': h_name, 'stack_nr': stack_nr, 'interface': nr, 
                         'type': type_of_i, 'poe_mode': poe_mode, 'poe_type': poe_type})
 
         if type_key in sfp_interfaces.keys():
@@ -167,7 +167,7 @@ def device_interfaces(config_files):
 
                 for stack_nr, h_name in hostname.items():
                     for nr in range(int(start_i), int(end_i) + 1, 1):
-                        data['device_interfaces'].append({'name': h_name, 'stack_nr': stack_nr, 'interface': prefix_start + str(nr), 
+                        data['device_interfaces'].append({'hostname': h_name, 'stack_nr': stack_nr, 'interface': prefix_start + str(nr), 
                             'type': type_of_i, 'poe_mode': poe_mode, 'poe_type': poe_type})
 
     return data
@@ -180,7 +180,7 @@ def stack(data_folder, output_file_path, device_type_slags, devices_tags):
         yaml.dump({"add_stack_interfaces": True}, f)
         yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
-        yaml.dump(device_interfaces(files), f)
+        yaml.dump(device_interfaces_json(files), f)
         yaml.dump(trunks_json(files), f)
         #yaml.dump(interface_names_json(files), f)
         yaml.dump(vlans_json(files), f)
@@ -201,7 +201,7 @@ def stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
         yaml.dump({"add_stack_interfaces": add_stack_interfaces}, f)
         yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
-        yaml.dump(device_interfaces(files), f)
+        yaml.dump(device_interfaces_json(files), f)
         yaml.dump(trunks_json(files), f)
         #yaml.dump(interface_names_json(files), f)
         yaml.dump(vlans_json(files), f)
@@ -299,7 +299,7 @@ def main():
     stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
 if __name__ == "__main__":
-    main()
+    #main()
 
     # Run Debugging
     #debug_data_folder = main_folder + "/data/aruba-stack/"
@@ -307,7 +307,6 @@ if __name__ == "__main__":
     #debug_data_folder = main_folder + "/data/aruba-stack-2920/"
     debug_data_folder = main_folder + "/data/aruba-modular-stack/"
 
-    debug_device_interfaces(debug_data_folder)
-    #debug_get_modules(debug_data_folder)
+    debug_get_modules(debug_data_folder)
 
     #test_stack_module_yaml()

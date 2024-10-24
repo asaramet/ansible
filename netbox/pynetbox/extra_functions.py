@@ -6,7 +6,7 @@ import re, os, yaml
 from tabulate import tabulate
 from std_functions import main_folder, config_files, search_line
 from std_functions import convert_range
-from std_functions import device_type, get_hostname
+from std_functions import device_type, get_hostname, interfaces_dict
 
 # get the interfaces configuration from a config file
 def get_interfaces_config(config_file):
@@ -170,8 +170,8 @@ def get_lag_interfaces(config_file):
     """
     lag_interfaces = {}
     
-    interfaces_dict = get_interfaces_config(config_file)['physical']
-    for interface, configs in interfaces_dict.items():
+    interfaces = get_interfaces_config(config_file)['physical']
+    for interface, configs in interfaces.items():
         for config in configs:
             config = config.strip()
             if config.startswith('lag'):
@@ -212,28 +212,11 @@ def get_vlan_names(config_file):
 def interfaces_types(config_file):
     data = {'type': {}, 'poe_type': {}, 'poe_mode': {}}
 
-    types = {
-        "JL658A": {
-            "1-24": "10gbase-x-sfpp",
-            "25-28": "25gbase-x-sfp28"
-        },
-        "JL679A": {
-            "1-14": "1000base-t",
-            "15-16": "10gbase-x-sfpp"
-        }
-    }
-    poe_types = {
-        "JL679A": {
-            "1-12": "type2-ieee802.3at",
-            "13-16": None
-        }
-    }
-    poe_modes = {
-        "JL679A": {
-            "1-12": "pd",
-            "13-16": None
-        }
-    }
+    interfaces = interfaces_dict()
+
+    types = interfaces['types']
+    poe_modes = interfaces['poe_modes']
+    poe_types = interfaces['poe_types']
 
     poe_type = poe_mode = None
 
@@ -243,24 +226,23 @@ def interfaces_types(config_file):
     d_type = device_type(hostname).split('_')[0]
 
     # create interface type dictionary
-    if d_type in types:
+    if d_type in types.keys():
         for key, value in types[d_type].items():
             for i_nr in convert_range(key):
                 data['type'][str(i_nr)] = value
 
     # create poe interface dictionaries
-    if d_type in poe_types:
+    if d_type in poe_types.keys():
         for key, value in poe_types[d_type].items():
             for i_nr in convert_range(key):
                 data['poe_type'][str(i_nr)] = value
 
-    if d_type in poe_modes:
+    if d_type in poe_modes.keys():
         for key, value in poe_modes[d_type].items():
             for i_nr in convert_range(key):
                 data['poe_mode'][str(i_nr)] = value
 
     return data
-
 
 #---- Debugging ----#
 def debug_get_interfaces_config(config_file):
@@ -325,7 +307,6 @@ def debug_interfaces_types(data_folder):
     for f in config_files(data_folder):
         print(os.path.basename(f), '---> ', interfaces_types(f))
 
-
 if __name__ == "__main__":
     #main()
 
@@ -347,9 +328,6 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/aruba_6300/"
     config_file = data_folder + "rgcs0006"
 
-    #debug_get_location(data_folder)
-    #debug_get_room_location(data_folder)
-
     #debug_get_interfaces_config(config_file)
     #debug_get_looback_interface(data_folder)
     #debug_get_uplink_vlan(data_folder)
@@ -361,27 +339,34 @@ if __name__ == "__main__":
     #debug_get_interfaces_config(config_file)
 
     print("\n=== HPE Singles ===")
+    #data_folder = main_folder + "/data/procurve-single/"
     data_folder = main_folder + "/data/hpe-8-ports/"
+    #data_folder = main_folder + "/data/hpe-48-ports/"
 
-    #debug_get_location(data_folder)
-    #debug_get_room_location(data_folder)
+    #debug_interfaces_types(data_folder)
+
+    print("\n=== Aruba 8 Ports ===")
+    #data_folder = main_folder + "/data/aruba-48-ports/"
+    #data_folder = main_folder + "/data/aruba-8-ports/"
+    data_folder = main_folder + "/data/aruba-12-ports/"
+
+    #debug_interfaces_types(data_folder)
 
     print("\n=== HPE Stacking ===")
     #data_folder = main_folder + "/data/aruba-stack/"
     data_folder = main_folder + "/data/aruba-stack-2930/"
 
-    #debug_get_location(data_folder)
-    #debug_get_room_location(data_folder)
+    #debug_interfaces_types(data_folder)
 
     print("\n=== ProCurve Modular ===")
     data_folder = main_folder + "/data/procurve-modular/"
 
-    debug_get_location(data_folder)
-    #debug_get_room_location(data_folder)
+    debug_interfaces_types(data_folder)
 
     print("\n=== ProCurve Single ===")
     data_folder = main_folder + "/data/procurve-single/"
 
-    #debug_get_location(data_folder)
-    #debug_get_room_location(data_folder)
-    #debug_get_flor_nr(data_folder)
+    #debug_interfaces_types(data_folder)
+
+    print("\n=== All ===")
+    config_file = data_folder + "rhsw1u107p"

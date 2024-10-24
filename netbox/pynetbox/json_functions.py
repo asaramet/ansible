@@ -15,6 +15,8 @@ from std_functions import get_ip_address
 from std_functions import get_location, get_room_location, get_flor_name
 from std_functions import get_parent_location
 
+from extra_functions import interfaces_types
+
 # create the loactions json objects list
 def locations_json(config_files):
     data = {"locations":[]}
@@ -128,23 +130,28 @@ def trunks_json(config_files):
 def device_interfaces_json(config_files):
     data = {'device_interfaces':[]}
 
-    i_type = i_poe_mode = i_poe_type = None
     for t_file in config_files:
         hostname = get_hostname(t_file)
+        i_types = interfaces_types(t_file)
 
         for i_tuple in get_interface_names(t_file):
             interface, name = i_tuple
+            i_nr = interface
 
             if '0' in hostname.keys():
                 stack_hostname = hostname['0']
 
             else:
-                stack_nr, _ = interface.split('/', 1)
+                stack_nr, i_nr = interface.split('/', 1)
+                if '/' in i_nr:
+                    _, i_nr = interface.split('/')
+
                 stack_hostname = hostname[stack_nr]
 
+            print(stack_hostname, interface, i_nr)
             if {'hostname': stack_hostname, 'interface': interface, 'name': name} not in data['device_interfaces']:
                 data['device_interfaces'].append({'hostname': stack_hostname, 'interface': interface, 'name': name,
-                    'type': i_type, 'poe_mode': i_poe_mode, 'poe_type': i_poe_type
+                    'type': i_types["type"][i_nr], 'poe_mode': i_types["poe_mode"][i_nr], 'poe_type': i_types["poe_type"][i_nr]
                 })
 
     return data
@@ -347,11 +354,13 @@ if __name__ == "__main__":
     #debug_locations_json(data_folder)
     #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
     #debug_vlans_json(data_folder)
     #debug_untagged_vlans_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
     #debug_ip_addresses_json(data_folder)
+
+    debug_device_interfaces_json(data_folder)
 
     print("\n=== Stacking JSON ===")
     #data_folder = main_folder + "/data/aruba-stack/"
@@ -359,17 +368,25 @@ if __name__ == "__main__":
 
     #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
     #debug_vlans_json(data_folder)
     #debug_untagged_vlans_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
     #debug_ip_addresses_json(data_folder)
 
+    debug_device_interfaces_json(data_folder)
+
     print("\n=== ProCurve Modular JSON ===")
     data_folder = main_folder + "/data/procurve-modular/"
 
     #debug_locations_json(data_folder)
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
+    #debug_locations_json(data_folder)
+
+    print("\n=== Aruba Modular Stack JSON ===")
+    data_folder = main_folder + "/data/aruba-modular-stack/"
+
+    #debug_locations_json(data_folder)
 
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
