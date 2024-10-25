@@ -4,96 +4,16 @@
 
 import re, os, yaml
 from tabulate import tabulate
-from std_functions import this_folder, main_folder, get_hostname
+from std_functions import this_folder, main_folder, get_hostname, get_modules
 from std_functions import config_files, device_type, recursive_search
 from json_functions import devices_json, trunks_json, device_interfaces_json
 from json_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
-from json_functions import ip_addresses_json, locations_json
-
-module_types = {
-    'jl083a': 'Aruba 3810M/2930M 4SFP+ MACsec Module',
-    'j9731a': 'Aruba 2920 2-Port 10GbE SFP+ Module',
-    'j9733a': 'Aruba 2920 2-Port Stacking Module',
-    'j9827a': 'Aruba J9827A',
-    'j9993a': 'Aruba J9993A',
-    'j9988a': 'Aruba J9988A',
-    'j9996a': 'Aruba J9996A'
-}
-
-def get_modules(t_file):
-    with open(t_file, "r") as f:
-        text = f.readlines()
-
-    modules = []
-    hostnames = get_hostname(t_file)
-
-    # Modules for Aruba 2930 stacks
-    names = {
-        'A': 'Uplink'
-    }
-
-    flexible_modules = recursive_search("flexible-module", text)
-    if len(flexible_modules) > 0:
-        for line in flexible_modules:
-            m_list = line.split()
-            modules.append({'hostname': hostnames[m_list[1]], 'module': m_list[3], 'type': m_list[5], 'name': names[m_list[3]]})
-        return modules
-
-    clean_hostname, _ = hostnames['1'].split('-')
-
-    # Modules for Aruba 2920 stacks
-    module_2920 = {
-        'rsgw7009sp': [ ('1', 'A', 'j9731a'), ('1', 'B', 'j9731a') ],
-        'rsgw5313sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'A', 'j9731a'), ('3', 'STK', 'j9733a') ],
-        'rsgw10118sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ], 
-        'rsgw1u140sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
-        'rsgw12205sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
-        'rsgw2112sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'A', 'j9731a'), ('3', 'STK', 'j9733a') ],
-        'rsgw9108sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ]
-    }
-
-    names = {
-        'A': 'Module A',
-        'B': 'Module B',
-        'STK': 'Stacking Module'
-    }
-
-    if clean_hostname in module_2920.keys():
-        for stack, module, m_type in module_2920[clean_hostname]:
-            modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': names[module]})
-        return modules
-
-    # Modules for Aruba Modular stacks
-    module_chassis = {
-        'rscs0007': [
-            ('1', 'MM1', 'j9827a'), ('1', 'A', 'j9993a'), ('1', 'B', 'j9993a'), ('1', 'C', 'j9993a'), ('1', 'D', 'j9993a'), ('1', 'E', 'j9988a'), ('1', 'F', 'j9996a'),
-            ('2', 'MM1', 'j9827a'), ('2', 'A', 'j9993a'), ('2', 'B', 'j9993a'), ('2', 'C', 'j9993a'), ('2', 'D', 'j9993a'), ('2', 'E', 'j9988a'), ('2', 'F', 'j9996a') 
-         ]
-    }
-
-    if clean_hostname in module_chassis.keys():
-        for stack, module, m_type in module_chassis[clean_hostname]:
-            modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': module})
-        return modules
-
-    return modules
+from json_functions import ip_addresses_json, locations_json, modules_json
 
 def assign_sfp_modules(t_file):
     with open(main_folder + "/host_vars/99/sfp_modules.yaml", 'r' ) as f:
         modules = yaml.safe_load(f)
     return modules
-
-# return the modules json object
-def modules_json(config_files, module_types = {}):
-    data = {'modules':[]}
-    for t_file in config_files:
-        modules = get_modules(t_file)
-
-        for module in modules:
-            _, stack_nr = module['hostname'].split('-')
-            new_position = stack_nr + '/' + module['module']
-            data['modules'].append({'device': module['hostname'], 'name': module['name'], 'module_bay': module['module'], 'new_position': new_position, 'type': module_types[module['type'].lower()]})
-    return data
 
 def device_interfaces_old(config_files):
     nr_of_interfaces = {
@@ -182,7 +102,6 @@ def stack(data_folder, output_file_path, device_type_slags, devices_tags):
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(device_interfaces_json(files), f)
         yaml.dump(trunks_json(files), f)
-        #yaml.dump(interface_names_json(files), f)
         yaml.dump(vlans_json(files), f)
         yaml.dump(untagged_vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
@@ -203,13 +122,12 @@ def stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(device_interfaces_json(files), f)
         yaml.dump(trunks_json(files), f)
-        #yaml.dump(interface_names_json(files), f)
         yaml.dump(vlans_json(files), f)
         yaml.dump(untagged_vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)
 
-        yaml.dump(modules_json(files, module_types), f)
+        yaml.dump(modules_json(files), f)
 
 #----- Debugging -------
 def debug_device_interfaces(data_folder):
@@ -299,7 +217,7 @@ def main():
     stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
 if __name__ == "__main__":
-    #main()
+    main()
 
     # Run Debugging
     #debug_data_folder = main_folder + "/data/aruba-stack/"
@@ -307,6 +225,6 @@ if __name__ == "__main__":
     #debug_data_folder = main_folder + "/data/aruba-stack-2920/"
     debug_data_folder = main_folder + "/data/aruba-modular-stack/"
 
-    debug_get_modules(debug_data_folder)
+    #debug_get_modules(debug_data_folder)
 
     #test_stack_module_yaml()

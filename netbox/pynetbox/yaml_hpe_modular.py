@@ -11,38 +11,6 @@ from json_functions import devices_json, trunks_json, device_interfaces_json
 from json_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
 from json_functions import ip_addresses_json, locations_json
 
-module_types = {
-    "j8702a": "ProCurve 24-port 10/100/1000Base-T PoE Switch Module",
-    "j8705a": "HP J8705A ProCurve PoE 20 Port Gig-T SFP Plus 4 Port Mini GBIC ZL Module",
-    "j8706a": "ProCurve Switch 5400zl 24p Mini-GBIC Module",
-    "j8707a": "HP 4-Port 10GbE X2 ZL Module",
-    "j8765a": "ProCurve Switch VL 24-Port 10/100-TX Module",
-    "j8766a": "HP ProCurve J8766A VL 1-Port 10GbE X2 ZL Module",
-    "j8768a": "ProCurve Switch 24-port Gig-T vl Module",
-    "j9033a": "HP ProCurve Switch vl 20-Port Gig-T+ 4 SFP Module",
-    "j9534a": "Aruba J9534A",
-    "j9550a": "HP 24-Port GiG-T v2 ZL Module",
-    "j9537a": "Aruba J9537A",
-    "j9538a": "Aruba J9538A",
-    "j9731a": "Aruba 2920 2-Port 10GbE SFP+ Module",
-    "j9729a": "Aruba 2920 2-Port 10GbE SFP+ Module", # same as j9731a
-    "j9986a": "Aruba J9986A",
-    "j9990a": "Aruba J9990A",
-    "j9992a": "Aruba J9992A",
-    "j9993a": "Aruba J9993A",
-    'jl083a': 'Aruba 3810M/2930M 4SFP+ MACsec Module'
-}
-
-# return the modules json object
-def modules_json(config_files, module_types = {}):
-    data = {'modules':[]}
-    for t_file in config_files:
-        modules = get_modules(t_file)
-
-        for module in modules:
-            data['modules'].append({'device': module['hostname'], 'module_bay': module['module'], 'type': module_types[module['type'].lower()]})
-    return data
-
 # Collect modular switches data and saved it to a YAML file
 def modular(data_folder, output_file_path, device_type_slags, devices_tags, module_types):
     files = config_files(data_folder)
@@ -91,23 +59,5 @@ def main():
     print("Update data for Aruba modular Switches into the file: ", output_file_path) 
     modular(data_folder, output_file_path, device_type_slags, devices_tags, module_types)
 
-#---- Debugging ----#
-def debug_get_modules(data_folder):
-    table = []
-    types = set()
-    headers = ["File Name", "Modules"]
-    for f in config_files(data_folder):
-        modules = get_modules(f)
-        table.append([os.path.basename(f), modules])
-        for module in modules:
-            types.add(module['type'])
-    print(tabulate(table, headers, "github"))
-
 if __name__ == "__main__":
     main()
-
-    data_folder = main_folder + "/data/procurve-modular/"
-    #debug_get_modules(data_folder)
-
-    data_folder = main_folder + "/data/aruba-modular/"
-    #debug_get_modules(data_folder)

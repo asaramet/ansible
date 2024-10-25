@@ -343,36 +343,76 @@ def get_modules(t_file):
         '7': 'G', '8': 'H', '9': 'I', '10': 'J', '11': 'K', '12': 'L'
     }
 
+    hostnames = get_hostname(t_file)
+
+    stack = '0'
+
     with open(t_file, "r") as f:
         text = f.readlines()
 
+    if '0' in hostnames.keys():
+        clean_hostname = hostnames['0']
+    else:
+        clean_hostname, _ = hostnames['1'].split('-')
+
+    # Modules for Aruba 2920 stacks
+    module_2920 = {
+        'rsgw7009sp': [ ('1', 'A', 'j9731a'), ('1', 'B', 'j9731a') ],
+        'rsgw5313sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'A', 'j9731a'), ('3', 'STK', 'j9733a') ],
+        'rsgw10118sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ], 
+        'rsgw1u140sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
+        'rsgw12205sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
+        'rsgw2112sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'A', 'j9731a'), ('3', 'STK', 'j9733a') ],
+        'rsgw9108sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ]
+    }
+
+    names_2920 = {
+        'A': 'Module A',
+        'B': 'Module B',
+        'STK': 'Stacking Module'
+    }
+
+    if clean_hostname in module_2920.keys():
+        for stack, module, m_type in module_2920[clean_hostname]:
+            modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': names_2920[module], 'stack': stack})
+        return modules
+
+    # Modules for Aruba Modular stacks
+    module_chassis = {
+        'rscs0007': [
+            ('1', 'MM1', 'j9827a'), ('1', 'A', 'j9993a'), ('1', 'B', 'j9993a'), ('1', 'C', 'j9993a'), ('1', 'D', 'j9993a'), ('1', 'E', 'j9988a'), ('1', 'F', 'j9996a'),
+            ('2', 'MM1', 'j9827a'), ('2', 'A', 'j9993a'), ('2', 'B', 'j9993a'), ('2', 'C', 'j9993a'), ('2', 'D', 'j9993a'), ('2', 'E', 'j9988a'), ('2', 'F', 'j9996a') 
+         ]
+    }
+
+    if clean_hostname in module_chassis.keys():
+        for stack, module, m_type in module_chassis[clean_hostname]:
+            modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': module, 'stack': stack})
+        return modules
+
+    # HPE OS
     flexible_modules = recursive_search("flexible-module", text)
     if len(flexible_modules) > 0:
-        hostnames = get_hostname(t_file)
-
         for line in flexible_modules:
             m_list = line.split()
 
             module = m_list[1] if len(m_list) == 4 else m_list[3]
             m_type = m_list[-1]
 
-            stack = m_list[1]
-            if stack in stacks_dict.values():
-                stack = '1'
+            if m_list[1] in stacks_dict.keys():
+                stack = m_list[1]
 
-            if '0' in hostnames.keys():
-                stack = '0'
-
-            modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': 'Uplink'})
+            modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': 'Uplink', 'stack': stack})
         return modules
 
+    # Aruba-OS 
     for line in recursive_search("module", text, True):
         m_list = line.split()
 
         module = m_list[1]
-        hostnames = get_hostname(t_file)
 
-        stack = '0' if '0' in hostnames else module
+        if '0' not in hostnames:
+            stack = module
 
         if '/' in stack:
             stack, module = stack.split('/')
@@ -380,7 +420,7 @@ def get_modules(t_file):
         if module in stacks_dict.keys():
             module = stacks_dict[module]
 
-        modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_list[3]})
+        modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_list[3], 'name': 'Uplink', 'stack': stack})
 
     return modules
 
@@ -417,6 +457,15 @@ def device_type(hostname):
 # Return a interfaces dictionary from a yaml file
 def interfaces_dict():
     yaml_file = main_folder + "/data/src/interfaces.yaml"
+
+    with open(yaml_file, 'r') as f:
+        return yaml.safe_load(f)
+
+    return None
+
+# Return a module types dictionary from a yaml file
+def module_types_dict():
+    yaml_file = main_folder + "/data/src/module_types.yaml"
 
     with open(yaml_file, 'r') as f:
         return yaml.safe_load(f)
@@ -603,6 +652,7 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/hpe-48-ports/"
     #data_folder = main_folder + "/data/procurve-single/"
 
+    print("\nData folder: ", data_folder)
     #debug_get_site(data_folder)
     #debug_config_files(data_folder)
     #debug_convert_range()
@@ -616,14 +666,14 @@ if __name__ == "__main__":
     #debug_get_untagged_vlans(data_folder)
     #debug_get_ip_address(data_folder)
     #debug_device_type(data_folder)
-    debug_get_modules(data_folder)
+    #debug_get_modules(data_folder)
 
     print("\n=== Stacking ===")
     #data_folder = main_folder + "/data/aruba-stack/"
     #data_folder = main_folder + "/data/hpe-stack/"
     #data_folder = main_folder + "/data/aruba-modular-stack/"
     data_folder = main_folder + "/data/aruba-stack-2930/"
-    print("\nData folder: ", data_folder)
+    #print("\nData folder: ", data_folder)
 
     #debug_get_location(data_folder)
     #debug_get_room_location(data_folder)
@@ -637,23 +687,24 @@ if __name__ == "__main__":
     debug_get_modules(data_folder)
 
     data_folder = main_folder + "/data/aruba-stack-2920/"
-    print("\nData folder: ", data_folder)
 
+    print("\nData folder: ", data_folder)
     debug_get_modules(data_folder)
 
     data_folder = main_folder + "/data/aruba-modular-stack/"
-    print("\nData folder: ", data_folder)
 
+    print("\nData folder: ", data_folder)
     debug_get_modules(data_folder)
 
     data_folder = main_folder + "/data/aruba-modular/"
-    print("\nData folder: ", data_folder)
 
+    print("\nData folder: ", data_folder)
     debug_get_modules(data_folder)
 
 
     print("\n=== ProCurve Modular ===")
     data_folder = main_folder + "/data/procurve-modular/"
+
     print("\nData folder: ", data_folder)
 
     #debug_get_location(data_folder)
@@ -673,17 +724,18 @@ if __name__ == "__main__":
     #debug_get_hostname(data_folder)
     #debug_get_ip_address(data_folder)
     #debug_get_vlans(data_folder)
-    debug_get_modules(data_folder)
+    #debug_get_modules(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
     #debug_get_hostname(data_folder)
     #debug_get_vlans(data_folder)
-    debug_get_modules(data_folder)
+    #debug_get_modules(data_folder)
 
     print("\n=== No files functions ===")
     #debug_convert_range()
     #debug_convert_interfaces_range()
 
     #print(yaml.dump(interfaces_dict()))
+    print(yaml.dump(module_types_dict()))
