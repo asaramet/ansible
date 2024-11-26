@@ -225,6 +225,7 @@ def interfaces_types(config_file):
 
     d_type = device_type(hostname).split('_')[0]
 
+    #print(d_type)
     # create interface type dictionary
     if d_type in types.keys():
         for key, value in types[d_type].items():
@@ -339,11 +340,11 @@ if __name__ == "__main__":
     #debug_get_interfaces_config(config_file)
 
     print("\n=== HPE Singles ===")
-    #data_folder = main_folder + "/data/procurve-single/"
-    data_folder = main_folder + "/data/hpe-8-ports/"
+    data_folder = main_folder + "/data/procurve-single/"
+    #data_folder = main_folder + "/data/hpe-8-ports/"
     #data_folder = main_folder + "/data/hpe-48-ports/"
 
-    #debug_interfaces_types(data_folder)
+    debug_interfaces_types(data_folder)
 
     print("\n=== Aruba 8 Ports ===")
     #data_folder = main_folder + "/data/aruba-48-ports/"
@@ -353,11 +354,20 @@ if __name__ == "__main__":
     #debug_interfaces_types(data_folder)
 
     print("\n=== HPE Stacking ===")
-    #data_folder = main_folder + "/data/aruba-stack/"
+    data_folder = main_folder + "/data/aruba-stack/"
+
+    #debug_interfaces_types(data_folder)
+
+    print("\n=== HPE Stacking 2930 ===")
     data_folder = main_folder + "/data/aruba-stack-2930/"
 
     #debug_interfaces_types(data_folder)
 
+    print("\n=== HPE Stacking 2920 ===")
+    data_folder = main_folder + "/data/aruba-stack-2920/"
+
+    #debug_interfaces_types(data_folder)
+    
     print("\n=== ProCurve Modular ===")
     data_folder = main_folder + "/data/procurve-modular/"
 

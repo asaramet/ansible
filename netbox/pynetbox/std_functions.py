@@ -344,7 +344,6 @@ def get_modules(t_file):
     }
 
     hostnames = get_hostname(t_file)
-
     stack = '0'
 
     with open(t_file, "r") as f:
@@ -466,6 +465,15 @@ def interfaces_dict():
 # Return a module types dictionary from a yaml file
 def module_types_dict():
     yaml_file = main_folder + "/data/src/module_types.yaml"
+
+    with open(yaml_file, 'r') as f:
+        return yaml.safe_load(f)
+
+    return None
+
+# Return a modules interfaces types dictionary from a yaml file
+def modules_interfaces():
+    yaml_file = main_folder + "/data/src/modules_interfaces.yaml"
 
     with open(yaml_file, 'r') as f:
         return yaml.safe_load(f)
@@ -648,12 +656,12 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/aruba-48-ports/"
     #data_folder = main_folder + "/data/aruba-48-ports/"
     #data_folder = main_folder + "/data/aruba-modular/"
-    data_folder = main_folder + "/data/hpe-8-ports/"
+    #data_folder = main_folder + "/data/hpe-8-ports/"
     #data_folder = main_folder + "/data/hpe-48-ports/"
-    #data_folder = main_folder + "/data/procurve-single/"
+    data_folder = main_folder + "/data/procurve-single/"
 
     print("\nData folder: ", data_folder)
-    #debug_get_site(data_folder)
+    debug_get_site(data_folder)
     #debug_config_files(data_folder)
     #debug_convert_range()
     #debug_get_hostname(data_folder)
@@ -684,7 +692,7 @@ if __name__ == "__main__":
     #debug_get_device_role(data_folder)
     #debug_get_trunks(data_folder)
     #debug_get_trunk_stack(data_folder)
-    debug_get_modules(data_folder)
+    #debug_get_modules(data_folder)
 
     data_folder = main_folder + "/data/aruba-stack-2920/"
 
@@ -694,12 +702,12 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/aruba-modular-stack/"
 
     print("\nData folder: ", data_folder)
-    debug_get_modules(data_folder)
+    #debug_get_modules(data_folder)
 
     data_folder = main_folder + "/data/aruba-modular/"
 
     print("\nData folder: ", data_folder)
-    debug_get_modules(data_folder)
+    #debug_get_modules(data_folder)
 
 
     print("\n=== ProCurve Modular ===")
@@ -711,7 +719,7 @@ if __name__ == "__main__":
     #debug_get_room_location(data_folder)
     #debug_get_flor_nr(data_folder)
     #debug_get_site(data_folder)
-    debug_get_modules(data_folder)
+    #debug_get_modules(data_folder)
 
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
@@ -738,4 +746,5 @@ if __name__ == "__main__":
     #debug_convert_interfaces_range()
 
     #print(yaml.dump(interfaces_dict()))
-    print(yaml.dump(module_types_dict()))
+    #print(yaml.dump(module_types_dict()))
+    #print(yaml.dump(modules_interfaces()))

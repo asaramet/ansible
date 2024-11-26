@@ -11,6 +11,8 @@ from std_functions import get_hostname, get_device_role, get_site
 from std_functions import get_trunks, get_interface_names, get_vlans
 from std_functions import get_untagged_vlans, get_vlans_names, get_trunk_stack
 from std_functions import get_ip_address, get_modules, module_types_dict
+from std_functions import module_types_dict, modules_interfaces
+from std_functions import convert_range
 
 from std_functions import get_location, get_room_location, get_flor_name
 from std_functions import get_parent_location
@@ -134,6 +136,39 @@ def device_interfaces_json(config_files):
         hostname = get_hostname(t_file)
         i_types = interfaces_types(t_file)
 
+        modules = get_modules(t_file)
+
+        if modules:
+            # add modules interfaces to i_types
+            m_interfaces = modules_interfaces()
+
+            #print(hostname, m_interfaces)
+
+            unique_modules = set()
+            for stack in modules:
+                unique_modules.add(stack['type'].lower())
+
+            for m_type in unique_modules:
+                if m_type in m_interfaces['types']:
+                    interfaces = m_interfaces['types'][m_type]
+                    for keys_range in interfaces.keys():
+                        for key in convert_range(keys_range):
+                            i_types['type'][key] = interfaces[keys_range]
+                            i_types['poe_type'][key] = None
+                            i_types['poe_mode'][key] = None
+
+                if m_type in m_interfaces['poe_types'].keys():
+                    interfaces = m_interfaces['poe_types'][m_type]
+                    for keys_range in interfaces.keys():
+                        for key in convert_range(keys_range):
+                            i_types['poe_type'][key] = interfaces[keys_range]
+
+                if m_type in m_interfaces['poe_mode']:
+                    interfaces = m_interfaces['poe_mode'][m_type]
+                    for keys_range in interfaces.keys():
+                        for key in convert_range(keys_range):
+                            i_types['poe_mode'][key] = interfaces[keys_range]
+
         for i_tuple in get_interface_names(t_file):
             interface, name = i_tuple
             i_nr = interface
@@ -148,8 +183,12 @@ def device_interfaces_json(config_files):
 
                 stack_hostname = hostname[stack_nr]
 
-            print(stack_hostname, interface, i_nr)
             if {'hostname': stack_hostname, 'interface': interface, 'name': name} not in data['device_interfaces']:
+
+                if not i_types["poe_type"] or ( i_nr not in i_types["poe_type"].keys()):
+                    i_types["poe_type"][i_nr] = None
+                    i_types["poe_mode"][i_nr] = None
+
                 data['device_interfaces'].append({'hostname': stack_hostname, 'interface': interface, 'name': name,
                     'type': i_types["type"][i_nr], 'poe_mode': i_types["poe_mode"][i_nr], 'poe_type': i_types["poe_type"][i_nr]
                 })
@@ -386,8 +425,15 @@ if __name__ == "__main__":
 
     #debug_device_interfaces_json(data_folder)
 
+    print("\n=== ProCurve Singles JSON ===")
+    data_folder = main_folder + "/data/procurve-single/"
+
+    #debug_locations_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
+
     print("\n=== Stacking JSON ===")
     #data_folder = main_folder + "/data/aruba-stack/"
+    #data_folder = main_folder + "/data/aruba-stack-2920/"
     data_folder = main_folder + "/data/aruba-stack-2930/"
 
     #debug_devices_json(data_folder)
@@ -399,34 +445,42 @@ if __name__ == "__main__":
     #debug_ip_addresses_json(data_folder)
 
     #debug_device_interfaces_json(data_folder)
-    debug_modules_json(data_folder)
+    #debug_modules_json(data_folder)
+
+    print("\n=== Stacking 2920 JSON ===")
+    data_folder = main_folder + "/data/aruba-stack-2920/"
+    #debug_device_interfaces_json(data_folder)
 
     print("\n=== ProCurve Modular JSON ===")
     data_folder = main_folder + "/data/procurve-modular/"
 
     #debug_locations_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
     #debug_locations_json(data_folder)
-    debug_modules_json(data_folder)
+    debug_device_interfaces_json(data_folder)
+    #debug_modules_json(data_folder)
 
     print("\n=== Aruba Modular JSON ===")
     data_folder = main_folder + "/data/aruba-modular/"
 
     #debug_locations_json(data_folder)
-    debug_modules_json(data_folder)
+    debug_device_interfaces_json(data_folder)
+    #debug_modules_json(data_folder)
 
     print("\n=== Aruba Modular Stack JSON ===")
     data_folder = main_folder + "/data/aruba-modular-stack/"
 
     #debug_locations_json(data_folder)
-    debug_modules_json(data_folder)
+    debug_device_interfaces_json(data_folder)
+    #debug_modules_json(data_folder)
 
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
 
     #debug_vlans_json(data_folder)
+    debug_device_interfaces_json(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
     #debug_vlans_json(data_folder)
+    debug_device_interfaces_json(data_folder)
