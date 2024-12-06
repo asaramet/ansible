@@ -189,7 +189,7 @@ def device_interfaces_json(config_files):
                     i_types["poe_type"][i_nr] = None
                     i_types["poe_mode"][i_nr] = None
 
-                data['device_interfaces'].append({'hostname': stack_hostname, 'interface': interface, 'name': name,
+                data['device_interfaces'].append({'hostname': stack_hostname, 'interface': interface, 'name': name, "default_interface": i_nr,
                     'type': i_types["type"][i_nr], 'poe_mode': i_types["poe_mode"][i_nr], 'poe_type': i_types["poe_type"][i_nr]
                 })
 
@@ -268,19 +268,19 @@ def tagged_vlans_json(config_files):
             for stack_nr, interface in convert_interfaces_range(interfaces_range):
                 
                 interface = str(interface)
-                vlan_stacks = []
+                vlan_stacks = set()
 
                 if '0' in hostnames.keys():
-                    vlan_stacks.append(hostnames['0'])
+                    vlan_stacks.add(hostnames['0'])
 
                 # Find stack number for Trunks
                 if 'T' in interface: 
                     for nr in range(0,20):
                         nr = str(nr)
                         if (interface, nr) in trunk_stacks:
-                            vlan_stacks.append(hostnames[nr])
+                            vlan_stacks.add(hostnames[nr])
                 else: 
-                    vlan_stacks.append(hostnames[str(stack_nr)])
+                    vlan_stacks.add(hostnames[str(stack_nr)])
 
                 for hostname in vlan_stacks:
                     interface_exists = False # flag to notify that the interface exist in data['tagged_vlans'][hostname]
@@ -430,11 +430,12 @@ if __name__ == "__main__":
 
     #debug_locations_json(data_folder)
     #debug_device_interfaces_json(data_folder)
+    #debug_tagged_vlans_json(data_folder)
 
     print("\n=== Stacking JSON ===")
-    #data_folder = main_folder + "/data/aruba-stack/"
+    data_folder = main_folder + "/data/aruba-stack/"
     #data_folder = main_folder + "/data/aruba-stack-2920/"
-    data_folder = main_folder + "/data/aruba-stack-2930/"
+    #data_folder = main_folder + "/data/aruba-stack-2930/"
 
     #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
@@ -444,19 +445,19 @@ if __name__ == "__main__":
     #debug_tagged_vlans_json(data_folder)
     #debug_ip_addresses_json(data_folder)
 
-    #debug_device_interfaces_json(data_folder)
+    debug_device_interfaces_json(data_folder)
     #debug_modules_json(data_folder)
 
     print("\n=== Stacking 2920 JSON ===")
     data_folder = main_folder + "/data/aruba-stack-2920/"
-    #debug_device_interfaces_json(data_folder)
+    debug_device_interfaces_json(data_folder)
 
     print("\n=== ProCurve Modular JSON ===")
     data_folder = main_folder + "/data/procurve-modular/"
 
     #debug_locations_json(data_folder)
     #debug_locations_json(data_folder)
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
     #debug_modules_json(data_folder)
 
     print("\n=== Aruba Modular JSON ===")

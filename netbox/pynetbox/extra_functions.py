@@ -344,7 +344,7 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/hpe-8-ports/"
     #data_folder = main_folder + "/data/hpe-48-ports/"
 
-    debug_interfaces_types(data_folder)
+    #debug_interfaces_types(data_folder)
 
     print("\n=== Aruba 8 Ports ===")
     #data_folder = main_folder + "/data/aruba-48-ports/"

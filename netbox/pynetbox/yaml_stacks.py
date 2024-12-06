@@ -173,7 +173,7 @@ def main():
     devices_tags = ["switch", "stack"]
 
     print("Update data for Aruba stacks into the file: ", output_file_path) 
-    stack(data_folder, output_file_path, device_type_slags, devices_tags)
+    #stack(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba 2930 stacks with LWL modules
     data_folder = main_folder + "/data/aruba-stack-2930/"
@@ -214,7 +214,7 @@ def main():
     devices_tags = ["switch", "stack"]
 
     print("Update data for Aruba modular stacks into the file: ", output_file_path)
-    stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
+    #stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
 if __name__ == "__main__":
     main()

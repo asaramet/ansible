@@ -661,7 +661,7 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/procurve-single/"
 
     print("\nData folder: ", data_folder)
-    debug_get_site(data_folder)
+    #debug_get_site(data_folder)
     #debug_config_files(data_folder)
     #debug_convert_range()
     #debug_get_hostname(data_folder)
@@ -683,10 +683,10 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/aruba-stack-2930/"
     #print("\nData folder: ", data_folder)
 
-    #debug_get_location(data_folder)
-    #debug_get_room_location(data_folder)
-    #debug_get_flor_nr(data_folder)
-    #debug_get_site(data_folder)
+    debug_get_location(data_folder)
+    debug_get_room_location(data_folder)
+    debug_get_flor_nr(data_folder)
+    debug_get_site(data_folder)
 
     #debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
@@ -697,7 +697,7 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/aruba-stack-2920/"
 
     print("\nData folder: ", data_folder)
-    debug_get_modules(data_folder)
+    #debug_get_modules(data_folder)
 
     data_folder = main_folder + "/data/aruba-modular-stack/"
 

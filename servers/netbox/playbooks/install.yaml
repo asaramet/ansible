@@ -4,7 +4,7 @@
   gather_facts: false
   tags: global
   vars: 
-    netbox_version: &netbox_version 4.1.4
+    netbox_version: &netbox_version 4.1.7
     sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
 
     #server: &server debian12-ansible

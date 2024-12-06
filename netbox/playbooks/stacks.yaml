@@ -104,9 +104,10 @@
         validate_certs: false
         data:
           device: "{{ item.hostname }}"
-          name: "{{ item.interface }}"
+          name: "{{ item.default_interface }}"
         state: absent
       loop: "{{ device_interfaces }}"
+      when: "{{ modular }}"
 
     - name: Add stack interfaces
       tags: 
@@ -118,7 +119,6 @@
         validate_certs: false
         data:
           device: "{{ item.hostname }}"
-          #name: "{{ item.stack_nr }}/{{ item.interface }}"
           name: "{{ item.interface }}"
           type: "{{ item.type }}"
           poe_mode: "{{ item.poe_mode }}"
@@ -190,6 +190,7 @@
         state: present
       loop: "{{ modules }}"
       when: "{{ modular }}"
+      when: false
 
     - name: Create Trunk interfaces as LAG
       tags:
