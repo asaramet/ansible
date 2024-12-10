@@ -99,8 +99,7 @@
           name: "{{ '1' + item.interface[1:] }}" # delete '1/x/x' interfaces
         state: absent
       loop: "{{ device_interfaces }}"
-      when: "{{ chassis }}" # if chassis is not an empty list
-      when: "{{ item.stack_nr != '1' }}"
+      when: "{{ chassis }} and {{ item.stack_nr != '1' }}" # if chassis is not an empty list
 
     - name: Add stack interfaces
       tags: 
@@ -119,8 +118,7 @@
           poe_type: "{{ item.poe_type }}"
         state: present
       loop: "{{ device_interfaces }}"
-      when: "{{ chassis }}"
-      when: "{{ item.stack_nr != '1' }}"
+      when: "{{ chassis }} and {{ item.stack_nr != '1' }}"
 
     - name: Delete virtual chassis 
       tags: 

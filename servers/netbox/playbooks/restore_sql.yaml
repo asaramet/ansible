@@ -4,9 +4,10 @@
   gather_facts: false
   vars: 
     dump_folder: &dump_folder "/opt/db_dumps"
-    dump_file_date: &dump_file_date 2024-09-30
+    dump_file_date: &dump_file_date 2024-12-10
 
     from_local: &from_local false
+    #from_local: &from_local true
     server: &server debian12-ansible
     #server: &server hs_netbox 
 
