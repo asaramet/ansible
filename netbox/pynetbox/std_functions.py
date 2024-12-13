@@ -76,6 +76,9 @@ def config_files(data_folder):
 
 # Convert a range string, i.e A1-A4, to a list of elements, i.e [A1,A2,A3,A4]
 def convert_range(range_str):
+    if '-' not in range_str:
+        return [range_str]
+
     # Split the input string into the start and end parts
     start, end = range_str.split('-')
 
@@ -356,13 +359,14 @@ def get_modules(t_file):
 
     # Modules for Aruba 2920 stacks
     module_2920 = {
-        'rsgw7009sp': [ ('1', 'A', 'j9731a'), ('1', 'B', 'j9731a') ],
-        'rsgw5313sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'A', 'j9731a'), ('3', 'STK', 'j9733a') ],
-        'rsgw10118sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ], 
-        'rsgw1u140sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
-        'rsgw12205sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
-        'rsgw2112sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'A', 'j9731a'), ('3', 'STK', 'j9733a') ],
-        'rsgw9108sp': [ ('1', 'A', 'j9731a'), ('1', 'STK', 'j9733a'), ('2', 'A', 'j9731a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ]
+        'rsgw7009sp': [('1', 'A', 'j9731a'), ('1', 'B', 'j9731a')],
+        'rsgw5313sp': [('1', 'A', 'j9731a'), ('2', 'A', 'j9731a'), ('3', 'A', 'j9731a')], # ('1', 'STK', 'j9733a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a')
+        'rsgw10118sp': [('1', 'A', 'j9731a'), ('2', 'A', 'j9731a')], #('1', 'STK', 'j9733a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ], 
+        'rsgw1u140sp': [('1', 'A', 'j9731a'), ('2', 'A', 'j9731a')], #('1', 'STK', 'j9733a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
+        'rsgw12205sp': [('1', 'A', 'j9731a'), ('2', 'A', 'j9731a')], #('1', 'STK', 'j9733a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
+        'rsgw2112sp': [('1', 'A', 'j9731a'), ('2', 'A', 'j9731a'), ('3', 'A', 'j9731a')], #('1', 'STK', 'j9733a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
+        'rsgw9108sp': [('1', 'A', 'j9731a'), ('2', 'A', 'j9731a')], #('1', 'STK', 'j9733a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
+        'rggw3102p': [('1', 'A', 'j9731a')]
     }
 
     names_2920 = {
@@ -373,14 +377,16 @@ def get_modules(t_file):
 
     if clean_hostname in module_2920.keys():
         for stack, module, m_type in module_2920[clean_hostname]:
+            if '0' in hostnames.keys(): stack = '0'
             modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': names_2920[module], 'stack': stack})
         return modules
 
     # Modules for Aruba Modular stacks
     module_chassis = {
         'rscs0007': [
-            ('1', 'MM1', 'j9827a'), ('1', 'A', 'j9993a'), ('1', 'B', 'j9993a'), ('1', 'C', 'j9993a'), ('1', 'D', 'j9993a'), ('1', 'E', 'j9988a'), ('1', 'F', 'j9996a'),
-            ('2', 'MM1', 'j9827a'), ('2', 'A', 'j9993a'), ('2', 'B', 'j9993a'), ('2', 'C', 'j9993a'), ('2', 'D', 'j9993a'), ('2', 'E', 'j9988a'), ('2', 'F', 'j9996a') 
+            ('1', 'A', 'j9993a'), ('1', 'B', 'j9993a'), ('1', 'C', 'j9993a'), ('1', 'D', 'j9993a'), ('1', 'E', 'j9988a'), ('1', 'F', 'j9996a'),
+            ('2', 'A', 'j9993a'), ('2', 'B', 'j9993a'), ('2', 'C', 'j9993a'), ('2', 'D', 'j9993a'), ('2', 'E', 'j9988a'), ('2', 'F', 'j9996a') 
+            #('1', 'MM1', 'j9827a'), ('2', 'MM1', 'j9827a'), 
          ]
     }
 
@@ -471,14 +477,41 @@ def module_types_dict():
 
     return None
 
+# Convert interfaces ranges from 'A' prefix to any other
+def convert_prefix(range_str, new_prefix):
+    prefix = range_str[0]
+
+    if prefix == "A":
+
+        if '-' in range_str:
+            start, end = range_str.split('-')
+            range_str = new_prefix + start[1:] + '-' + new_prefix + end[1:]
+
+            return range_str
+
+        return new_prefix + range_str[1:]
+
+    return range_str
+
 # Return a modules interfaces types dictionary from a yaml file
-def modules_interfaces():
+def modules_interfaces(model, stack_prefix = "A"):
+    model = model.lower()
+
     yaml_file = main_folder + "/data/src/modules_interfaces.yaml"
 
     with open(yaml_file, 'r') as f:
-        return yaml.safe_load(f)
+        modules = yaml.safe_load(f)
 
-    return None
+    data = {'types': {}, 'poe_mode': {}, 'poe_types': {}}
+
+    for key in modules['types'][model]:
+        converted_key = convert_prefix(key, stack_prefix)
+        data['types'][converted_key] = modules['types'][model][key]
+        
+        data['poe_mode'][converted_key] = None if key not in modules['poe_mode'] else modules['poe_mode'][model][key] 
+        data['poe_types'][converted_key] = None if key not in modules['poe_types'] else modules['poe_types'][model][key] 
+
+    return data
 
 #----- Debugging -------
 def debug_config_files(data_folder):
@@ -494,7 +527,7 @@ def debug_convert_range():
     ranges = [
         'B10-B13', 'B15-B20', 
         '1/1-1/14', '2/1-2/12',
-        '2/A2-2/A4'
+        '2/A2-2/A4', 'A21'
     ]
 
     table = []
@@ -663,7 +696,6 @@ if __name__ == "__main__":
     print("\nData folder: ", data_folder)
     #debug_get_site(data_folder)
     #debug_config_files(data_folder)
-    #debug_convert_range()
     #debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_site(data_folder)
@@ -697,7 +729,7 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/aruba-stack-2920/"
 
     print("\nData folder: ", data_folder)
-    #debug_get_modules(data_folder)
+    debug_get_modules(data_folder)
 
     data_folder = main_folder + "/data/aruba-modular-stack/"
 
@@ -747,4 +779,5 @@ if __name__ == "__main__":
 
     #print(yaml.dump(interfaces_dict()))
     #print(yaml.dump(module_types_dict()))
-    #print(yaml.dump(modules_interfaces()))
+    #print(yaml.dump(modules_interfaces("J9537A")))
+    #print(yaml.dump(modules_interfaces("J9537a", "B")))

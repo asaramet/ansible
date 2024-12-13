@@ -9,16 +9,16 @@ from std_functions import recursive_search, get_hostname, get_modules
 
 from json_functions import devices_json, trunks_json, device_interfaces_json
 from json_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
-from json_functions import ip_addresses_json, locations_json
+from json_functions import ip_addresses_json, locations_json, modules_json
 
 # Collect modular switches data and saved it to a YAML file
-def modular(data_folder, output_file_path, device_type_slags, devices_tags, module_types):
+def modular(data_folder, output_file_path, device_type_slags, devices_tags):
     files = config_files(data_folder)
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump({"modular": True}, f)
         yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
-        yaml.dump(modules_json(files, module_types), f)
+        yaml.dump(modules_json(files), f)
         yaml.dump(trunks_json(files), f)
         yaml.dump(device_interfaces_json(files), f)
         yaml.dump(vlans_json(files), f)
@@ -44,7 +44,7 @@ def main():
     }
 
     print("Update data for ProCurve modular Switches into the file: ", output_file_path) 
-    modular(data_folder, output_file_path, device_type_slags, devices_tags, module_types)
+    modular(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba Modular Switches
     data_folder = main_folder + "/data/aruba-modular/"
@@ -57,7 +57,7 @@ def main():
     }
 
     print("Update data for Aruba modular Switches into the file: ", output_file_path) 
-    modular(data_folder, output_file_path, device_type_slags, devices_tags, module_types)
+    modular(data_folder, output_file_path, device_type_slags, devices_tags)
 
 if __name__ == "__main__":
     main()

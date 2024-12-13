@@ -85,6 +85,7 @@
           parent_location: "{{ item.parent_location }}"
         state: present
       loop: "{{ locations }}"
+      when: false
 
     - name: Add switches
       tags: 

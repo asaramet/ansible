@@ -220,8 +220,8 @@ if __name__ == "__main__":
     main()
 
     # Run Debugging
-    debug_data_folder = main_folder + "/data/aruba-stack/"
-    debug_data_folder = main_folder + "/data/aruba-stack-2930/"
+    #debug_data_folder = main_folder + "/data/aruba-stack/"
+    #debug_data_folder = main_folder + "/data/aruba-stack-2930/"
     #debug_data_folder = main_folder + "/data/aruba-stack-2920/"
     #debug_data_folder = main_folder + "/data/aruba-modular-stack/"
 
