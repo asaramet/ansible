@@ -15,83 +15,6 @@ def assign_sfp_modules(t_file):
         modules = yaml.safe_load(f)
     return modules
 
-def device_interfaces_old(config_files):
-    nr_of_interfaces = {
-        'JL256A_stack': (48, '1000base-t', 'pd', 'type2-ieee802.3at'),
-        'JL075A_stack': (16, '10gbase-x-sfpp', None, None),
-        'JL693A_stack': (12, '1000base-t', 'pd', 'type2-ieee802.3at'),
-        'JL322A_stack': (48, '1000base-t', 'pd', 'type2-ieee802.3at'),
-        'J9729A_stack': (48, '1000base-t', 'pd', 'type2-ieee802.3at'),
-        'J9850A_stack': (None, None, None, None)
-    }
-
-    uplink_interfaces = {
-        'JL693A_stack': ('13-14', '1000base-t', None, None)
-    }
-
-    sfp_interfaces = {
-        'JL256A_stack': [('49-52', '10gbase-x-sfpp', None, None)],
-        'JL693A_stack': [('15-16', '10gbase-x-sfpp', None, None)],
-        #'JL322A_stack': ('A1-A4', '10gbase-x-sfpp', None, None)
-        'J9850A_stack': [
-            ('A1-A8', '10gbase-x-sfpp', None, None),
-            ('B1-B8', '10gbase-x-sfpp', None, None),
-            ('C1-C8', '10gbase-x-sfpp', None, None),
-            ('D1-D8', '10gbase-x-sfpp', None, None),
-            ('E1-E24', '1gbase-x-sfpp', None, None),
-            ('F1-F2', '40gbase-q-sfpp', None, None)
-        ]
-    }
-
-    data = {'device_interfaces':[]}
-    for t_file in config_files:
-        hostname = get_hostname(t_file)
-
-        clean_name = hostname['1'][:-2]
-
-        type_key = device_type(clean_name)
-        nr_of_i, type_of_i, poe_mode, poe_type = nr_of_interfaces[type_key]
-
-        for stack_nr, h_name in hostname.items():
-            if not nr_of_i: continue
-
-            for nr in range(1, int(nr_of_i) + 1):
-                data['device_interfaces'].append({'hostname': h_name, 'stack_nr': stack_nr, 'interface': nr, 
-                    'type': type_of_i, 'poe_mode': poe_mode, 'poe_type': poe_type})
-
-        if type_key in uplink_interfaces.keys():
-            range_of_i, type_of_i, poe_mode, poe_type = uplink_interfaces[type_key]
-            start_i, end_i = range_of_i.split('-')
-
-            for stack_nr, h_name in hostname.items():
-                for nr in range(int(start_i), int(end_i) + 1, 1):
-                    data['device_interfaces'].append({'hostname': h_name, 'stack_nr': stack_nr, 'interface': nr, 
-                        'type': type_of_i, 'poe_mode': poe_mode, 'poe_type': poe_type})
-
-        if type_key in sfp_interfaces.keys():
-            for interfaces_range in sfp_interfaces[type_key]:
-                range_of_i, type_of_i, poe_mode, poe_type = interfaces_range
-                start_i, end_i = range_of_i.split('-')
-
-                prefix_start = ''
-                if re.match(r'[^\d]+', start_i): 
-                    prefix_start = re.match(r'[^\d]+', start_i).group()
-                    prefix_end = re.match(r'[^\d]+', end_i).group()
-
-                    # Ensure the prefixes are the same
-                    if prefix_start != prefix_end:
-                        raise ValueError("Prefixes do not match")
-                    
-                    start_i = re.search(r'\d+', start_i).group()
-                    end_i = re.search(r'\d+', end_i).group()
-
-                for stack_nr, h_name in hostname.items():
-                    for nr in range(int(start_i), int(end_i) + 1, 1):
-                        data['device_interfaces'].append({'hostname': h_name, 'stack_nr': stack_nr, 'interface': prefix_start + str(nr), 
-                            'type': type_of_i, 'poe_mode': poe_mode, 'poe_type': poe_type})
-
-    return data
-
 # Collect stack switches data to a YAML file
 def stack(data_folder, output_file_path, device_type_slags, devices_tags):
     files = config_files(data_folder)
@@ -130,19 +53,6 @@ def stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
         yaml.dump(modules_json(files), f)
 
 #----- Debugging -------
-def debug_device_interfaces(data_folder):
-    files = config_files(data_folder)
-    print(device_interfaces(files))
-
-def debug_get_modules(data_folder):
-    table = []
-    headers = ["File name", "Modules"]
-    for f in config_files(data_folder):
-        table.append([ os.path.basename(f), get_modules(f) ])
-    print("\n== Debug: get_modules ==")
-    print(tabulate(table, headers, "github"))
-
-
 def test_stack_module_yaml():
     # Create test.yaml file from test folder
     data_folder = main_folder + "/data/test/"
@@ -173,7 +83,7 @@ def main():
     devices_tags = ["switch", "stack"]
 
     print("Update data for Aruba stacks into the file: ", output_file_path) 
-    #stack(data_folder, output_file_path, device_type_slags, devices_tags)
+    stack(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba 2930 stacks with LWL modules
     data_folder = main_folder + "/data/aruba-stack-2930/"
@@ -198,7 +108,7 @@ def main():
 
     devices_tags = ["switch", "stack"]
 
-    assign_sfp_modules(data_folder)
+    #assign_sfp_modules(data_folder)
 
     print("Update data for Aruba 2920 stacks into the file: ", output_file_path)
     stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
@@ -214,7 +124,7 @@ def main():
     devices_tags = ["switch", "stack"]
 
     print("Update data for Aruba modular stacks into the file: ", output_file_path)
-    #stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
+    stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
 if __name__ == "__main__":
     main()
@@ -224,7 +134,5 @@ if __name__ == "__main__":
     #debug_data_folder = main_folder + "/data/aruba-stack-2930/"
     #debug_data_folder = main_folder + "/data/aruba-stack-2920/"
     #debug_data_folder = main_folder + "/data/aruba-modular-stack/"
-
-    #debug_get_modules(debug_data_folder)
 
     #test_stack_module_yaml()

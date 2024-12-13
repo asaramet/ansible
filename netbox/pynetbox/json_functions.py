@@ -137,8 +137,6 @@ def device_interfaces_json(config_files):
         i_types = interfaces_types(t_file)
         modules = get_modules(t_file)
 
-        #print("Hostname: ", hostname, '\n')
-
         # update i_types with module interfaces
         for module in modules:
             interfaces_dict = modules_interfaces(module['type'], module['module'])
@@ -151,6 +149,8 @@ def device_interfaces_json(config_files):
         for i_tuple in get_interface_names(t_file):
             interface, name = i_tuple
             i_nr = interface
+
+            if interface == "mgmt": continue # skip management interface
 
             if '0' in hostname.keys():
                 stack_hostname = hostname['0']
@@ -391,12 +391,13 @@ def debug_modules_json(data_folder):
 if __name__ == "__main__":
     print("\n=== Singles JSON ===")
     #data_folder = main_folder + "/data/hpe-48-ports/"
-    data_folder = main_folder + "/data/hpe-8-ports/"
+    #data_folder = main_folder + "/data/hpe-8-ports/"
+    data_folder = main_folder + "/data/aruba-48-ports/"
 
     #debug_locations_json(data_folder)
     #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
+    debug_device_interfaces_json(data_folder)
     #debug_vlans_json(data_folder)
     #debug_untagged_vlans_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
@@ -459,10 +460,10 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/aruba_6100/"
 
     #debug_vlans_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
+    debug_device_interfaces_json(data_folder)  #TODO
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
     #debug_vlans_json(data_folder)
-    debug_device_interfaces_json(data_folder)  #TODO
+    #debug_device_interfaces_json(data_folder)  #TODO

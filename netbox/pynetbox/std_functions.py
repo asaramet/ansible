@@ -411,11 +411,12 @@ def get_modules(t_file):
         return modules
 
     # Aruba-OS 
+    not_modular = ["jl255a", "jl256a", "jl258a", "jl322a", "jl357a", "jl693a"]
     for line in recursive_search("module", text, True):
         m_list = line.split()
+        if m_list[3] in not_modular: return modules
 
         module = m_list[1]
-
         if '0' not in hostnames:
             stack = module
 
@@ -685,13 +686,13 @@ def debug_device_type(data_folder):
 if __name__ == "__main__":
     print("\n=== Singles ===")
     #data_folder = main_folder + "/data/aruba-8-ports/"
-    #data_folder = main_folder + "/data/aruba-12-ports/"
+    data_folder = main_folder + "/data/aruba-12-ports/"
     #data_folder = main_folder + "/data/aruba-48-ports/"
     #data_folder = main_folder + "/data/aruba-48-ports/"
     #data_folder = main_folder + "/data/aruba-modular/"
     #data_folder = main_folder + "/data/hpe-8-ports/"
     #data_folder = main_folder + "/data/hpe-48-ports/"
-    data_folder = main_folder + "/data/procurve-single/"
+    #data_folder = main_folder + "/data/procurve-single/"
 
     print("\nData folder: ", data_folder)
     #debug_get_site(data_folder)
@@ -706,7 +707,7 @@ if __name__ == "__main__":
     #debug_get_untagged_vlans(data_folder)
     #debug_get_ip_address(data_folder)
     #debug_device_type(data_folder)
-    #debug_get_modules(data_folder)
+    debug_get_modules(data_folder)
 
     print("\n=== Stacking ===")
     #data_folder = main_folder + "/data/aruba-stack/"
@@ -715,10 +716,10 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/aruba-stack-2930/"
     #print("\nData folder: ", data_folder)
 
-    debug_get_location(data_folder)
-    debug_get_room_location(data_folder)
-    debug_get_flor_nr(data_folder)
-    debug_get_site(data_folder)
+    #debug_get_location(data_folder)
+    #debug_get_room_location(data_folder)
+    #debug_get_flor_nr(data_folder)
+    #debug_get_site(data_folder)
 
     #debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
@@ -729,7 +730,7 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/aruba-stack-2920/"
 
     print("\nData folder: ", data_folder)
-    debug_get_modules(data_folder)
+    #debug_get_modules(data_folder)
 
     data_folder = main_folder + "/data/aruba-modular-stack/"
 
