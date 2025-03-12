@@ -15,6 +15,8 @@ ansible --version
 
 #ansible-playbook playbooks/sync_data.yaml | tee ${logs_folder}/sync_data.logs
 
+python3 pynetbox/yaml_singles.py &&
+
 ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,production,switches | tee ${logs_folder}/hpe_8_ports.logs &&
 ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,production,trunks | tee -a ${logs_folder}/hpe_8_ports.logs &&
 ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,production,interfaces | tee -a ${logs_folder}/hpe_8_ports.logs &&

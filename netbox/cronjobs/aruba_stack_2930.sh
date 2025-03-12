@@ -15,6 +15,8 @@ ansible --version
 
 #ansible-playbook playbooks/sync_data.yaml | tee ${logs_folder}/sync_data.logs
 
+python3 pynetbox/yaml_stacks.py &&
+
 #ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2930,production,delete_chassis | tee -a ${logs_folder}/aruba_stack_2930_ports.logs &&
 
 ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2930,production,switches | tee ${logs_folder}/aruba_stack_2930_ports.logs &&

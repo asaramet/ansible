@@ -14,6 +14,7 @@ cd $exec_folder
 ansible --version
 
 #ansible-playbook playbooks/sync_data.yaml | tee ${logs_folder}/sync_data.logs
+python3 pynetbox/yaml_singles.py &&
 
 ansible-playbook playbooks/hp_switches.yaml --tags aruba_48,production,switches | tee ${logs_folder}/aruba_48_ports.logs &&
 ansible-playbook playbooks/hp_switches.yaml --tags aruba_48,production,trunks | tee -a ${logs_folder}/aruba_48_ports.logs &&
