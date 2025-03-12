@@ -1,3 +1,16 @@
 #!/usr/bin/env bash
 
-rsync -uav --delete-excluded pynetbox 23:/opt/ansible/inventories/netbox/
+remote_srv="23:/opt/ansible/inventories/netbox/"
+
+sync_objs="
+ansible.cfg
+hosts.ini
+envs.sh
+pynetbox
+playbooks
+host_vars
+cronjobs
+src
+"
+
+rsync -uav --delete-excluded ${sync_objs} ${remote_srv}

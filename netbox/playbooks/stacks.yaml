@@ -26,12 +26,12 @@
     - name: Include development server variables
       tags: development
       include_vars:
-        file: ../data/src/development_server.yaml
+        file: ../src/development_server.yaml
 
     - name: Include production server variables
       tags: production
       include_vars:
-        file: ../data/src/production_server.yaml
+        file: ../src/production_server.yaml
 
     - name: Include data for Aruba stacked switches
       tags: aruba_stack
@@ -174,24 +174,24 @@
       loop: "{{ modules }}"
       when: "{{ modular }}"
 
-    - name: Install modules
-      tags:
-        - install_modules
-        - modules
-      netbox.netbox.netbox_module:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          device: "{{ item.device }}"
-          module_bay: "{{ item.device }}-{{ item.module_bay }}"
-          module_type: "{{ item.type }}"
-          description: "{{ item.type }}"
-          status: active
-        state: present
-      loop: "{{ modules }}"
-      when: "{{ modular }}"
-      when: false
+#    - name: Install modules
+#      tags:
+#        - install_modules
+#        - modules
+#      netbox.netbox.netbox_module:
+#        netbox_url: "{{ netbox_url }}"
+#        netbox_token: "{{ netbox_token }}"
+#        validate_certs: false
+#        data:
+#          device: "{{ item.device }}"
+#          module_bay: "{{ item.device }}-{{ item.module_bay }}"
+#          module_type: "{{ item.type }}"
+#          description: "{{ item.type }}"
+#          status: active
+#        state: present
+#      loop: "{{ modules }}"
+#      when: "{{ modular }}"
+#      when: false
 
     - name: Create Trunk interfaces as LAG
       tags:

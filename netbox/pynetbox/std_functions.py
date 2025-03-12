@@ -433,7 +433,7 @@ def get_modules(t_file):
 # --- Additional function ---
 # Return a list of devices serial numbers from the yaml file
 def serial_numbers():
-    yaml_file = main_folder + "/data/src/serial_numbers.yaml"
+    yaml_file = main_folder + "/src/serial_numbers.yaml"
 
     s_dict = {}
     with open(yaml_file, 'r') as f:
@@ -445,7 +445,7 @@ def serial_numbers():
 
 # Return a list of devices dictionary
 def devices():
-    yaml_file = main_folder + "/data/src/devices.yaml"
+    yaml_file = main_folder + "/src/devices.yaml"
 
     with open(yaml_file, 'r') as f:
         return yaml.safe_load(f)
@@ -462,7 +462,7 @@ def device_type(hostname):
 
 # Return a interfaces dictionary from a yaml file
 def interfaces_dict():
-    yaml_file = main_folder + "/data/src/interfaces.yaml"
+    yaml_file = main_folder + "/src/interfaces.yaml"
 
     with open(yaml_file, 'r') as f:
         return yaml.safe_load(f)
@@ -471,7 +471,7 @@ def interfaces_dict():
 
 # Return a module types dictionary from a yaml file
 def module_types_dict():
-    yaml_file = main_folder + "/data/src/module_types.yaml"
+    yaml_file = main_folder + "/src/module_types.yaml"
 
     with open(yaml_file, 'r') as f:
         return yaml.safe_load(f)
@@ -498,7 +498,7 @@ def convert_prefix(range_str, new_prefix):
 def modules_interfaces(model, stack_prefix = "A"):
     model = model.lower()
 
-    yaml_file = main_folder + "/data/src/modules_interfaces.yaml"
+    yaml_file = main_folder + "/src/modules_interfaces.yaml"
 
     with open(yaml_file, 'r') as f:
         modules = yaml.safe_load(f)

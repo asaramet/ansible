@@ -23,12 +23,12 @@
     - name: Include development server variables
       tags: development
       include_vars:
-        file: ../data/src/development_server.yaml
+        file: ../src/development_server.yaml
 
     - name: Include production server variables
       tags: production
       include_vars:
-        file: ../data/src/production_server.yaml
+        file: ../src/production_server.yaml
 
     - name: Include data for ProCurve modular switches 
       tags: procurve_modular

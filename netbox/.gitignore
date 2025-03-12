@@ -1,5 +1,6 @@
 data
-host_vars/99/
+src
+host_vars/rhlx99/
 pynetbox/__pycache__/
 cronjobs/logs/
 temp/
