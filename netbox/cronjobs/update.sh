@@ -12,14 +12,16 @@ export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
 cd $exec_folder
 
-ansible-playbook playbooks/sync_data.yaml | tee ${logs_folder}/sync_data.logs
+ansible-playbook playbooks/sync_data.yaml | tee ${logs_folder}/sync_data.logs &&
 
 python3 pynetbox/yaml_singles.py | tee ${logs_folder}/yaml_singles.logs  &&
 python3 pynetbox/yaml_stacks.py | tee ${logs_folder}/yaml_stacks.logs  && 
 python3 pynetbox/yaml_hpe_modular.py | tee ${logs_folder}/yaml_hpe_modular.logs  &&
 
 #python3 pynetbox/yaml_aruba_6xxx.py | tee ${logs_folder}/yaml_aruba_6xxx.logs &&
-#python3 pynetbox/yaml_cisco.py | tee ${logs_folder}/yaml_cisco.logs 
+#python3 pynetbox/yaml_cisco.py | tee ${logs_folder}/yaml_cisco.logs  &&
+
+ansible-playbook playbooks/backup_sql.yaml | tee ${logs_folder}/sync_data.logs &&
 
 cd $this_folder
 ./aruba_8_ports.sh &&

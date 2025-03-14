@@ -1,0 +1,83 @@
+---
+- name: Define global variables
+  hosts: localhost
+  gather_facts: false
+  vars: 
+    dump_folder: &dump_folder "/opt/db_dumps"
+
+    #server: &server debian12-ansible
+    server: &server hs_netbox 
+    backup_to_99: &backup_to_99 true
+    local_backup_folder: &local_backup_folder "{{ inventory_dir }}/data/db_dumps"
+
+- name: Backup media
+  hosts: *server
+  gather_facts: false
+  become: true # run as root
+  vars: 
+    dump_folder: *dump_folder
+    local_backup_folder: *local_backup_folder
+    archived_data_file: "{{ dump_folder }}/localdata.tgz"
+  tasks:
+    - name: "Create {{ dump_folder }} on the remote server"
+      file:
+        path: "{{ dump_folder }}"
+        state: directory
+        owner: postgres
+        group: postgres
+
+    - name: Backup remote data folder
+      archive:
+        path: /opt/localdata
+        dest: "{{ archived_data_file }}"
+
+    - name: "Fetch archived data to {{ local_backup_folder }}"
+      fetch:
+        src: "{{ archived_data_file }}"
+        dest: "{{ local_backup_folder }}/"
+        flat: true
+
+- name: Backup PostgreSQL database
+  hosts: *server
+  gather_facts: true
+  become: true # run as root
+  tags: postgresql
+  become_method: su
+  become_user: postgres # change to postgres user
+  vars:
+    dump_folder: *dump_folder
+    local_backup_folder: *local_backup_folder
+  tasks: 
+    - name: "Dump the 'netbox' database to {{ dump_folder }} with compression"
+      community.postgresql.postgresql_db:
+        name: netbox
+        state: dump
+        target: "{{ dump_folder }}/netbox-{{ ansible_date_time.date }}.sql.gz"
+        dump_extra_args: --exclude-table-data extras_cachedvalue --exclude-table-data extras_objectchange
+
+    - name: Backup remote data to "{{ local_backup_folder }}"
+      fetch:
+        src: "{{ dump_folder }}/netbox-{{ ansible_date_time.date }}.sql.gz"
+        dest: "{{ local_backup_folder }}/"
+        flat: true
+
+- name: Double backup to an internal server
+  hosts: rhlx99
+  gather_facts: true
+  vars:
+    backup_folder: /opt/backup_netbox
+    backup_to_99: *backup_to_99
+    local_backup_folder: *local_backup_folder
+  tasks:
+    - name: Copy to rhlx99
+      copy: 
+        src: "{{ local_backup_folder }}/{{ item }}"
+        dest: "{{ backup_folder }}"
+        owner: asaramet
+        group: asaramet
+      loop: 
+        - "netbox-{{ ansible_date_time.date }}.sql.gz"
+        - "localdata.tgz"
+      when: backup_to_99
+
+
