@@ -14,8 +14,7 @@ cd $exec_folder
 ansible --version
 
 #ansible-playbook playbooks/sync_data.yaml | tee ${logs_folder}/sync_data.logs
-
-python3 pynetbox/yaml_hpe_modular.py &&
+#python3 pynetbox/yaml_hpe_modular.py &&
 
 ansible-playbook playbooks/hp_switches.yaml --tags procurve_modular,production,switches | tee ${logs_folder}/procurve_modular.logs &&
 ansible-playbook playbooks/hp_switches.yaml --tags procurve_modular,production,modules | tee -a ${logs_folder}/procurve_modular.logs &&
