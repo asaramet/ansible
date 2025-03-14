@@ -13,19 +13,19 @@ export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 cd $exec_folder
 ansible --version
 
-#ansible-playbook playbooks/sync_data.yaml | tee ${logs_folder}/sync_data.logs
+#ansible-playbook playbooks/sync_data.yaml &> ${logs_folder}/sync_data.logs
 #python3 pynetbox/yaml_stacks.py &&
 
-#ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,delete_chassis | tee -a ${logs_folder}/aruba_stack_2920_ports.logs &&
+#ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,delete_chassis &>> ${logs_folder}/aruba_stack_2920_ports.logs &&
 
-ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,switches | tee ${logs_folder}/aruba_stack_2920_ports.logs &&
-ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,modules | tee -a ${logs_folder}/aruba_stack_2920_ports.logs &&
-ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,interfaces | tee -a ${logs_folder}/aruba_stack_2920_ports.logs &&
+ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,switches &> ${logs_folder}/aruba_stack_2920_ports.logs &&
+ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,modules &>> ${logs_folder}/aruba_stack_2920_ports.logs &&
+ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,interfaces &>> ${logs_folder}/aruba_stack_2920_ports.logs &&
 
-ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,chassis | tee -a ${logs_folder}/aruba_stack_2920_ports.logs
+ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,chassis &>> ${logs_folder}/aruba_stack_2920_ports.logs
 
-ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,trunks | tee -a ${logs_folder}/aruba_stack_2920_ports.logs &&
-ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,create_vlans | tee -a ${logs_folder}/aruba_stack_2920_ports.logs &&
-ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,untagged_vlans | tee -a ${logs_folder}/aruba_stack_2920_ports.logs &&
-ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,tagged_vlans | tee -a ${logs_folder}/aruba_stack_2920_ports.logs &&
-ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,ip | tee -a ${logs_folder}/aruba_stack_2920_ports.logs 
+ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,trunks &>> ${logs_folder}/aruba_stack_2920_ports.logs &&
+ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,create_vlans &>> ${logs_folder}/aruba_stack_2920_ports.logs &&
+ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,untagged_vlans &>> ${logs_folder}/aruba_stack_2920_ports.logs &&
+ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,tagged_vlans &>> ${logs_folder}/aruba_stack_2920_ports.logs &&
+ansible-playbook playbooks/stacks.yaml --tags aruba_stack_2920,production,ip &>> ${logs_folder}/aruba_stack_2920_ports.logs 

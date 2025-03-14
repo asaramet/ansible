@@ -13,13 +13,13 @@ export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 cd $exec_folder
 ansible --version
 
-#ansible-playbook playbooks/sync_data.yaml | tee ${logs_folder}/sync_data.logs
+#ansible-playbook playbooks/sync_data.yaml &> ${logs_folder}/sync_data.logs
 #python3 pynetbox/yaml_singles.py &&
 
-ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,switches | tee ${logs_folder}/procurve_single.logs &&
-ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,trunks | tee -a ${logs_folder}/procurve_single.logs &&
-ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,interfaces | tee -a ${logs_folder}/procurve_single.logs &&
-ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,create_vlans | tee -a ${logs_folder}/procurve_single.logs &&
-ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,untagged_vlans | tee -a ${logs_folder}/procurve_single.logs &&
-ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,tagged_vlans | tee -a ${logs_folder}/procurve_single.logs &&
-ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,ip | tee -a ${logs_folder}/procurve_single.logs
+ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,switches &> ${logs_folder}/procurve_single.logs &&
+ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,trunks &>> ${logs_folder}/procurve_single.logs &&
+ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,interfaces &>> ${logs_folder}/procurve_single.logs &&
+ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,create_vlans &>> ${logs_folder}/procurve_single.logs &&
+ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,untagged_vlans &>> ${logs_folder}/procurve_single.logs &&
+ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,tagged_vlans &>> ${logs_folder}/procurve_single.logs &&
+ansible-playbook playbooks/hp_switches.yaml --tags procurve_single,production,ip &>> ${logs_folder}/procurve_single.logs
