@@ -35,9 +35,34 @@ Packages:
 - `backup_sql.yaml` - dump the Postgresql database and back it up to local host.
 - `create_admin.yaml` - create a Django superuser on the remote server
 - `install.yaml` - install the required apps and start NetBox on the server
-- `pip_packages.yaml` - create a local python virtual environment and download required packages
 - `plugins.yaml` - install NetBox plugins on the remote server. You should then update the "PLUGINS" keyword in `configuration.py` and update NetBox by running the `install.yaml` playbook with `reboot: true` option.
 - `restore_sql.yaml` - Restore PostgreSQL database from a backup dump file and archived media.
+- `update_packages.yaml` - Update NetBox version and required Python packages locally.
+- `update_server.yaml` - Debian server full system update & cleanup.
+
+## Managing Python Versions with `pyenv`  
+
+The server is based on **Debian 12**, which comes with **Python 3.11.2** by default. However, other distributions, such as **Arch Linux**, may have a newer version. Some required project dependencies may not be backward-compatible with older Python versions.  
+
+To address this, we use **`pyenv`** to manage Python versions. This allows us to:  
+
+1. Install **Python 3.11** within a controlled environment.  
+2. Set it as the default version for a specific directory where **Ansible update tasks** will run.  
+
+### Useful `pyenv` Commands  
+
+```bash
+# Show available Python versions managed by pyenv
+pyenv versions  
+
+# Set a specific Python version for the current shell session
+pyenv shell 3.11.2  
+
+# Set a specific Python version for the current project directory (creates a .python-version file)
+pyenv local 3.11.2  
+```
+
+By using **`pyenv local`**, the selected Python version will be automatically activated whenever you enter the designated project directory.  
 
 ## Download a release
 

@@ -1,0 +1,71 @@
+---
+# Update NetBox version and required Python packages locally
+#
+# Constants:
+# 
+# netbox_version - defined in `host_vars/localhost/vars.yaml`
+
+- name: Download required files to localhost
+  hosts: localhost
+  gather_facts: false
+  tags: global
+  vars: 
+    inventory_dir: "{{ playbook_dir }}/.."
+    releases_dir: "{{ inventory_dir }}/src/releases"
+    netbox_src_dir: "{{ releases_dir }}/netbox-{{ netbox_version }}"
+    requirements_txt: "{{ releases_dir }}/requirements-{{ netbox_version }}.txt"
+    venv_path: "{{ inventory_dir }}/pip_packages" 
+  
+  tasks:
+    - name: Download the new NetBox release
+      ansible.builtin.get_url:
+        url: "https://github.com/netbox-community/netbox/archive/refs/tags/v{{ netbox_version }}.tar.gz"
+        dest: "{{ releases_dir }}"
+
+    - name: Temporary extract contents of tar.gz to "{{ releases_dir }}"
+      ansible.builtin.unarchive:
+        src: "{{ netbox_src_dir }}.tar.gz"
+        dest: "{{ releases_dir }}"
+
+    - name: Get requirements.txt
+      ansible.builtin.copy:
+        src: "{{ netbox_src_dir }}/requirements.txt"
+        dest: "{{ requirements_txt }}"
+
+    - name: Remove temporary extracted "{{ netbox_src_dir }}"
+      ansible.builtin.file:
+        path: "{{ netbox_src_dir }}"
+        state: absent
+
+    - name: Append required plugins to requirements-{{ netbox_version }}.txt
+      ansible.builtin.blockinfile:
+        path: "{{ requirements_txt }}"
+
+    - name: Append plugins to requirements-{{ netbox_version }}.txt
+      ansible.builtin.blockinfile:
+        path: "{{ requirements_txt }}"
+        block: |
+          netbox-documents
+          netbox-plugin-dns
+          netbox-qrcode
+          netbox-reorder-rack
+          netbox-topology-views
+          netbox-inventory
+        insertafter: EOF
+
+    - name: Remove existing virtual environment folder
+      ansible.builtin.file: 
+        path: "{{ venv_path }}"
+        state: absent 
+
+    - name: Create a new virtual environment
+      ansible.builtin.shell:
+        cmd: "python3.11 -m venv {{ venv_path }}"
+        executable: /usr/bin/bash
+
+    - name: Download required packaged
+      ansible.builtin.shell:
+        cmd: "source bin/activate && pip download -r {{ requirements_txt }} -d packages"
+        executable: /usr/bin/bash
+        chdir: "{{ venv_path }}"
+... 

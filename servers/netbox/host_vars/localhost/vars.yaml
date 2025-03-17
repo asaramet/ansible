@@ -1,0 +1,4 @@
+---
+#netbox_version: 4.2.5
+netbox_version: &netbox_version "4.2.5"
+...
