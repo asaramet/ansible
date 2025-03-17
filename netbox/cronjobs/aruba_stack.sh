@@ -11,6 +11,8 @@ logs_folder=${this_folder}/logs
 export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
 cd $exec_folder
+
+echo "== Updating Aruba stacked switches - $(date)"
 ansible --version
 
 #ansible-playbook playbooks/sync_data.yaml &> ${logs_folder}/sync_data.logs
@@ -26,3 +28,5 @@ ansible-playbook playbooks/stacks.yaml --tags aruba_stack,production,create_vlan
 ansible-playbook playbooks/stacks.yaml --tags aruba_stack,production,untagged_vlans &>> ${logs_folder}/aruba_stack_ports.logs &&
 ansible-playbook playbooks/stacks.yaml --tags aruba_stack,production,tagged_vlans &>> ${logs_folder}/aruba_stack_ports.logs &&
 ansible-playbook playbooks/stacks.yaml --tags aruba_stack,production,ip &>> ${logs_folder}/aruba_stack_ports.logs
+
+echo "== Done updating Aruba stacked switches - $(date)"

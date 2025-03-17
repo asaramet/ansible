@@ -12,8 +12,7 @@ export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
 cd $exec_folder
 
-echo "== Updating Aruba 6xxx Switches..."
-
+echo "== Updating Aruba 6xxx Switches - $(date)"
 ansible --version
 
 #ansible-playbook playbooks/sync_data.yaml &>> ${logs_folder}/sync_data.logs
@@ -34,4 +33,4 @@ ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,ip &>> $
 ansible-playbook playbooks/aruba_6xxx.yaml --tags aruba_6300,production,interfaces &>> ${logs_folder}/aruba_6300.logs
 
 
-echo "== Done updating Aruba 6xxx Switches...
+echo "== Done updating Aruba 6xxx Switches - $(date)"

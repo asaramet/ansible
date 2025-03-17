@@ -11,6 +11,8 @@ logs_folder=${this_folder}/logs
 export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
 cd $exec_folder
+
+echo "== Updating HPE 8 Ports switches - $(date)"
 ansible --version
 
 #ansible-playbook playbooks/sync_data.yaml &> ${logs_folder}/sync_data.logs
@@ -23,3 +25,5 @@ ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,production,create_vlans
 ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,production,untagged_vlans &>> ${logs_folder}/hpe_8_ports.logs &&
 ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,production,tagged_vlans &>> ${logs_folder}/hpe_8_ports.logs &&
 ansible-playbook playbooks/hp_switches.yaml --tags hpe_8,production,ip &>> ${logs_folder}/hpe_8_ports.logs
+
+echo "== Done updating HPE 8 Ports switches - $(date)"
