@@ -64,59 +64,30 @@ pyenv local 3.11.2
 
 By using **`pyenv local`**, the selected Python version will be automatically activated whenever you enter the designated project directory.  
 
-## Download a release
-
-  [Netbox Releases](https://github.com/netbox-community/netbox/releases)
-
-  ```bash
-  cd <FOLDER>/ansible/servers/netbox/src/
-  wget https://github.com/netbox-community/netbox/archive/refs/tags/v<NEW_VERSION>.tar.gz
-  ```
-  
 ## Update NetBox
 
-As example will take NetBox version: `4.0.9`
+1. Download a new release and new Python packages locally
 
-1. Check if requirements are updated or conformed in the corresponding file.
+    [Netbox Releases](https://github.com/netbox-community/netbox/releases)
 
-    i.e:  `src/requirements-{version}.txt`
-    Ex:   `src/requirements-4.0.9.txt`
+    Set the NetBox version in `host_vars/localhost/vars.yaml`
 
-   NB: Don't forget to add NetBox plugins into new `requirements-x.x.x.txt` file.
-
-2. Update/Download python packages.
-
-    Playbook: `playbooks/pip_packages.yaml`
-    Update variable in the playbook: `netbox_version`
-      Ex: `netbox_version: 4.0.9`
-
-    Run the script:
+    Run the playbook:
 
     ```bash
-    pyenv shell 3.11.2
-    ansible-playbook playbooks/pip_packages.yaml 
+    ansible-playbook playbooks/update_packages.yaml
     ```
 
-3. Run the install script on development server
+2. Update the development server
 
     Playbook: `playbooks/install.yaml`
-    Update variable in the playbook: `netbox_version`
-      Ex: `netbox_version: &netbox_version 4.0.9`
-
-    Set development variables. Ex:
-
-    ```yaml
-    server: &server debian12-ansible
-    production: &production false
-    ```
-
-    Run the script:
 
     ```bash
+    ansible-playbook playbooks/update_server.yaml
     ansible-playbook playbooks/install.yaml
     ```
 
-4. Backup production server database
+3. Backup production server database
 
     Playbook: `playbooks/backup_sql.yaml`
 
@@ -126,32 +97,11 @@ As example will take NetBox version: `4.0.9`
     ansible-playbook playbooks/backup_sql.yaml
     ```
 
-5. Update Linux packages
-
-    ```bash
-    ssh root@rzlx8750
-
-      apt update
-      apt upgrade
-      apt autoremove
-      reboot
-    ```
-
-6. Update the production server
-
-    Playbook: `playbooks/install.yaml`
-    Update variable in the playbook: `netbox_version`
-      Ex: `netbox_version: &netbox_version 4.0.9`
-
-    Set development variables. Ex:
-
-    ```yaml
-    server: &server hs_netbox 
-    production: &production true
-    ```
+4. Update the production server
 
     Run the script:
 
     ```bash
-    ansible-playbook playbooks/install.yaml
+    ansible-playbook playbooks/update_server.yaml -e production=true
+    ansible-playbook playbooks/install.yaml -e production=true
     ```

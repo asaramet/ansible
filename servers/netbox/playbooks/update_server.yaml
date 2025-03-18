@@ -1,16 +1,32 @@
 ---
 # Debian server full system update & cleanup
 #
-# Constants:
+# RUN:
+# - development server
+#   ansible-playbook playbooks/update_server.yaml
 # 
-# hosts:
-#  - 'debian12-ansible' - local VM
-#  - 'hs-netbox' - production server (HE)
-#
+# - production server
+#   ansible-playbook playbooks/update_server.yaml -e production=true
+
+- name: Define production and development servers
+  hosts: localhost
+  vars:
+    production: false
+  tasks:
+    - name: Set server 
+      set_fact:
+        server: "{{ 'hs_netbox' if  production else 'debian12_ansible' }}"
+
+    - name: "Running updates on: "
+      debug:
+        msg: "{{ server }}"
+
+    - name: "Is it a production server?"
+      debug:
+        msg: "{{ production }}"
 
 - name: Full system update and cleanup
-  #hosts: debian12-ansible
-  hosts: hs_netbox 
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   tags: global
   become: true
@@ -34,7 +50,6 @@
         - redis-server
         - python3-dev 
         - python3-venv 
-        #- python3-virtualenv # will be depricated and not needed in later Django module versions
         - build-essential 
         - libxml2-dev 
         - libxslt1-dev 
@@ -63,7 +78,9 @@
 
     - name: Show kernels
       debug:
-        msg: "Running Kernel: linux-image-{{ running_kernel.stdout }} \nInstalled Kernel: {{ installed_kernel.stdout_lines }}"
+        msg: 
+          - "Running Kernel: linux-image-{{ running_kernel.stdout }}" 
+          - "Installed Kernel: {{ installed_kernel.stdout_lines }}"
 
     - name: Reboot if a new kernel is installed
       ansible.builtin.reboot:

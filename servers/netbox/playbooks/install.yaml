@@ -1,46 +1,36 @@
 ---
+# Install / update NetBox on a Debian Linux server
+#
+# RUN
+# - development server
+#   ansible-playbook playbooks/update_server.yaml
+#
+# - production server
+#    ansible-playbook playbooks/update_server.yaml -e production=true
+
 - name: Define global variables
   hosts: localhost
   gather_facts: false
   tags: global
   vars: 
-    #netbox_version: &netbox_version 4.2.2
+    production: false
     sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
 
-    server: &server debian12-ansible
-    production: &production false
-    #server: &server hs_netbox 
-    #production: &production true
-    reboot: &reboot false
+  tasks:
+    - name: Set server 
+      set_fact:
+        server: "{{ 'hs_netbox' if  production else 'debian12_ansible' }}"
 
-- name: Install packages and dependencies for NetBox
-  hosts: *server
-  gather_facts: false
-  become: true # run as root
-  tags: apt_install
-  tasks: 
-    - name: apt install
-      apt: 
-        pkg: "{{ item }}"
-        state: latest
-        update_cache: true
-      loop:
-        - postgresql
-        - python3-psycopg2
-        - redis-server
-        - python3-dev 
-        - python3-venv 
-        - python3-virtualenv # will be depricated and not needed in later Django module versions
-        - build-essential 
-        - libxml2-dev 
-        - libxslt1-dev 
-        - libffi-dev 
-        - libpq-dev 
-        - libssl-dev 
-        - zlib1g-dev
+    - name: "Running install on: "
+      debug:
+        msg: "{{ server }}"
+
+    - name: "Is it a production server?"
+      debug:
+        msg: "{{ production }}"
 
 - name: Configure PostgreSQL on Debian
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true # run as root
   tags: postgresql
@@ -63,16 +53,16 @@
         comment: NetBox as a user
 
 - name: Configure default apps
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true # run as root
   tags: apps
   vars:
-    netbox_version: *netbox_version
+    netbox_version: &netbox_version "{{ hostvars['localhost']['netbox_version'] }}" # inherit the variable from localhost
   tasks:
     - name: Unpack the netbox package version "{{ netbox_version }}" from local folder to '/opt'
       unarchive:
-        src: "{{ inventory_dir }}/src/v{{ netbox_version }}.tar.gz"
+        src: "{{ inventory_dir }}/src/releases/netbox-{{ netbox_version }}.tar.gz"
         dest: /opt
 
     - name: Create a relative symlink to the 'netbox' folder
@@ -116,7 +106,7 @@
         backup: yes
 
 - name: Install python apps in netbox virtual environment
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true # run as root
   tags: pip
@@ -125,7 +115,7 @@
   tasks:
     - name: Copy local requirements.txt to the remote 'netbox' virtual environment
       copy:
-        src: "{{ inventory_dir }}/src/requirements-{{ netbox_version }}.txt"
+        src: "{{ inventory_dir }}/src/releases/requirements-{{ netbox_version }}.txt"
         dest: /opt/netbox/requirements.txt
         owner: root
         mode: 664
@@ -150,7 +140,7 @@
       #when: no
 
 - name: Link local postgresql folders
-  hosts: *server 
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true # run as root
   tags: localdata
@@ -192,7 +182,7 @@
       loop: "{{ folders }}"
 
 - name: Configure Django settings
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true # run as root
   tags: django
@@ -237,7 +227,7 @@
         virtualenv: "{{ virtualenv }}"
 
 - name: Enable and run NetBox services
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true # run as root
   tags: services
@@ -261,12 +251,12 @@
         - netbox-rq
 
 - name: Install and configure the HTTP server
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true # run as root
   tags: http
   vars: 
-    production: *production
+    production: false
   tasks:
     - name: apt install nginx
       apt: 
@@ -335,20 +325,13 @@
         enabled: yes
 
 - name: Reboot the services
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true 
   tags: reboot
-  vars:
-    reboot: *reboot
   tasks:
     - name: Restart the netbox service
       service: 
         name: netbox
         state: restarted
         enabled: yes
-
-    - name: Reboot the server 
-      reboot:
-      when: reboot
-...
