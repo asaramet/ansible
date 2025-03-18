@@ -1,17 +1,37 @@
 ---
+# Backup the NetBoxes Postgres database 
+#
+# RUN
+# - development server
+#   ansible-playbook playbooks/backup_sql.yaml -e production=false
+#
+# - production server
+#    ansible-playbook playbooks/backup_sql.yaml
+
 - name: Define global variables
   hosts: localhost
   gather_facts: false
   vars: 
     dump_folder: &dump_folder "/opt/db_dumps"
-
-    #server: &server debian12-ansible
-    server: &server hs_netbox 
     backup_to_99: &backup_to_99 true
     local_backup_folder: &local_backup_folder "{{ inventory_dir }}/data/db_dumps"
+    production: true
+
+  tasks:
+    - name: Set server 
+      set_fact:
+        server: "{{ 'hs_netbox' if  production else 'debian12_ansible' }}"
+
+    - name: "Backup data from: "
+      debug:
+        msg: "{{ server }}"
+
+    - name: "Is it a production server?"
+      debug:
+        msg: "{{ production }}"
 
 - name: Backup media
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true # run as root
   vars: 
@@ -38,7 +58,7 @@
         flat: true
 
 - name: Backup PostgreSQL database
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: true
   become: true # run as root
   tags: postgresql

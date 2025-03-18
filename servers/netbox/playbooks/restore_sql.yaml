@@ -8,7 +8,7 @@
 
     from_local: &from_local false
     #from_local: &from_local true
-    server: &server debian12-ansible
+    server: &server debian12_ansible
     #server: &server hs_netbox 
 
 - name: Stop the services

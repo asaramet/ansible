@@ -3,10 +3,10 @@
 #
 # RUN
 # - development server
-#   ansible-playbook playbooks/update_server.yaml
+#   ansible-playbook playbooks/install.yaml
 #
 # - production server
-#    ansible-playbook playbooks/update_server.yaml -e production=true
+#    ansible-playbook playbooks/install.yaml -e production=true
 
 - name: Define global variables
   hosts: localhost
