@@ -51,32 +51,32 @@ def devices_json(config_files, type_slags, tags):
 
     return data
 
-def device_interfaces_json(config_files):
-    data = {"device_interfaces":[]}
+#def device_interfaces_json(config_files):
+#    data = {"device_interfaces":[]}
 
-    for f in config_files:
-        interfaces = get_interfaces_config(f)["physical"].keys()
+#    for f in config_files:
+#        interfaces = get_interfaces_config(f)["physical"].keys()
 
-        hostnames = get_hostname(f)
-        if '0' in hostnames.keys():
-            hostnames['1'] = hostnames['0']
+#        hostnames = get_hostname(f)
+#        if '0' in hostnames.keys():
+#            hostnames['1'] = hostnames['0']
 
-        i_types = interfaces_types(f)
+#        i_types = interfaces_types(f)
 
-        for value in interfaces:
-            _, interface = value.split()
+#        for value in interfaces:
+#            _, interface = value.split()
 
-            stack_nr, _, pos_nr = interface.split('/')
+#            stack_nr, _, pos_nr = interface.split('/')
 
-            poe_mode = i_types['poe_mode'][pos_nr] if i_types['poe_mode'] else None
-            poe_type = i_types['poe_type'][pos_nr] if i_types['poe_type'] else None
+#            poe_mode = i_types['poe_mode'][pos_nr] if i_types['poe_mode'] else None
+#            poe_type = i_types['poe_type'][pos_nr] if i_types['poe_type'] else None
             
-            data["device_interfaces"].append({
-                'device': hostnames[stack_nr], 'type': i_types['type'][pos_nr],
-                'interface': interface, 'stack_nr': stack_nr, 
-                'poe_mode': poe_mode, 'poe_type': poe_type })
+#            data["device_interfaces"].append({
+#                'device': hostnames[stack_nr], 'type': i_types['type'][pos_nr],
+#                'interface': interface, 'stack_nr': stack_nr, 
+#                'poe_mode': poe_mode, 'poe_type': poe_type })
 
-    return data
+#    return data
 
 # create ip_addresses json objects list
 def ip_addresses_json(config_files):
@@ -203,7 +203,7 @@ if __name__ == "__main__":
     config_file = data_folder + "rggw1018bp"
 
     #debug_devices_json(data_folder)
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
     #debug_ip_addresses_json(data_folder)
     #debug_lags_json(data_folder)
     #debug_interfaces_json(data_folder)
@@ -214,7 +214,7 @@ if __name__ == "__main__":
     config_file = data_folder + "rgcs0006"
 
     #debug_devices_json(data_folder)
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
     #debug_ip_addresses_json(data_folder)
     #debug_lags_json(data_folder)
     #debug_interfaces_json(data_folder)

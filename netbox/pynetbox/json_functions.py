@@ -130,47 +130,54 @@ def trunks_json(config_files):
     return data
 
 def device_interfaces_json(config_files):
-    data = {'device_interfaces':[]}
+    data = {'device_interfaces': []}
 
     for t_file in config_files:
         hostname = get_hostname(t_file)
         i_types = interfaces_types(t_file)
-        modules = get_modules(t_file)
 
-        # update i_types with module interfaces
-        for module in modules:
+        # Process module interfaces (only if modules exist)
+        for module in get_modules(t_file):
             interfaces_dict = modules_interfaces(module['type'], module['module'])
-            for keys_range in interfaces_dict['types'].keys():
+            for keys_range in interfaces_dict['types']:
                 for key in convert_range(keys_range):
-                    i_types['type'][key] = interfaces_dict['types'][keys_range]
-                    i_types['poe_type'][key] = interfaces_dict['poe_types'][keys_range]
-                    i_types['poe_mode'][key] = interfaces_dict['poe_mode'][keys_range]
+                    i_types["type"][key] = interfaces_dict['types'][keys_range]
+                    i_types["poe_type"][key] = interfaces_dict['poe_types'].get(keys_range)
+                    i_types["poe_mode"][key] = interfaces_dict['poe_mode'].get(keys_range)
 
-        for i_tuple in get_interface_names(t_file):
-            interface, name = i_tuple
-            i_nr = interface
+        for interface, name in get_interface_names(t_file):
+            if interface == "mgmt":  
+                continue  # Skip management interface
 
-            if interface == "mgmt": continue # skip management interface
+            i_nr = interface.split('/')[-1]  # Extract last part of interface
+            stack_hostname = hostname.get('0', hostname.get(interface.split('/')[0]))
 
-            if '0' in hostname.keys():
-                stack_hostname = hostname['0']
+            if stack_hostname is None:  
+                continue  # Skip if hostname resolution fails
 
-            else:
-                stack_nr, i_nr = interface.split('/', 1)
-                if '/' in i_nr:
-                    _, i_nr = interface.split('/')
+            # Ensure missing keys are set to None
+            entry = {
+                'hostname': stack_hostname,
+                'interface': interface,
+                'name': name,
+                #'default_interface': i_nr,
+                'type': i_types["type"].get(i_nr),
+                'poe_mode': i_types["poe_mode"].get(i_nr),
+                'poe_type': i_types["poe_type"].get(i_nr)
+            }
 
-                stack_hostname = hostname[stack_nr]
+            if entry not in data['device_interfaces']:
+                data['device_interfaces'].append(entry)
 
-            if {'hostname': stack_hostname, 'interface': interface, 'name': name} not in data['device_interfaces']:
+    return data
 
-                if not i_types["poe_type"] or ( i_nr not in i_types["poe_type"].keys()):
-                    i_types["poe_type"][i_nr] = None
-                    i_types["poe_mode"][i_nr] = None
+def delete_default_interfaces_json(config_files):
+    data = {'delete_interfaces': []}
 
-                data['device_interfaces'].append({'hostname': stack_hostname, 'interface': interface, 'name': name, "default_interface": i_nr,
-                    'type': i_types["type"][i_nr], 'poe_mode': i_types["poe_mode"][i_nr], 'poe_type': i_types["poe_type"][i_nr]
-                })
+    for t_file in config_files:
+        hostname = get_hostname(t_file)
+        i_types = interfaces_types(t_file)
+
 
     return data
 
@@ -324,7 +331,11 @@ def debug_devices_json(data_folder):
       'JL693A_stack': "hpe-aruba-2930f-12g-poep-2sfpp",
       'JL322A_stack': 'hpe-aruba-2930m-48g-poep',
       "JL679A": "hpe-aruba-6100-12g-poe4-2sfpp",
-      "JL658A_stack": "hpe-aruba-6300m-24sfpp-4sfp56"
+      "JL658A_stack": "hpe-aruba-6300m-24sfpp-4sfp56",
+      "JL255A": "hpe-aruba-2930f-24g-poep-4sfpp",
+      "JL256A": "hpe-aruba-2930f-48g-poep-4sfpp",
+      "JL322A": "hpe-aruba-2930m-48g-poep",
+      "JL357A": "hpe-aruba-2540-48g-poep-4sfpp"
     }
 
     files = config_files(data_folder)
@@ -356,6 +367,14 @@ def debug_device_interfaces_json(data_folder):
     output = yaml.dump(device_interfaces_json(files))
 
     print("\n'device_interfaces_json()' Output: for ", data_folder)
+    print(output)
+
+def debug_delete_default_interfaces_json(data_folder):
+    files = config_files(data_folder)
+    devices_tags = ["switch"]
+    output = yaml.dump(delete_default_interfaces_json(files))
+
+    print("\n'delete_default_interfaces_json()' Output: for ", data_folder)
     print(output)
 
 def debug_untagged_vlans_json(data_folder):
@@ -397,13 +416,14 @@ if __name__ == "__main__":
     #debug_locations_json(data_folder)
     #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
     #debug_vlans_json(data_folder)
     #debug_untagged_vlans_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
     #debug_ip_addresses_json(data_folder)
 
     #debug_device_interfaces_json(data_folder)
+    debug_delete_default_interfaces_json(data_folder)
 
     print("\n=== ProCurve Singles JSON ===")
     data_folder = main_folder + "/data/procurve-single/"
@@ -416,7 +436,7 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/aruba-stack-2920/"
     #debug_device_interfaces_json(data_folder)
 
-    print("\n=== Stacking 2930 JSON ===")
+    #print("\n=== Stacking 2930 JSON ===")
     data_folder = main_folder + "/data/aruba-stack-2930/"
     #debug_device_interfaces_json(data_folder)
 
@@ -433,6 +453,7 @@ if __name__ == "__main__":
 
     #debug_device_interfaces_json(data_folder)
     #debug_modules_json(data_folder)
+    debug_delete_default_interfaces_json(data_folder)
 
     print("\n=== ProCurve Modular JSON ===")
     data_folder = main_folder + "/data/procurve-modular/"
@@ -442,12 +463,16 @@ if __name__ == "__main__":
     #debug_device_interfaces_json(data_folder)
     #debug_modules_json(data_folder)
 
+    debug_delete_default_interfaces_json(data_folder)
+
     print("\n=== Aruba Modular JSON ===")
     data_folder = main_folder + "/data/aruba-modular/"
 
     #debug_locations_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     #debug_modules_json(data_folder)
+
+    debug_delete_default_interfaces_json(data_folder)
 
     print("\n=== Aruba Modular Stack JSON ===")
     data_folder = main_folder + "/data/aruba-modular-stack/"
@@ -456,14 +481,20 @@ if __name__ == "__main__":
     #debug_device_interfaces_json(data_folder)
     #debug_modules_json(data_folder)
 
+    debug_delete_default_interfaces_json(data_folder)
+
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
 
     #debug_vlans_json(data_folder)
-    debug_device_interfaces_json(data_folder)  #TODO
+    #debug_device_interfaces_json(data_folder)
+
+    debug_delete_default_interfaces_json(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
     #debug_vlans_json(data_folder)
-    #debug_device_interfaces_json(data_folder)  #TODO
+    #debug_device_interfaces_json(data_folder)
+
+    debug_delete_default_interfaces_json(data_folder)

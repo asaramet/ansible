@@ -42,29 +42,22 @@ def recursive_search(pattern, text, start=False):
 
 # return a tuple (section, value), ex: (interface, interface_name), recursively from a switch config
 def recursive_section_search(text, section, value):
-    # Base case
-    if not text:
-        return []
-
     names_tuple = []
-    for i, line in enumerate(text):
+    section_value = None
 
-        if line.startswith(section):
-            # Found a section line
-            section_value = line.split()[1]
+    for line in text:
+        stripped_line = line.strip()
 
-            # Collect lines until 'exit' is found
-            j = i + 1
-            while j < len(text) and not (text[j].strip().startswith('exit') or text[j].strip().startswith(section)):
-                next_line = text[j].strip()
-                if next_line.startswith(value):
-                    found_value = next_line.split(' ', 1)[1].strip('"')
-                    names_tuple.append((section_value, found_value))
-                j += 1
+        if stripped_line.startswith(section):
+            section_value = stripped_line.split()[1]  # Extract interface name
+            continue
 
-            # Recur from the line after the 'exit' line
-            names_tuple += recursive_section_search(text[i + 1:], section, value)
-            break
+        if section_value and stripped_line.startswith(value):
+            found_value = stripped_line.split(' ', 1)[1].strip('"')
+            names_tuple.append((section_value, found_value))
+
+        if stripped_line in ["exit", "!"]:  # Common section termination keywords
+            section_value = None  # Reset section
 
     return names_tuple
 
@@ -301,7 +294,10 @@ def get_interface_names(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    return recursive_section_search(text, 'interface', 'name')
+    names = recursive_section_search(text, 'interface', 'name')
+    names += recursive_section_search(text, 'interface', 'description')
+
+    return names
 
 def get_vlans(t_file):
     with open(t_file, "r") as f:
@@ -701,13 +697,13 @@ if __name__ == "__main__":
     #debug_get_device_role(data_folder)
     #debug_get_site(data_folder)
     #debug_get_trunks(data_folder)
-    #debug_get_interface_names(data_folder)
+    debug_get_interface_names(data_folder)
     #debug_get_vlans(data_folder)
     #debug_get_vlans_names(data_folder)
     #debug_get_untagged_vlans(data_folder)
     #debug_get_ip_address(data_folder)
     #debug_device_type(data_folder)
-    debug_get_modules(data_folder)
+    #debug_get_modules(data_folder)
 
     print("\n=== Stacking ===")
     #data_folder = main_folder + "/data/aruba-stack/"
@@ -766,6 +762,7 @@ if __name__ == "__main__":
     #debug_get_ip_address(data_folder)
     #debug_get_vlans(data_folder)
     #debug_get_modules(data_folder)
+    debug_get_interface_names(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
@@ -782,3 +779,4 @@ if __name__ == "__main__":
     #print(yaml.dump(module_types_dict()))
     #print(yaml.dump(modules_interfaces("J9537A")))
     #print(yaml.dump(modules_interfaces("J9537a", "B")))
+    debug_get_interface_names(data_folder)

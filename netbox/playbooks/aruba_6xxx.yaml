@@ -86,40 +86,40 @@
         state: present
       loop: "{{ devices }}"
 
-    - name: Delete default interfaces
-      tags: 
-        - delete_default_interfaces
-        - switches
-      netbox.netbox.netbox_device_interface:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        update_vc_child: true
-        data:
-          device: "{{ item.device }}"
-          name: "{{ '1' + item.interface[1:] }}" # delete '1/x/x' interfaces
-        state: absent
-      loop: "{{ device_interfaces }}"
-      when: "{{ chassis }} and {{ item.stack_nr != '1' }}" # if chassis is not an empty list
+#    - name: Delete default interfaces
+#      tags: 
+#        - delete_default_interfaces
+#        #- switches
+#      netbox.netbox.netbox_device_interface:
+#        netbox_url: "{{ netbox_url }}"
+#        netbox_token: "{{ netbox_token }}"
+#        validate_certs: false
+#        update_vc_child: true
+#        data:
+#          device: "{{ item.hostname }}"
+#          name: "{{ '1' + item.interface[1:] }}" # delete '1/x/x' interfaces
+#        state: absent
+#      loop: "{{ device_interfaces }}"
+#      when: chassis | length > 0 and chassis[0].name == item.hostname.split('-')[0] # if chassis is not an empty list and the chassis['name'] is the hostname
 
-    - name: Add stack interfaces
-      tags: 
-        - stack_interfaces
-        - switches
-      netbox.netbox.netbox_device_interface:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        update_vc_child: true
-        data:
-          device: "{{ item.device }}"
-          name: "{{ item.interface }}"
-          type: "{{ item.type }}"
-          poe_mode: "{{ item.poe_mode }}"
-          poe_type: "{{ item.poe_type }}"
-        state: present
-      loop: "{{ device_interfaces }}"
-      when: "{{ chassis }} and {{ item.stack_nr != '1' }}"
+#    - name: Add stack interfaces
+#      tags:
+#        - switches
+#      netbox.netbox.netbox_device_interface:
+#        netbox_url: "{{ netbox_url }}"
+#        netbox_token: "{{ netbox_token }}"
+#        validate_certs: false
+#        update_vc_child: true
+#        data:
+#          device: "{{ item.hostname }}"
+#          name: "{{ item.interface }}"
+#          type: "{{ item.type }}"
+#          poe_mode: "{{ item.poe_mode }}"
+#          poe_type: "{{ item.poe_type }}"
+#        state: present
+#      loop: "{{ device_interfaces }}"
+#      #when: "{{ chassis }} and {{ item.stack_nr != '1' }}"
+#      when: chassis | length > 0 and chassis[0].name == item.hostname.split('-')[0] # if chassis is not an empty list and the chassis['name'] is the hostname
 
     - name: Delete virtual chassis 
       tags: 
@@ -137,6 +137,7 @@
       tags: 
         - create_chassis
         - chassis
+        - switches
       netbox.netbox.netbox_virtual_chassis:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -148,12 +149,14 @@
             - stack
         state: present
       loop: "{{ chassis }}"
-      when: "{{ chassis }}" # if chassis is not an empty list
+      when: chassis # if chassis is not an empty list
+      #when: chassis | length > 0 and chassis[0].name == item.hostname.split('-')[0] # if chassis is not an empty list and the chassis['name'] is the hostname
 
     - name: Assign switches to chassis
       tags: 
         - assign_switches
         - chassis
+        - switches
       netbox.netbox.netbox_device:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -171,7 +174,7 @@
           vc_priority: "{{ '255' if item.name[-1:] == '1' else '128' }}"
         state: present
       loop: "{{ devices }}"
-      when: "{{ chassis }}" # if chassis is not an empty list
+      when: chassis # if chassis is not an empty list
 
     - name: Create VLAN 1 interfaces
       tags: 
