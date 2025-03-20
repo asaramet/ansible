@@ -123,6 +123,17 @@ def convert_interfaces_range(interfaces_string):
     return i_list
 
 # --- Get functions ---
+def get_os_version(t_file):
+
+    if search_line("; Ver", t_file):
+        return "AOS"
+
+    os_line = search_line("!Version", t_file)
+    if os_line:
+        return os_line.split(' ')[1]
+
+    return
+
 def get_hostname(t_file):
     hostname_line = search_line("hostname", t_file)
 
@@ -553,6 +564,14 @@ def debug_convert_interfaces_range():
         table.append([value, convert_interfaces_range(value)])
     print(tabulate(table, headers, "github"))
 
+def debug_get_os_version(data_folder):
+    table = []
+    headers = ["File name", "OS"]
+    for f in config_files(data_folder):
+        table.append([ os.path.basename(f), get_os_version(f) ])
+    print("\n== Debug: get_os_version ==")
+    print(tabulate(table, headers, "github"))
+
 def debug_get_hostname(data_folder):
     table = []
     headers = ["File name", "Hostname"]
@@ -693,11 +712,12 @@ if __name__ == "__main__":
     print("\nData folder: ", data_folder)
     #debug_get_site(data_folder)
     #debug_config_files(data_folder)
+    debug_get_os_version(data_folder)
     #debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_site(data_folder)
     #debug_get_trunks(data_folder)
-    debug_get_interface_names(data_folder)
+    #debug_get_interface_names(data_folder)
     #debug_get_vlans(data_folder)
     #debug_get_vlans_names(data_folder)
     #debug_get_untagged_vlans(data_folder)
@@ -717,6 +737,7 @@ if __name__ == "__main__":
     #debug_get_flor_nr(data_folder)
     #debug_get_site(data_folder)
 
+    debug_get_os_version(data_folder)
     #debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_trunks(data_folder)
@@ -758,15 +779,17 @@ if __name__ == "__main__":
     #debug_get_flor_nr(data_folder)
     #debug_get_site(data_folder)
 
+    debug_get_os_version(data_folder)
     #debug_get_hostname(data_folder)
     #debug_get_ip_address(data_folder)
     #debug_get_vlans(data_folder)
     #debug_get_modules(data_folder)
-    debug_get_interface_names(data_folder)
+    #debug_get_interface_names(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
+    debug_get_os_version(data_folder)
     #debug_get_hostname(data_folder)
     #debug_get_vlans(data_folder)
     #debug_get_modules(data_folder)
@@ -779,4 +802,4 @@ if __name__ == "__main__":
     #print(yaml.dump(module_types_dict()))
     #print(yaml.dump(modules_interfaces("J9537A")))
     #print(yaml.dump(modules_interfaces("J9537a", "B")))
-    debug_get_interface_names(data_folder)
+    #debug_get_interface_names(data_folder)

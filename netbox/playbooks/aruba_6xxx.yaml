@@ -86,22 +86,6 @@
         state: present
       loop: "{{ devices }}"
 
-#    - name: Delete default interfaces
-#      tags: 
-#        - delete_default_interfaces
-#        #- switches
-#      netbox.netbox.netbox_device_interface:
-#        netbox_url: "{{ netbox_url }}"
-#        netbox_token: "{{ netbox_token }}"
-#        validate_certs: false
-#        update_vc_child: true
-#        data:
-#          device: "{{ item.hostname }}"
-#          name: "{{ '1' + item.interface[1:] }}" # delete '1/x/x' interfaces
-#        state: absent
-#      loop: "{{ device_interfaces }}"
-#      when: chassis | length > 0 and chassis[0].name == item.hostname.split('-')[0] # if chassis is not an empty list and the chassis['name'] is the hostname
-
 #    - name: Add stack interfaces
 #      tags:
 #        - switches
@@ -124,14 +108,31 @@
     - name: Delete virtual chassis 
       tags: 
         - delete_chassis
+        - switches
       netbox.netbox.netbox_virtual_chassis:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
         data:
           name: "{{ item.name }}"
+          master: "{{ item.master }}"
         state: absent
       loop: "{{ chassis }}"
+
+    - name: Delete default interfaces
+      tags: 
+        - delete_default_interfaces
+        - switches
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        update_vc_child: true
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}" 
+        state: absent
+      loop: "{{ delete_interfaces }}"
 
     - name: Create virtual chassis 
       tags: 
@@ -144,9 +145,7 @@
         validate_certs: false
         data:
           name: "{{ item.name }}"
-          master: "{{ item.name + '-1' | regex_replace('0') }}" 
-          tags:
-            - stack
+          master: "{{ item.master }}"
         state: present
       loop: "{{ chassis }}"
       when: chassis # if chassis is not an empty list
