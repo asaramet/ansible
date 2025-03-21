@@ -3,8 +3,6 @@
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack_modular,production,switches
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack_modular,production,modules
 #
-# ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,switches
-#
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,interfaces
 #
 # ansible-playbook playbooks/stacks.yaml --tags aruba_stack,development,chassis
@@ -95,42 +93,10 @@
         state: present
       loop: "{{ devices }}"
 
-    - name: Delete default interfaces
-      tags: 
-        - delete_default_interfaces
-        - switches
-      netbox.netbox.netbox_device_interface:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          device: "{{ item.hostname }}"
-          name: "{{ item.default_interface }}"
-        state: absent
-      loop: "{{ device_interfaces }}"
-      when: "{{ modular }}"
-
-    - name: Add stack interfaces
-      tags: 
-        - stack_interfaces
-        - switches
-      netbox.netbox.netbox_device_interface:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          device: "{{ item.hostname }}"
-          name: "{{ item.interface }}"
-          type: "{{ item.type }}"
-          poe_mode: "{{ item.poe_mode }}"
-          poe_type: "{{ item.poe_type }}"
-        state: present
-      loop: "{{ device_interfaces }}"
-      when: "{{ add_stack_interfaces }}"
-
     - name: Delete virtual chassis 
       tags: 
         - delete_chassis
+        - switches
       netbox.netbox.netbox_virtual_chassis:
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
@@ -139,6 +105,20 @@
           name: "{{ item.name }}"
         state: absent
       loop: "{{ chassis }}"
+
+    - name: Delete slave's default interfaces
+      tags: 
+        - delete_slaves_interfaces
+        - switches
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+        state: absent
+      loop: "{{ delete_interfaces }}"
 
     - name: Delete module bays
       tags:
@@ -154,7 +134,7 @@
           position: "{{ item.module_bay }}"
         state: absent
       loop: "{{ modules }}"
-      when: "{{ modular }}"
+      when: modular
 
     - name: Create module bays
       tags:
@@ -172,26 +152,64 @@
           description: "{{ item.type }}"
         state: present
       loop: "{{ modules }}"
-      when: "{{ modular }}"
+      when: modular
 
-#    - name: Install modules
-#      tags:
-#        - install_modules
-#        - modules
-#      netbox.netbox.netbox_module:
-#        netbox_url: "{{ netbox_url }}"
-#        netbox_token: "{{ netbox_token }}"
-#        validate_certs: false
-#        data:
-#          device: "{{ item.device }}"
-#          module_bay: "{{ item.device }}-{{ item.module_bay }}"
-#          module_type: "{{ item.type }}"
-#          description: "{{ item.type }}"
-#          status: active
-#        state: present
-#      loop: "{{ modules }}"
-#      when: "{{ modular }}"
-#      when: false
+    - name: Add/Update interfaces
+      tags: 
+        - interfaces
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          description: "{{ item.name }}"
+          type: "{{ item.type }}"
+          poe_mode: "{{ item.poe_mode }}"
+          poe_type: "{{ item.poe_type }}"
+        state: present
+      loop: "{{ device_interfaces }}"
+
+    - name: Create virtual chassis 
+      tags: 
+        - create_chassis
+        - chassis
+      netbox.netbox.netbox_virtual_chassis:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          master: "{{ item.master }}"
+          tags:
+            - stack
+        state: present
+      loop: "{{ chassis }}"
+      #when: master_device_map[item.master] is not none
+      when: item.name != "rggw4121sp" # ignore a 10 stack items (it has issues reading 'master' line. i.e '1' or '10')
+
+    - name: Assign switches to chassis
+      tags: 
+        - assign_switches
+        - chassis
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          site: "{{ item.site }}"
+          device_type: "{{ item.device_type }}" 
+          device_role: "{{ item.device_role }}"
+          serial: "{{ item.serial }}"
+          tags: "{{ item.tags }}"
+          tenant: netzadmin
+          virtual_chassis: "{{ item.virtual_chassis }}"
+          vc_position: "{{ item.vc_position }}"
+          vc_priority: "{{ item.vc_priority }}"
+        state: present
+      loop: "{{ devices }}"
 
     - name: Create Trunk interfaces as LAG
       tags:
@@ -227,23 +245,6 @@
         update_vc_child: true
         state: present
       loop: "{{ trunk_interfaces }}"
-
-    - name: Update device interfaces
-      tags:
-        - interfaces
-      netbox.netbox.netbox_device_interface:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          device: "{{ item.hostname }}"
-          name: "{{ item.interface }}"
-          description: "{{ item.name }}"
-          type: "{{ item.type }}"
-          poe_mode: "{{ item.poe_mode }}"
-          poe_type: "{{ item.poe_type }}"
-        state: present
-      loop: "{{ device_interfaces }}"
 
     - name: Create VLANs
       tags:
@@ -345,42 +346,42 @@
         state: present
       loop: "{{ ip_addresses }}"
 
-    - name: Create virtual chassis 
-      tags: 
-        - create_chassis
-        - chassis
-      netbox.netbox.netbox_virtual_chassis:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          name: "{{ item.name }}"
-          master: "{{ item.name + '-1' | regex_replace('0') }}" 
-          #master: "{{ item.master }}"
-          tags:
-            - stack
-        state: present
+    - name: Debug NetBox ID device lookup for each master in a chassis
+      tags: debug
+      ansible.builtin.debug:
+        msg: "Master {{ item.master }} ID: {{ 
+          query('netbox.netbox.nb_lookup', 'devices', 
+          api_endpoint = netbox_url,
+          api_filter = 'name={}'.format(item.master),
+          token = netbox_token,
+          validate_certs = false )[0]['value']['id']
+          }}"
       loop: "{{ chassis }}"
-      when: item.name != "rggw4121sp" # ignore a 10 stack items (it has issues reading 'master' line. i.e '1' or '10')
 
-    - name: Assign switches to chassis
-      tags: 
-        - assign_switches
-        - chassis
-      netbox.netbox.netbox_device:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          name: "{{ item.name }}"
-          site: "{{ item.site }}"
-          device_type: "{{ item.device_type }}" 
-          device_role: "{{ item.device_role }}"
-          serial: "{{ item.serial }}"
-          tags: "{{ item.tags }}"
-          tenant: netzadmin
-          virtual_chassis: "{{ item.virtual_chassis }}"
-          vc_position: "{{ item.vc_position }}"
-          vc_priority: "{{ item.vc_priority }}"
-        state: present
-      loop: "{{ devices }}"
+    - name: Get exact device IDs for all masters
+      tags: debug
+      ansible.builtin.set_fact:
+        master_device_map: >-
+          {{
+            master_device_map | default({}) |
+            combine({
+            item.master: (
+            query('netbox.netbox.nb_lookup', 'devices', 
+            api_endpoint = netbox_url,
+            api_filter = 'name={}'.format(item.master),
+            token = netbox_token,
+            validate_certs = false )[0]['value']['id']
+            )})
+          }}
+      loop: "{{ chassis }}"
+
+    - name: "Debug: show the master_device_map dict"
+      tags: debug
+      ansible.builtin.debug:
+        msg: "{{ master_device_map }}"
+
+    - name: "Debug: show IDs for masters"
+      tags: debug 
+      ansible.builtin.debug:
+        msg: "{{ item.master }} - {{ master_device_map[item.master] }}"
+      loop: "{{ chassis }}"

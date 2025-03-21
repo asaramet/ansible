@@ -20,7 +20,6 @@ def stack(data_folder, output_file_path, device_type_slags, devices_tags):
     files = config_files(data_folder)
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump({"modular": False}, f)
-        yaml.dump({"add_stack_interfaces": True}, f)
         yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(device_interfaces_json(files), f)
@@ -40,7 +39,6 @@ def stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump({"modular": True}, f)
-        yaml.dump({"add_stack_interfaces": add_stack_interfaces}, f)
         yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(device_interfaces_json(files), f)

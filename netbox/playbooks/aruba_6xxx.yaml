@@ -119,7 +119,7 @@
         state: absent
       loop: "{{ chassis }}"
 
-    - name: Delete default interfaces
+    - name: Delete slave's default interfaces
       tags: 
         - delete_default_interfaces
         - switches

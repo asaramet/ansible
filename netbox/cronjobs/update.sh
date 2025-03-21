@@ -18,7 +18,7 @@ python3 pynetbox/yaml_singles.py | tee ${logs_folder}/pynetbox.logs  &&
 python3 pynetbox/yaml_stacks.py | tee -a ${logs_folder}/pynetbox.logs  && 
 python3 pynetbox/yaml_hpe_modular.py | tee -a ${logs_folder}/pynetbox.logs  &&
 
-#python3 pynetbox/yaml_aruba_6xxx.py | tee -a ${logs_folder}/pynetbox.logs &&
+python3 pynetbox/yaml_aruba_6xxx.py | tee -a ${logs_folder}/pynetbox.logs &&
 #python3 pynetbox/yaml_cisco.py | tee -a ${logs_folder}/pynetbox.logs  &&
 
 ansible-playbook playbooks/backup_sql.yaml | tee ${logs_folder}/backup.logs &&
@@ -40,4 +40,4 @@ cd $this_folder
 #./aruba_modular.sh &&
 #./aruba_modular_stack.sh &&
 
-#./aruba_6xxx.sh
+./aruba_6xxx.sh
