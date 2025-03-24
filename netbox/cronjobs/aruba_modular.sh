@@ -2,21 +2,21 @@
 
 # Update netbox Aruba Modular switches configs
 
-cd `dirname $0`
-this_folder=$PWD
+SCRIPT_DIR="$(dirname $(realpath $0))"
+EXEC_DIR="$(dirname ${SCRIPT_DIR})"
 
-exec_folder="${this_folder}/.."
-logs_folder=${this_folder}/logs
+logs_folder="${SCRIPT_DIR}/logs"
 
 export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
-cd $exec_folder
+cd $EXEC_DIR
 
 #server='production'
 server='development'
 
 echo "== Updating Aruba Modular switches on $server server - $(date)"
 ansible --version
+echo "Log file: ${logs_folder}/aruba_modular.logs"
 
 #ansible-playbook playbooks/sync_data.yaml &>> ${logs_folder}/sync_data.logs
 

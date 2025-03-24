@@ -2,15 +2,14 @@
 
 # Update netbox switches configs from synct config files
 
-cd `dirname $0`
-this_folder=$PWD
+SCRIPT_DIR="$(dirname $(realpath $0))"
+EXEC_DIR="$(dirname ${SCRIPT_DIR})"
 
-exec_folder="${this_folder}/.."
-logs_folder=${this_folder}/logs
+logs_folder="${SCRIPT_DIR}/logs"
 
 export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
-cd $exec_folder
+cd $EXEC_DIR
 
 ansible-playbook playbooks/sync_data.yaml | tee ${logs_folder}/sync_data.logs &&
 
@@ -23,7 +22,7 @@ python3 pynetbox/yaml_aruba_6xxx.py | tee -a ${logs_folder}/pynetbox.logs &&
 
 ansible-playbook playbooks/backup_sql.yaml | tee ${logs_folder}/backup.logs &&
 
-cd $this_folder
+cd $SCRIPT_DIR
 ./aruba_8_ports.sh &&
 ./aruba_12_ports.sh &&
 ./aruba_48_ports.sh &&

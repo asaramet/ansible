@@ -2,18 +2,18 @@
 
 # Update netbox switches configs from synct config files
 
-cd `dirname $0`
-this_folder=$PWD
+SCRIPT_DIR="$(dirname $(realpath $0))"
+EXEC_DIR="$(dirname ${SCRIPT_DIR})"
 
-exec_folder="${this_folder}/.."
-logs_folder=${this_folder}/logs
+logs_folder="${SCRIPT_DIR}/logs"
 
 export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
-cd $exec_folder
+cd $EXEC_DIR
 
 echo "== Updating ProCurve switches - $(date)"
 ansible --version
+echo "Log file: ${logs_folder}/procurve_single.logs"
 
 #ansible-playbook playbooks/sync_data.yaml &> ${logs_folder}/sync_data.logs
 #python3 pynetbox/yaml_singles.py &&
