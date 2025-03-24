@@ -220,8 +220,8 @@
           vid: "{{ item.id }}"
         state: present
       loop: "{{ vlans }}"
-    
-    - name: Assign untagged vlans to interfaces
+
+    - name: Assign untagged VLANs to interfaces (remove all tagged VLANs)
       tags:
         - untagged_vlans
         - vlans
@@ -233,12 +233,13 @@
           device: "{{ item.hostname }}"
           name: "{{ item.interface }}"
           mode: Access
+          tagged_vlans: []
           untagged_vlan: 
             vlan_id: "{{ item.vlan_id }}"
             name: "{{ item.vlan_name }}"
       loop: "{{ untagged_vlans }}"
 
-    - name: Assign tagged vlans to interfaces
+    - name: Assign tagged VLANs to interfaces
       tags: 
         - tagged_vlans
         - vlans
