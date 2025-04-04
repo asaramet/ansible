@@ -25,15 +25,18 @@ def locations_json(config_files):
     locations = set()
     rooms = {}
     sites = {}
+    is_racks = {}
 
     for file in config_files:
         location = get_location(file)
         if not location: continue
 
-        location,room = location
+        is_rack = False
+        location, room, is_rack = location
         locations.add(location)
         rooms.update({location: room})
         sites.update({location: get_site(file)})
+        is_racks.update({location: is_rack})
 
     for location in locations:
         room = rooms[location]
@@ -41,8 +44,10 @@ def locations_json(config_files):
         flor_tuple = get_flor_name(room)
 
         site = sites[location]
+        is_rack = is_racks[location]
 
-        data["locations"].append({"name": building + "." + flor_tuple[0] + " - " + flor_tuple[1], "site": site, "parent_location": get_parent_location(location)})
+        data["locations"].append({"name": building + "." + flor_tuple[0] + " - " + flor_tuple[1], 
+            "site": site, "parent_location": get_parent_location(location), 'is_rack': is_rack})
 
     return data
 
@@ -71,7 +76,7 @@ def devices_json(config_files, device_type_slags, tags):
         site = get_site(t_file)
 
         if location: # Not None
-            location, _ = location # ignore room
+            location, _, _ = location # ignore room and rack
             location = get_room_location(location)
 
         # update data for single switches 
@@ -80,7 +85,8 @@ def devices_json(config_files, device_type_slags, tags):
 
             d_label = device_type_slags[device_type(hostname)]
 
-            data['devices'].append({'name': hostname, "location": location, 'device_role': get_device_role(t_file, hostname), 'device_type': d_label,
+            data['devices'].append({'name': hostname, "location": location, 
+                'device_role': get_device_role(t_file, hostname), 'device_type': d_label, 
                 'site': site, 'tags': tags, 'serial':serial_numbers()[hostname]})
             continue
 
@@ -95,9 +101,11 @@ def devices_json(config_files, device_type_slags, tags):
         for h_name in hostname.values(): 
             vc_position = int(h_name[-1])
             vc_priority = 255 if vc_position == 1 else 128
-            data['devices'].append({'name': h_name, "location": location, 'device_role': get_device_role(t_file, clean_name), 'device_type': d_label, 
+            data['devices'].append({'name': h_name, "location": location, 
+                'device_role': get_device_role(t_file, clean_name), 'device_type': d_label, 
                 'site': site, 'tags': tags, 'serial':serial_numbers()[h_name],
-                'virtual_chassis': clean_name, 'vc_position': vc_position, 'vc_priority': vc_priority
+                'virtual_chassis': clean_name, 'vc_position': vc_position, 
+                'vc_priority': vc_priority
             })
 
     return data
@@ -317,7 +325,7 @@ def modules_json(config_files):
         modules = get_modules(t_file)
 
         for module in modules:
-            new_position = None
+            new_position = module['module']
             if module['stack'] != '0':
                 new_position = module['stack'] + '/' + module['module']
 
@@ -415,8 +423,8 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/hpe-8-ports/"
     data_folder = main_folder + "/data/aruba-48-ports/"
 
-    #debug_locations_json(data_folder)
-    #debug_devices_json(data_folder)
+    debug_locations_json(data_folder)
+    debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     #debug_vlans_json(data_folder)
@@ -424,29 +432,27 @@ if __name__ == "__main__":
     #debug_tagged_vlans_json(data_folder)
     #debug_ip_addresses_json(data_folder)
 
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
 
     print("\n=== ProCurve Singles JSON ===")
     data_folder = main_folder + "/data/procurve-single/"
 
-    #debug_locations_json(data_folder)
+    debug_locations_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
 
-    debug_device_interfaces_json(data_folder)
-
-    print("\n=== Stacking 2920 JSON ===")
-    data_folder = main_folder + "/data/aruba-stack-2920/"
     #debug_device_interfaces_json(data_folder)
 
-    #print("\n=== Stacking 2930 JSON ===")
+    #data_folder = main_folder + "/data/aruba-stack/"
+    #data_folder = main_folder + "/data/aruba-stack-2920/"
     data_folder = main_folder + "/data/aruba-stack-2930/"
+
+    print("\n=== data_folder ===")
     #debug_device_interfaces_json(data_folder)
 
-    print("\n=== Stacking JSON ===")
-    data_folder = main_folder + "/data/aruba-stack/"
 
-    #debug_devices_json(data_folder)
+    debug_locations_json(data_folder)
+    debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     #debug_vlans_json(data_folder)
@@ -465,7 +471,7 @@ if __name__ == "__main__":
     #debug_device_interfaces_json(data_folder)
     #debug_modules_json(data_folder)
 
-    #print("\n=== Aruba Modular JSON ===")
+    print("\n=== Aruba Modular JSON ===")
     data_folder = main_folder + "/data/aruba-modular/"
 
     #debug_locations_json(data_folder)
@@ -476,7 +482,7 @@ if __name__ == "__main__":
     data_folder = main_folder + "/data/aruba-modular-stack/"
 
     #debug_locations_json(data_folder)
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
     #debug_modules_json(data_folder)
 
     print("\n=== Aruba 6100 ===")
@@ -488,5 +494,6 @@ if __name__ == "__main__":
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
+    debug_locations_json(data_folder)
     #debug_vlans_json(data_folder)
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)

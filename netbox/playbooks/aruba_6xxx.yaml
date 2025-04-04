@@ -64,7 +64,6 @@
           parent_location: "{{ item.parent_location }}"
         state: present
       loop: "{{ locations }}"
-      when: false
 
     - name: Add switches
       tags: 
@@ -174,6 +173,8 @@
         state: present
       loop: "{{ devices }}"
       when: chassis # if chassis is not an empty list
+
+# TODO: Move this to aruba.yaml
 
     - name: Create VLAN 1 interfaces
       tags: 

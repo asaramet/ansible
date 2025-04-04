@@ -19,7 +19,7 @@ def devices_json(config_files, type_slags, tags):
 
     for file in config_files:
 
-        location,room = get_location(file)
+        location, room, _ = get_location(file)
         location = get_room_location(location)
         
         site = get_site(file)
@@ -46,7 +46,8 @@ def devices_json(config_files, type_slags, tags):
 
             d_type = type_slags[device_type(clean_name)]
 
-            data["devices"].append({"name": hostname, "location": location, "site": site, "device_role": device_role, 
+            data["devices"].append({"name": hostname, "location": location, "site": site, 
+                "device_role": device_role,
                 "device_type": d_type, "serial": serial_numbers()[hostname], "tags": tags })
 
     return data

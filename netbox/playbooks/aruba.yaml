@@ -1,0 +1,678 @@
+---
+# Examples how to use:
+# ansible-playbook playbooks/aruba.yaml --tags procurve_modular,production,switches
+# ansible-playbook playbooks/aruba.yaml --tags procurve_modular,production,modules
+#
+# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,interfaces
+#
+# ansible-playbook playbooks/aruba.yaml --tags aruba_stack,development,chassis
+#
+# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,trunks
+# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,create_vlans
+# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,untagged_vlans
+# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,tagged_vlans
+# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,ip
+#
+# Switch type Tags:
+# aruba_8
+# aruba_12
+# aruba_48
+# aruba_modular
+# hpe_8
+# hpe_48
+# procurve_modular
+# procurve_single
+#
+# aruba_stack
+# aruba_stack_2920
+# aruba_stack_2930
+#
+# aruba_6100
+# aruba_6300
+
+- name: Add HP Switches from configuration files
+  hosts: localhost
+  gather_facts: false
+  vars: 
+    netbox_url: "https://{{ netbox_server }}"
+  tasks:
+    - name: Include development server variables
+      tags: development
+      include_vars:
+        file: ../src/development_server.yaml
+
+    - name: Include production server variables
+      tags: production
+      include_vars:
+        file: ../src/production_server.yaml
+
+    - name: Include data for ProCurve modular switches 
+      tags: procurve_modular
+      include_vars:
+        file: ../data/yaml/procurve_modular.yaml
+
+    - name: Include data for Aruba modular switches 
+      tags: aruba_modular
+      include_vars:
+        file: ../data/yaml/aruba_modular.yaml
+
+    - name: Include data for ProCurve single switches
+      tags: procurve_single
+      include_vars:
+        file: ../data/yaml/procurve_single.yaml
+
+    - name: Include data for 8 Ports old HP and ProCurve switches
+      tags: hpe_8
+      include_vars:
+        file: ../data/yaml/hpe_8_ports.yaml
+
+    - name: Include data for 24 and 48 Ports old HP switches
+      tags: hpe_48
+      include_vars:
+        file: ../data/yaml/hpe_48_ports.yaml
+
+    - name: Include data for 24 and 48 Ports Aruba switches
+      tags: aruba_48
+      include_vars:
+        file: ../data/yaml/aruba_48_ports.yaml
+
+    - name: Include data for 12 Ports Aruba switches
+      tags: aruba_12
+      include_vars:
+        file: ../data/yaml/aruba_12_ports.yaml
+
+    - name: Include data for 8 Ports Aruba switches
+      tags: aruba_8
+      include_vars:
+        file: ../data/yaml/aruba_8_ports.yaml
+
+    - name: Include data for Aruba stacked switches
+      tags: aruba_stack
+      include_vars:
+        file: ../data/yaml/aruba_stack.yaml
+
+    - name: Include data for Aruba 2930 stacked switches with mini modules
+      tags: aruba_stack_2930
+      include_vars:
+        file: ../data/yaml/aruba_stack_2930.yaml
+
+    - name: Include data for Aruba 2920 stacked switches with mini modules
+      tags: aruba_stack_2920
+      include_vars:
+        file: ../data/yaml/aruba_stack_2920.yaml
+
+    - name: Include data for Aruba modular stacked switches with mini modules
+      tags: aruba_stack_modular
+      include_vars:
+        file: ../data/yaml/aruba_modular_stack.yaml
+
+    - name: Create a Room (location)
+      tags: 
+        - location
+        - add_switches
+        - switches
+        - update
+      netbox.netbox.netbox_location:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          site: "{{ item.site }}"
+          parent_location: "{{ item.parent_location }}"
+        state: present
+      loop: "{{ locations }}"
+
+    - name: Get existing racks from NetBox
+      tags: 
+        - add_switches
+        - switches
+        - update
+      set_fact:
+        assigned_racks: >-
+          {{ assigned_racks | default({}) | combine
+            (
+              { item.name : 
+                (
+                  query(
+                    'netbox.netbox.nb_lookup', 'devices',
+                    api_endpoint = netbox_url,
+                    api_filter='name={}'.format(item.name),
+                    token = netbox_token, validate_certs=false
+                ) | default([]) | first | 
+                default({})).get('value', {}).get('rack', None)
+              }
+            )
+          }}
+      loop: "{{ devices }}"
+
+    - name: Get existing device position in the rack from NetBox
+      tags: 
+        - add_switches
+        - switches
+        - update
+      set_fact:
+        assigned_position: >-
+          {{ assigned_position | default({}) | combine
+            (
+              { item.name : ( query(
+                'netbox.netbox.nb_lookup', 'devices',
+                api_endpoint = netbox_url,
+                api_filter='name={}'.format(item.name),
+                token = netbox_token,
+                validate_certs=false) | default([]) | first | 
+                default({})).get('value', {}).get('position', None)
+              }
+            )
+          }}
+      loop: "{{ devices }}"
+
+    - name: Add rack switches (already assign to racks in NetBox)
+      tags: 
+        - add_switches
+        #- switches
+        - update
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          site: "{{ item.site }}"
+          location: "{{ item.location }}"
+          rack: "{{ assigned_racks[item.name]['name'] if assigned_racks.get(item.name) else None }}"
+          position: "{{ assigned_position.get(item.name, None) | float}}"
+          device_type: "{{ item.device_type }}" 
+          device_role: "{{ item.device_role }}"
+          serial: "{{ item.serial }}"
+          tags: "{{ item.tags }}"
+          tenant: netzadmin
+        state: present
+      loop: "{{ devices }}"
+      when: assigned_racks[item.name]
+
+    - name: Add switches (not assign to any racks in NetBox)
+      tags: 
+        - add_switches
+        - switches
+        - update
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          site: "{{ item.site }}"
+          location: "{{ item.location }}"
+          device_type: "{{ item.device_type }}" 
+          device_role: "{{ item.device_role }}"
+          serial: "{{ item.serial }}"
+          tags: "{{ item.tags }}"
+          tenant: netzadmin
+        state: present
+      loop: "{{ devices }}"
+      when: not assigned_racks[item.name]
+
+    - name: Unassign switches to chassis
+      tags: 
+        - delete_chassis
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          tags: "{{ item.tags }}"
+          virtual_chassis: null # Remove the device from the virtual chassis
+        state: present # Ensure the device remains in NetBox
+      loop: "{{ devices }}"
+      when: chassis is defined and chassis | length > 0 and item.vc_position > 1
+
+    - name: Delete virtual chassis 
+      tags: 
+        - delete_chassis
+      netbox.netbox.netbox_virtual_chassis:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          master: "{{ item.master }}"
+          tags: 
+            - stack
+        state: absent
+      loop: "{{ chassis }}"
+      when: chassis is defined and chassis | length > 0
+
+    - name: Delete slave's default interfaces
+      tags: 
+        - delete_slaves_interfaces
+        - switches
+        - update
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+        update_vc_child: true
+        state: absent
+      loop: "{{ delete_interfaces }}"
+
+    - name: Delete module bays
+      tags:
+        - delete_bays
+        - modules
+        - update
+      netbox.netbox.netbox_module_bay:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.device }}"
+          name: "{{ item.module_bay }}"
+          position: "{{ item.module_bay }}"
+        state: absent
+      loop: "{{ modules }}"
+      when: modular
+
+    - name: Create module bays
+      tags:
+        - create_bays
+        - modules
+        - update
+      netbox.netbox.netbox_module_bay:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.device }}"
+          name: "{{ item.device }}-{{ item.module_bay }}"
+          position: "{{ item.new_position }}"
+          #module_type: "{{ item.type }}"
+          description: "{{ item.name }}"
+        state: present
+      loop: "{{ modules }}"
+      when: modular
+
+    - name: Update device interfaces 
+      tags:
+        - interfaces
+        - update
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          description: "{{ item.name }}"
+          type: "{{ item.type }}"
+          poe_mode: "{{ item.poe_mode }}"
+          poe_type: "{{ item.poe_type }}"
+        state: present
+      loop: "{{ device_interfaces }}"
+
+    - name: Create virtual chassis 
+      tags: 
+        - create_chassis
+        - chassis
+        - update
+      netbox.netbox.netbox_virtual_chassis:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          master: "{{ item.master }}"
+          tags:
+            - stack
+        state: present
+      loop: "{{ chassis }}"
+      when: item.name != "rggw4121sp" and chassis is defined and chassis | length > 0 
+
+    - name: Assign switches to chassis
+      tags: 
+        - assign_switches
+        - chassis
+        - update
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          site: "{{ item.site }}"
+          device_type: "{{ item.device_type }}" 
+          device_role: "{{ item.device_role }}"
+          serial: "{{ item.serial }}"
+          tags: "{{ item.tags }}"
+          tenant: netzadmin
+          virtual_chassis: "{{ item.virtual_chassis }}"
+          #vc_position: "{{ item.vc_position }}"
+          #vc_priority: "{{ item.vc_priority }}"
+          vc_position: "{{ item.name[-1:] }}"
+          vc_priority: "{{ '255' if item.name[-1:] == '1' else '128' }}"
+        state: present
+      loop: "{{ devices }}"
+      when: chassis is defined and chassis | length > 0 
+
+# TODO - Integrate aruba_6xxx.yaml from here
+
+    - name: Create Trunk interfaces as LAG
+      tags:
+        - lags
+        - trunks
+        - update
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.name }}"
+          type: Link Aggregation Group (LAG)
+        update_vc_child: true
+        state: present
+      loop: "{{ trunks }}"
+
+    - name: Assign interfaces to Trunks
+      tags:
+        - trunk_interfaces
+        - trunks
+        - update
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          lag:
+            name: "{{ item.trunk_name }}"
+        update_vc_child: true
+        state: present
+      loop: "{{ trunk_interfaces }}"
+
+    - name: Create VLANs
+      tags:
+        - create_vlans
+        - vlans
+        - update
+      netbox.netbox.netbox_vlan:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          vid: "{{ item.id }}"
+        state: present
+      loop: "{{ vlans }}"
+
+    - name: Assign untagged VLANs to interfaces (remove all tagged VLANs)
+      tags:
+        - untagged_vlans
+        - vlans
+        - update
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          mode: Access
+          tagged_vlans: []
+          untagged_vlan: 
+            vlan_id: "{{ item.vlan_id }}"
+            name: "{{ item.vlan_name }}"
+      loop: "{{ untagged_vlans }}"
+
+    - name: Assign tagged VLANs to interfaces
+      tags: 
+        - tagged_vlans
+        - vlans
+        - update
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          mode: Tagged
+          tagged_vlans: "{{ item.tagged_vlans }}"
+      loop: "{{ tagged_vlans }}"
+
+    - name: Create VLAN interfaces for loopback IPs
+      tags:
+        - loopback
+        - vlans
+        - ip
+        - update
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "vlan {{ item.vlan_id }}"
+          type: Virtual
+          description: "{{ item.vlan_name }}"
+        state: present
+      loop: "{{ ip_addresses }}"
+
+    - name: Assign IP to VLAN interfaces
+      tags:
+        - assign_ip
+        - vlans
+        - ip
+        - update
+      netbox.netbox.netbox_ip_address:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          address: "{{ item.ip }}"
+          dns_name: "{{ item.hostname }}"
+          description: "VLAN {{ item.vlan_id }} ({{ item.vlan_name }})"
+          assigned_object:
+            device: "{{item.hostname }}"
+            name: "vlan {{ item.vlan_id }}"
+          role: Loopback
+          tenant: netzadmin
+        state: present
+      loop: "{{ ip_addresses }}"
+
+    - name: Assign IP addresses to devices
+      tags:
+        - ip_to_devices
+        - ip
+        - update
+      netbox.netbox.netbox_device:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.hostname }}"
+          primary_ip4: "{{ item.ip }}"
+        state: present
+      loop: "{{ ip_addresses }}"
+
+    - name: "Debug: Get NetBox ID device lookup for each master in a chassis"
+      tags: debug
+      ansible.builtin.debug:
+        msg: "Master {{ item.master }} ID: {{ 
+          query('netbox.netbox.nb_lookup', 'devices', 
+          api_endpoint = netbox_url,
+          api_filter = 'name={}'.format(item.master),
+          token = netbox_token,
+          validate_certs = false )[0]['value']['id']
+          }}"
+      loop: "{{ chassis }}"
+
+    - name: "Debug: Get exact device IDs for all masters"
+      tags: debug
+      ansible.builtin.set_fact:
+        master_device_map: >-
+          {{
+            master_device_map | default({}) |
+            combine({
+            item.master: (
+            query('netbox.netbox.nb_lookup', 'devices', 
+            api_endpoint = netbox_url,
+            api_filter = 'name={}'.format(item.master),
+            token = netbox_token,
+            validate_certs = false )[0]['value']['id']
+            )})
+          }}
+      loop: "{{ chassis }}"
+
+    - name: "Debug: Show the master_device_map dict"
+      tags: debug
+      ansible.builtin.debug:
+        msg: "{{ master_device_map }}"
+
+    - name: "Debug: show IDs for masters"
+      tags: debug 
+      ansible.builtin.debug:
+        msg: "{{ item.master }} - {{ master_device_map[item.master] }}"
+      loop: "{{ chassis }}"
+
+    - name: Debug NetBox ID device lookup for each master in a chassis
+      tags: debug
+      ansible.builtin.debug:
+        msg: "Hostname {{ item.name }} ID: {{ 
+          query('netbox.netbox.nb_lookup', 'virtual-chassis', 
+          api_endpoint = netbox_url,
+          api_filter = 'name={}'.format(item.name),
+          token = netbox_token,
+          validate_certs = false )[0]
+          }}"
+      loop: "{{ chassis }}"
+
+    - name: Debug NetBox ID device lookup for each master in a chassis
+      tags: debug_chassis
+      ansible.builtin.debug:
+        msg: |
+          Hostname {{ item.name }} ID: {{
+            query('netbox.netbox.nb_lookup', 'virtual-chassis', 
+                    api_endpoint = netbox_url,
+                    api_filter = 'name={}'.format(item.name),
+                    token = netbox_token,
+                    validate_certs = false) | default([]) 
+                    }}
+      loop: "{{ chassis }}"
+
+    - name: Debug NetBox ID device lookup for each master in a chassis and store results
+      tags: debug_chassis
+      set_fact:
+        chassis_ids: "{{ chassis_ids | default([]) + 
+                         [(query('netbox.netbox.nb_lookup', 'virtual-chassis', 
+                                api_endpoint = netbox_url,
+                                api_filter = 'name={}'.format(item.name),
+                                token = netbox_token,
+                                validate_certs = false) | default([]) | first)['key'] 
+                          if query('netbox.netbox.nb_lookup', 'virtual-chassis', 
+                                    api_endpoint = netbox_url,
+                                    api_filter = 'name={}'.format(item.name),
+                                    token = netbox_token,
+                                    validate_certs = false) | default([]) | length > 0 
+                          else '' ] }}"
+      loop: "{{ chassis }}"
+      
+    - name: Debug the stored chassis_ids
+      tags: debug_chassis
+      ansible.builtin.debug:
+        msg: "Chassis IDs: {{ item.chassis_ids }}"
+      loop: "{{ chassis_ids }}"
+
+    - name: Debug - Display query to find racks in NetBox
+      tags: debug_rack_query
+      ansible.builtin.debug:
+        msg: >-
+          Name: {{ item.name }}
+          Rack: 
+          {{ (query('netbox.netbox.nb_lookup', 'devices',
+                  api_endpoint = netbox_url,
+                  api_filter='name={}'.format(item.name),
+                  token = netbox_token, validate_certs=false
+                  ) | default([]) | first | 
+                  default({})).get('value', {}).get('rack', None) }}
+      loop: "{{ devices }}"
+                  #default({})).get('value', None) }}
+
+    - name: Debug - Display query to find switch position in the racks in NetBox
+      tags: debug_position_query
+      ansible.builtin.debug:
+        msg: >-
+          Name: {{ item.name }}
+          Position: 
+          {{ (query('netbox.netbox.nb_lookup', 'devices',
+                  api_endpoint = netbox_url,
+                  api_filter='name={}'.format(item.name),
+                  token = netbox_token,
+                  validate_certs=false) | default([]) | first | 
+                  default({})).get('value', {}).get('position', None) }}
+      loop: "{{ devices }}"
+
+    - name: Debug - Get existing racks from NetBox
+      tags: debug_rack
+      set_fact:
+        assigned_racks: >-
+          {{ assigned_racks | default({}) | combine
+            (
+              { item.name : 
+                (
+                  query(
+                    'netbox.netbox.nb_lookup', 'devices',
+                    api_endpoint = netbox_url,
+                    api_filter='name={}'.format(item.name),
+                    token = netbox_token, validate_certs=false
+                ) | default([]) | first | 
+                default({})).get('value', {}).get('rack', None)
+              }
+            )
+          }}
+      loop: "{{ devices }}"
+
+    - name: Debug - Show assigned_racks list
+      tags: debug_rack
+      ansible.builtin.debug:
+        msg: "{{ assigned_racks }}"
+
+    - name: Debug - Display rack name if the rack is found
+      tags: debug_rack
+      ansible.builtin.debug:
+        msg: "{{ assigned_racks[item.name]['name'] if assigned_racks.get(item.name) else None }}"
+      loop: "{{ devices }}"
+
+    - name: Debug - Get existing device position in the rack from NetBox
+      tags: debug_position
+      set_fact:
+        assigned_position: >-
+          {{ assigned_position | default({}) | combine
+            (
+              { item.name : ( query(
+                'netbox.netbox.nb_lookup', 'devices',
+                api_endpoint = netbox_url,
+                api_filter='name={}'.format(item.name),
+                token = netbox_token,
+                validate_certs=false) | default([]) | first | 
+                default({})).get('value', {}).get('position', None)
+              }
+            )
+          }}
+      loop: "{{ devices }}"
+
+    - name: Debug - Show assigned_position list
+      tags: debug_position
+      ansible.builtin.debug:
+        msg: "{{ assigned_position }}"
+
+    - name: Debug - Display position in the rack, if the rack is found
+      tags: debug_position
+      ansible.builtin.debug:
+        msg: "{{ assigned_position.get(item.name, None) | float }}"
+      loop: "{{ devices }}"

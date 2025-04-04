@@ -180,7 +180,7 @@ def get_site(t_file):
 
     location = get_location(t_file)
     if location:
-        location, _ = location
+        location, _, _ = location
         location, _ = location.split('.', 1)
 
     if location == 'W20':
@@ -194,13 +194,11 @@ def get_location(file):
     if not location_line or location_line.isspace(): return None
 
     location = location_line.split()[-1].strip('"')
+    rack = False
 
     if location.split('.')[0] == 'V':
         location = location[2:]
-
-        rack_in_l = location.split('.') # Rack number specified in location
-        if len(rack_in_l) > 2:
-            location = rack_in_l[0] + '.' + rack_in_l[1]
+        rack = True
 
     building, room = location.split(".", 1)
 
@@ -211,7 +209,7 @@ def get_location(file):
 
     location = building[0] + building_nr + "." + room
 
-    return (location, room)
+    return (location, room, rack)
 
 # get flor number from room number
 def get_flor_nr(room_nr):
@@ -712,7 +710,7 @@ if __name__ == "__main__":
     print("\nData folder: ", data_folder)
     #debug_get_site(data_folder)
     #debug_config_files(data_folder)
-    debug_get_os_version(data_folder)
+    #debug_get_os_version(data_folder)
     #debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_site(data_folder)
@@ -724,46 +722,32 @@ if __name__ == "__main__":
     #debug_get_ip_address(data_folder)
     #debug_device_type(data_folder)
     #debug_get_modules(data_folder)
+    debug_get_location(data_folder)
 
     print("\n=== Stacking ===")
+    data_folder = main_folder + "/data/aruba-stack-2930/"
     #data_folder = main_folder + "/data/aruba-stack/"
     #data_folder = main_folder + "/data/hpe-stack/"
     #data_folder = main_folder + "/data/aruba-modular-stack/"
-    data_folder = main_folder + "/data/aruba-stack-2930/"
-    #print("\nData folder: ", data_folder)
+    #data_folder = main_folder + "/data/aruba-stack-2920/"
+    print("\nData folder: ", data_folder)
 
-    #debug_get_location(data_folder)
+    debug_get_location(data_folder)
     #debug_get_room_location(data_folder)
     #debug_get_flor_nr(data_folder)
     #debug_get_site(data_folder)
 
-    debug_get_os_version(data_folder)
+    #debug_get_os_version(data_folder)
     #debug_get_hostname(data_folder)
     #debug_get_device_role(data_folder)
     #debug_get_trunks(data_folder)
     #debug_get_trunk_stack(data_folder)
     #debug_get_modules(data_folder)
 
-    data_folder = main_folder + "/data/aruba-stack-2920/"
-
-    print("\nData folder: ", data_folder)
-    #debug_get_modules(data_folder)
-
-    data_folder = main_folder + "/data/aruba-modular-stack/"
-
-    print("\nData folder: ", data_folder)
-    #debug_get_modules(data_folder)
-
     data_folder = main_folder + "/data/aruba-modular/"
-
     print("\nData folder: ", data_folder)
     #debug_get_modules(data_folder)
-
-
-    print("\n=== ProCurve Modular ===")
-    data_folder = main_folder + "/data/procurve-modular/"
-
-    print("\nData folder: ", data_folder)
+    debug_get_location(data_folder)
 
     #debug_get_location(data_folder)
     #debug_get_room_location(data_folder)
@@ -779,7 +763,8 @@ if __name__ == "__main__":
     #debug_get_flor_nr(data_folder)
     #debug_get_site(data_folder)
 
-    debug_get_os_version(data_folder)
+    #debug_get_os_version(data_folder)
+    debug_get_location(data_folder)
     #debug_get_hostname(data_folder)
     #debug_get_ip_address(data_folder)
     #debug_get_vlans(data_folder)
@@ -789,7 +774,7 @@ if __name__ == "__main__":
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
-    debug_get_os_version(data_folder)
+    #debug_get_os_version(data_folder)
     #debug_get_hostname(data_folder)
     #debug_get_vlans(data_folder)
     #debug_get_modules(data_folder)

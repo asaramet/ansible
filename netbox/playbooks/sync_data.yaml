@@ -2,16 +2,12 @@
 - name: Sync data from rhlx99
   hosts: rhlx99
   gather_facts: false
-  vars:
-    #do_it: no
-    do_it: yes
   tasks:
     - name: Sync Aruba 6xxx config files from rhlx99
       ansible.posix.synchronize:
         mode: pull
         src: "/tftpboot/aruba_6*"
         dest: "{{ inventory_dir }}/data/"
-      when: "{{ do_it }}"
 
     - name: Sync ProCurve Modular Switches config files from rhlx99
       fetch:
@@ -19,7 +15,6 @@
         dest: "{{ inventory_dir }}/data/procurve-modular/{{ item }}"
         flat: yes
       loop: "{{ J8697A + J8698A + J8770A + J8773A + J9850A + J9851A + J9729A }}"
-      when: "{{ do_it }}"
 
     - name: Sync ProCurve single Switches config files from rhlx99
       fetch:
@@ -27,7 +22,6 @@
         dest: "{{ inventory_dir }}/data/procurve-single/{{ item }}"
         flat: yes
       loop: "{{ J9085A + J9086A + J9089A }}"
-      when: "{{ do_it }}"
 
     - name: Sync HP 8 ports switches config files from rhlx99
       fetch:
@@ -35,7 +29,6 @@
         dest: "{{ inventory_dir }}/data/hpe-8-ports/{{ item }}"
         flat: yes
       loop: "{{ J9562A + J9565A + J9774A + J9780A }}"
-      when: "{{ do_it }}"
 
     - name: Sync HP 24+ ports switches config files from rhlx99
       fetch:
@@ -43,7 +36,6 @@
         dest: "{{ inventory_dir }}/data/hpe-48-ports/{{ item }}"
         flat: yes
       loop: "{{ J9623A + J9772A + J9853A }}"
-      when: "{{ do_it }}"
 
     - name: Sync Aruba 24+ ports switches config files from rhlx99
       fetch:
@@ -51,7 +43,6 @@
         dest: "{{ inventory_dir }}/data/aruba-48-ports/{{ item }}"
         flat: yes
       loop: "{{ JL255A + JL256A + JL322A + JL357A }}"
-      when: "{{ do_it }}"
 
     - name: Sync Aruba 12 ports switches config files from rhlx99
       fetch:
@@ -59,7 +50,6 @@
         dest: "{{ inventory_dir }}/data/aruba-12-ports/{{ item }}"
         flat: yes
       loop: "{{ JL693A }}"
-      when: "{{ do_it }}"
 
     - name: Sync Aruba 8 ports switches config files from rhlx99
       fetch:
@@ -67,7 +57,6 @@
         dest: "{{ inventory_dir }}/data/aruba-8-ports/{{ item }}"
         flat: yes
       loop: "{{ JL258A }}"
-      when: "{{ do_it }}"
 
     - name: Sync Aruba modular switches config files from rhlx99
       fetch:
@@ -75,7 +64,6 @@
         dest: "{{ inventory_dir }}/data/aruba-modular/{{ item }}"
         flat: yes
       loop: "{{ JL322A_module }}"
-      when: "{{ do_it }}"
 
     - name: Sync Aruba stack switches config files from rhlx99
       fetch:
@@ -83,7 +71,6 @@
         dest: "{{ inventory_dir }}/data/aruba-stack/{{ item }}"
         flat: yes
       loop: "{{ JL256A_stack + JL693A_stack + JL075A_stack }}"
-      when: "{{ do_it }}"
 
     - name: Sync Aruba 2920 stack switches with mini modules config files from rhlx99
       fetch:
@@ -91,7 +78,6 @@
         dest: "{{ inventory_dir }}/data/aruba-stack-2920/{{ item }}"
         flat: yes
       loop: "{{ J9729A_stack }}"
-      when: "{{ do_it }}"
 
     - name: Sync Aruba 2930 stack switches with mini modules config files from rhlx99
       fetch:
@@ -99,7 +85,6 @@
         dest: "{{ inventory_dir }}/data/aruba-stack-2930/{{ item }}"
         flat: yes
       loop: "{{ JL322A_stack  }}"
-      when: "{{ do_it }}"
 
     - name: Sync Aruba modular stack switches config files from rhlx99
       fetch:
@@ -107,7 +92,6 @@
         dest: "{{ inventory_dir }}/data/aruba-modular-stack/{{ item }}"
         flat: yes
       loop: "{{ J9850A_stack }}"
-      when: "{{ do_it }}"
 
     - name: Sync Cisco config files from rhlx99
       fetch:
@@ -115,7 +99,6 @@
         dest: "{{ inventory_dir }}/data/cisco/{{ item }}"
         flat: yes
       loop: "{{ cisco }}"
-      when: "{{ do_it }}"
 
     - name: Debug
       vars:
