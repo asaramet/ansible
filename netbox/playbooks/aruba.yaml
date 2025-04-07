@@ -3,13 +3,13 @@
 # ansible-playbook playbooks/aruba.yaml --tags procurve_modular,production,switches
 # ansible-playbook playbooks/aruba.yaml --tags procurve_modular,production,modules
 #
-# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,interfaces
 #
 # ansible-playbook playbooks/aruba.yaml --tags aruba_stack,development,chassis
 #
 # ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,trunks
 # ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,create_vlans
-# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,untagged_vlans
+
+# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,interfaces
 # ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,tagged_vlans
 # ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,ip
 #
@@ -296,24 +296,6 @@
       loop: "{{ modules }}"
       when: modular
 
-    - name: Update device interfaces 
-      tags:
-        - interfaces
-        - update
-      netbox.netbox.netbox_device_interface:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          device: "{{ item.hostname }}"
-          name: "{{ item.interface }}"
-          description: "{{ item.name }}"
-          type: "{{ item.type }}"
-          poe_mode: "{{ item.poe_mode }}"
-          poe_type: "{{ item.poe_type }}"
-        state: present
-      loop: "{{ device_interfaces }}"
-
     - name: Create virtual chassis 
       tags: 
         - create_chassis
@@ -398,7 +380,6 @@
     - name: Create VLANs
       tags:
         - create_vlans
-        - vlans
         - update
       netbox.netbox.netbox_vlan:
         netbox_url: "{{ netbox_url }}"
@@ -410,10 +391,9 @@
         state: present
       loop: "{{ vlans }}"
 
-    - name: Assign untagged VLANs to interfaces (remove all tagged VLANs)
+    - name: Update device interfaces 
       tags:
-        - untagged_vlans
-        - vlans
+        - interfaces
         - update
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
@@ -422,17 +402,20 @@
         data:
           device: "{{ item.hostname }}"
           name: "{{ item.interface }}"
-          mode: Access
+          description: "{{ item.name }}"
+          type: "{{ item.type }}"
+          poe_mode: "{{ item.poe_mode }}"
+          poe_type: "{{ item.poe_type }}"
           tagged_vlans: []
-          untagged_vlan: 
-            vlan_id: "{{ item.vlan_id }}"
-            name: "{{ item.vlan_name }}"
-      loop: "{{ untagged_vlans }}"
+          untagged_vlan: "{{ { 'vlan_id': item.vlan_id, 'name': item.vlan_name } if item.vlan_id else omit }}" # omit the value if null id found
+          mode: "{{ 'Tagged' if item.is_lag | default(false) else 'Access' }}" # Dynamically assign mode
+        state: present
+        update_vc_child: true
+      loop: "{{ device_interfaces }}"
 
     - name: Assign tagged VLANs to interfaces
       tags: 
         - tagged_vlans
-        - vlans
         - update
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
@@ -443,6 +426,7 @@
           name: "{{ item.interface }}"
           mode: Tagged
           tagged_vlans: "{{ item.tagged_vlans }}"
+        update_vc_child: true
       loop: "{{ tagged_vlans }}"
 
     - name: Create VLAN interfaces for loopback IPs

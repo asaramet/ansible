@@ -137,68 +137,6 @@ def trunks_json(config_files):
 
     return data
 
-def device_interfaces_json(config_files):
-    data = {'device_interfaces': [], 'delete_interfaces': []}
-    unique_interfaces = set()
-    unique_delete_interfaces = set()
-
-    for t_file in config_files:
-        hostname = get_hostname(t_file)
-        i_types = interfaces_types(t_file)
-        os_version = get_os_version(t_file)
-        prefix = '1/1/' if os_version == 'ArubaOS-CX' else ''
-
-        # Process module interfaces (only if modules exist)
-        for module in get_modules(t_file):
-            interfaces_dict = modules_interfaces(module['type'], module['module'])
-            for keys_range, type_value in interfaces_dict['types'].items():
-                for key in convert_range(keys_range):
-                    i_types["type"][key] = type_value
-                    i_types["poe_type"][key] = interfaces_dict['poe_types'].get(keys_range)
-                    i_types["poe_mode"][key] = interfaces_dict['poe_mode'].get(keys_range)
-
-        # Process normal interfaces
-        for interface, name in get_interface_names(t_file):
-            if interface == "mgmt":
-                continue  # Skip management interface
-
-            i_nr = interface.split('/')[-1]  # Extract last part of interface
-            stack_nr = interface.split('/')[0] if '/' in interface else '0'
-            stack_hostname = hostname.get('0', hostname.get(stack_nr))
-
-            if stack_hostname is None:
-                continue  # Skip if hostname resolution fails
-
-            entry = (
-                stack_hostname,
-                interface,
-                name,
-                i_types["type"].get(i_nr),
-                i_types["poe_mode"].get(i_nr),
-                i_types["poe_type"].get(i_nr),
-            )
-
-            unique_interfaces.add(entry)
-
-        # Set interfaces to delete. Usually default interfaces for slaves in stacks
-        for stack_nr, stack_name in hostname.items():
-            if int(stack_nr) > 1:
-                for interface in i_types['type']:
-                    unique_delete_interfaces.add((stack_name, prefix + interface))
-
-    # Convert sets back to lists of dictionaries
-    data['device_interfaces'] = [
-        {'hostname': h, 'interface': i, 'name': n, 'type': t, 'poe_mode': p_mode, 'poe_type': p_type}
-        for h, i, n, t, p_mode, p_type in unique_interfaces
-    ]
-
-    data['delete_interfaces'] = [
-        {'hostname': h, 'interface': i}
-        for h, i in unique_delete_interfaces
-    ]
-
-    return data
-
 def vlans_json(config_files):
     # collect unique vlans
     vlans = set()
@@ -214,45 +152,143 @@ def vlans_json(config_files):
 
     return data
 
-def untagged_vlans_json(config_files):
-    data = {'untagged_vlans':[]}
+def untagged_vlans(config_files):
+    data = {'untagged_vlans': []}
 
     for t_file in config_files:
-        hostname = get_hostname(t_file)
-        vlan_sets = get_untagged_vlans(t_file)
-        # ex: [('1', 'B10-B13,B15-B20,E2,E4,E6,E8,F2,F4,F6,F8'), ('50', 'A2-A24'), ('101', 'A1,B2,B9,B14,B21-B24,E5,E7,F5,F7,Trk1,Trk20-Trk24')]
-        # ex2: [('1', '2/49-2/50'), ('50', '1/2-1/6,1/8,1/10-1/12,1/15,1/19,1/22-1/24,1/27-1/28,1/30-1/32,1/35-1/36,1/39-1/40,1/43-1/44,1/46-1/48,2/3,2/7,2/10,2/12,2/14-2/20,2/22,2/24-2/48')]
+        hostname_map = get_hostname(t_file)
 
-        # update data for single switches 
-        if '0' in hostname.keys():
-            hostname = hostname['0']
+        # Get untagged and tagged vlan sets
+        untagged_sets = get_untagged_vlans(t_file)
+        tagged_sets = get_untagged_vlans(t_file, 'tagged')
+        vlan_names = get_vlans_names(t_file)
 
-            for vlan_id, interfaces_range in vlan_sets:
-                vlan_name = get_vlans_names(t_file)[vlan_id]
-                for _, interface in convert_interfaces_range(interfaces_range):
-                    data['untagged_vlans'].append({'hostname': hostname, 'interface': interface,
-                        'vlan_id': vlan_id, 'vlan_name': vlan_name})
-                continue
-            continue
-        
-        # update data for stacks 
-        trunk_stacks = get_trunk_stack(t_file)
-        for vlan_id, interfaces_range in vlan_sets:
-            vlan_name = get_vlans_names(t_file)[vlan_id]
+        # Collect all LAG interfaces from tagged VLANs
+        lags = {
+            interface
+            for _, int_range in tagged_sets
+            for _, interface in convert_interfaces_range(int_range)
+        }
 
-            for stack_nr, interface in convert_interfaces_range(interfaces_range):
+        # Determine if device is single (flat) or stack
+        is_stack = isinstance(hostname_map, dict) and '0' not in hostname_map
+        trunk_stacks = get_trunk_stack(t_file) if is_stack else None
 
-                # Find stack number for Trunks
-                if 'T' in interface: 
-                    for nr in range(1,20):
+        for vlan_id, int_range in untagged_sets:
+            vlan_name = vlan_names.get(vlan_id, f"VLAN {vlan_id}")
+            interfaces = convert_interfaces_range(int_range)
+
+            for stack_nr, interface in interfaces:
+                is_lag = interface in lags
+
+                # For trunk interfaces in stacks, correct stack_nr
+                if is_stack and 'T' in interface:
+                    for nr in range(1, 20):
                         if (interface, str(nr)) in trunk_stacks:
                             stack_nr = str(nr)
                             break
 
-                data['untagged_vlans'].append({'hostname': hostname[stack_nr], 'interface': str(interface),
-                    'vlan_id': vlan_id, 'vlan_name': vlan_name})
+                hostname = (
+                    hostname_map
+                    if not is_stack else hostname_map.get(stack_nr, f"unknown-{stack_nr}")
+                )
+
+                data['untagged_vlans'].append({
+                    'hostname': hostname,
+                    'interface': str(interface),
+                    'vlan_id': vlan_id,
+                    'vlan_name': vlan_name,
+                    'is_lag': is_lag
+                })
 
     return data
+
+def device_interfaces_json(config_files):
+    data = {'device_interfaces': [], 'delete_interfaces': []}
+    unique_interfaces = set()
+    unique_delete_interfaces = set()
+
+    # Get untagged VLAN data first
+    vlan_data = untagged_vlans(config_files)['untagged_vlans']
+
+    # Normalize hostnames to strings and build a proper lookup
+    vlan_lookup = {}
+    for entry in vlan_data:
+        host = entry['hostname']
+        if isinstance(host, dict):
+            host = host.get('0')  # Fallback to stack 0 if needed
+        if host is not None:
+            vlan_lookup[(host, entry['interface'])] = {
+                'vlan_id': entry.get('vlan_id'),
+                'vlan_name': entry.get('vlan_name'),
+                'is_lag': entry.get('is_lag', False)
+            }
+
+    for t_file in config_files:
+        hostname = get_hostname(t_file)
+        i_types = interfaces_types(t_file)
+        os_version = get_os_version(t_file)
+        prefix = '1/1/' if os_version == 'ArubaOS-CX' else ''
+
+        # Process module interfaces
+        for module in get_modules(t_file):
+            interfaces_dict = modules_interfaces(module['type'], module['module'])
+            for keys_range, type_value in interfaces_dict['types'].items():
+                for key in convert_range(keys_range):
+                    i_types["type"][key] = type_value
+                    i_types["poe_type"][key] = interfaces_dict['poe_types'].get(keys_range)
+                    i_types["poe_mode"][key] = interfaces_dict['poe_mode'].get(keys_range)
+
+        # Process normal interfaces
+        for interface, name in get_interface_names(t_file):
+            if interface == "mgmt":
+                continue
+
+            i_nr = interface.split('/')[-1]
+            stack_nr = interface.split('/')[0] if '/' in interface else '0'
+            stack_hostname = hostname.get('0', hostname.get(stack_nr))
+
+            if stack_hostname is None:
+                continue
+
+            vlan_info = vlan_lookup.get((stack_hostname, interface), {})
+            entry = (
+                stack_hostname,
+                interface,
+                name,
+                i_types["type"].get(i_nr),
+                i_types["poe_mode"].get(i_nr),
+                i_types["poe_type"].get(i_nr),
+                vlan_info.get('vlan_id'),
+                vlan_info.get('vlan_name'),
+                vlan_info.get('is_lag', False)
+            )
+
+            unique_interfaces.add(entry)
+
+        # Interfaces to delete for stack slaves
+        for stack_nr, stack_name in hostname.items():
+            if int(stack_nr) > 1:
+                for interface in i_types['type']:
+                    unique_delete_interfaces.add((stack_name, prefix + interface))
+
+    # Build final lists
+    data['device_interfaces'] = [
+        {
+            'hostname': h, 'interface': i, 'name': n, 'type': t,
+            'poe_mode': p_mode, 'poe_type': p_type,
+            'vlan_id': v_id, 'vlan_name': v_name, 'is_lag': is_lag
+        }
+        for h, i, n, t, p_mode, p_type, v_id, v_name, is_lag in unique_interfaces
+    ]
+
+    data['delete_interfaces'] = [
+        {'hostname': h, 'interface': i}
+        for h, i in unique_delete_interfaces
+    ]
+
+    return data
+
 
 def tagged_vlans_json(config_files):
     data = {'tagged_vlans':[]}
@@ -387,12 +423,12 @@ def debug_device_interfaces_json(data_folder):
     print("\n'device_interfaces_json()' Output: for ", data_folder)
     print(output)
 
-def debug_untagged_vlans_json(data_folder):
+def debug_untagged_vlans(data_folder):
     files = config_files(data_folder)
     devices_tags = ["switch"]
-    output = yaml.dump(untagged_vlans_json(files))
+    output = yaml.dump(untagged_vlans(files))
 
-    print("\n'untagged_vlans_json()' Output: for ", data_folder)
+    print("\n'untagged_vlans()' Output: for ", data_folder)
     print(output)
 
 def debug_tagged_vlans_json(data_folder):
@@ -423,12 +459,12 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/hpe-8-ports/"
     data_folder = main_folder + "/data/aruba-48-ports/"
 
-    debug_locations_json(data_folder)
-    debug_devices_json(data_folder)
+    #debug_locations_json(data_folder)
+    #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     #debug_vlans_json(data_folder)
-    #debug_untagged_vlans_json(data_folder)
+    #debug_untagged_vlans(data_folder)
     #debug_tagged_vlans_json(data_folder)
     #debug_ip_addresses_json(data_folder)
 
@@ -437,26 +473,25 @@ if __name__ == "__main__":
     print("\n=== ProCurve Singles JSON ===")
     data_folder = main_folder + "/data/procurve-single/"
 
-    debug_locations_json(data_folder)
+    #debug_locations_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     #debug_tagged_vlans_json(data_folder)
 
     #debug_device_interfaces_json(data_folder)
 
+    print("\n=== Aruba Stacks JSON ===")
     #data_folder = main_folder + "/data/aruba-stack/"
     #data_folder = main_folder + "/data/aruba-stack-2920/"
     data_folder = main_folder + "/data/aruba-stack-2930/"
 
-    print("\n=== data_folder ===")
     #debug_device_interfaces_json(data_folder)
 
-
-    debug_locations_json(data_folder)
-    debug_devices_json(data_folder)
+    #debug_locations_json(data_folder)
+    #debug_devices_json(data_folder)
     #debug_trunks_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     #debug_vlans_json(data_folder)
-    #debug_untagged_vlans_json(data_folder)
+    #debug_untagged_vlans(data_folder)
     #debug_tagged_vlans_json(data_folder)
     #debug_ip_addresses_json(data_folder)
 
@@ -484,6 +519,7 @@ if __name__ == "__main__":
     #debug_locations_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     #debug_modules_json(data_folder)
+    #debug_untagged_vlans(data_folder)
 
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
@@ -494,6 +530,6 @@ if __name__ == "__main__":
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
-    debug_locations_json(data_folder)
+    #debug_locations_json(data_folder)
     #debug_vlans_json(data_folder)
     #debug_device_interfaces_json(data_folder)

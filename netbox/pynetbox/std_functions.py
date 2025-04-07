@@ -718,11 +718,11 @@ if __name__ == "__main__":
     #debug_get_interface_names(data_folder)
     #debug_get_vlans(data_folder)
     #debug_get_vlans_names(data_folder)
-    #debug_get_untagged_vlans(data_folder)
+    debug_get_untagged_vlans(data_folder)
     #debug_get_ip_address(data_folder)
     #debug_device_type(data_folder)
     #debug_get_modules(data_folder)
-    debug_get_location(data_folder)
+    #debug_get_location(data_folder)
 
     print("\n=== Stacking ===")
     data_folder = main_folder + "/data/aruba-stack-2930/"
@@ -732,7 +732,7 @@ if __name__ == "__main__":
     #data_folder = main_folder + "/data/aruba-stack-2920/"
     print("\nData folder: ", data_folder)
 
-    debug_get_location(data_folder)
+    #debug_get_location(data_folder)
     #debug_get_room_location(data_folder)
     #debug_get_flor_nr(data_folder)
     #debug_get_site(data_folder)
@@ -743,17 +743,19 @@ if __name__ == "__main__":
     #debug_get_trunks(data_folder)
     #debug_get_trunk_stack(data_folder)
     #debug_get_modules(data_folder)
+    debug_get_untagged_vlans(data_folder)
 
     data_folder = main_folder + "/data/aruba-modular/"
     print("\nData folder: ", data_folder)
     #debug_get_modules(data_folder)
-    debug_get_location(data_folder)
+    #debug_get_location(data_folder)
 
     #debug_get_location(data_folder)
     #debug_get_room_location(data_folder)
     #debug_get_flor_nr(data_folder)
     #debug_get_site(data_folder)
     #debug_get_modules(data_folder)
+    debug_get_untagged_vlans(data_folder)
 
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
@@ -764,7 +766,7 @@ if __name__ == "__main__":
     #debug_get_site(data_folder)
 
     #debug_get_os_version(data_folder)
-    debug_get_location(data_folder)
+    #debug_get_location(data_folder)
     #debug_get_hostname(data_folder)
     #debug_get_ip_address(data_folder)
     #debug_get_vlans(data_folder)

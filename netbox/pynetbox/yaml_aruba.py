@@ -8,7 +8,7 @@ from tabulate import tabulate
 from std_functions import this_folder, main_folder, config_files
 
 from json_functions import devices_json, trunks_json, device_interfaces_json
-from json_functions import vlans_json, untagged_vlans_json, tagged_vlans_json
+from json_functions import vlans_json, tagged_vlans_json
 from json_functions import ip_addresses_json, locations_json, modules_json
 
 # Collect single switches data and saved it to a YAML file
@@ -31,7 +31,6 @@ def single(data_folder, output_file_path, device_type_slags, devices_tags):
         yaml.dump(trunks_json(files), f)
         yaml.dump(device_interfaces_json(files), f)
         yaml.dump(vlans_json(files), f)
-        yaml.dump(untagged_vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)
     finally:
@@ -49,7 +48,6 @@ def modular(data_folder, output_file_path, device_type_slags, devices_tags):
         yaml.dump(trunks_json(files), f)
         yaml.dump(device_interfaces_json(files), f)
         yaml.dump(vlans_json(files), f)
-        yaml.dump(untagged_vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)
 
@@ -68,7 +66,6 @@ def stack(data_folder, output_file_path, device_type_slags, devices_tags):
         yaml.dump(device_interfaces_json(files), f)
         yaml.dump(trunks_json(files), f)
         yaml.dump(vlans_json(files), f)
-        yaml.dump(untagged_vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)
 
@@ -87,7 +84,6 @@ def stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
         yaml.dump(device_interfaces_json(files), f)
         yaml.dump(trunks_json(files), f)
         yaml.dump(vlans_json(files), f)
-        yaml.dump(untagged_vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)
 
