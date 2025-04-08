@@ -106,6 +106,16 @@
       include_vars:
         file: ../data/yaml/aruba_modular_stack.yaml
 
+    - name: Include locations vars vor Aruba 6100 switches
+      tags: aruba_6100
+      include_vars:
+        file: ../data/yaml/aruba_6100.yaml
+
+    - name: Include locations vars vor Aruba 6300 switches
+      tags: aruba_6300
+      include_vars:
+        file: ../data/yaml/aruba_6300.yaml
+
     - name: Create a Room (location)
       tags: 
         - location
@@ -340,11 +350,8 @@
       loop: "{{ devices }}"
       when: chassis is defined and chassis | length > 0 
 
-# TODO - Integrate aruba_6xxx.yaml from here
-
     - name: Create Trunk interfaces as LAG
       tags:
-        - lags
         - trunks
         - update
       netbox.netbox.netbox_device_interface:
@@ -358,6 +365,7 @@
         update_vc_child: true
         state: present
       loop: "{{ trunks }}"
+      when: trunks is defined and trunks | length > 0
 
     - name: Assign interfaces to Trunks
       tags:
@@ -376,6 +384,43 @@
         update_vc_child: true
         state: present
       loop: "{{ trunk_interfaces }}"
+      when: trunks is defined and trunks | length > 0
+
+    - name: Create LAG interfaces
+      tags:
+        - create_lags
+        - lags
+        - update
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "lag {{ item.lag_id }}"
+          type: Link Aggregation Group (LAG)
+        state: present
+      loop: "{{ lags }}"
+      when: lags is defined and lags | length > 0
+
+    - name: Assign interfaces to LAGs
+      tags:
+        - lag_interfaces
+        - lags
+        - update
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        update_vc_child: true
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          lag:
+            name: "lag {{ item.lag_id}}"
+        state: present
+      loop: "{{ lag_interfaces }}"
+      when: lags is defined and lags | length > 0
 
     - name: Create VLANs
       tags:
@@ -390,6 +435,8 @@
           vid: "{{ item.id }}"
         state: present
       loop: "{{ vlans }}"
+
+# TODO - Integrate aruba_6xxx.yaml from here
 
     - name: Update device interfaces 
       tags:
@@ -408,7 +455,7 @@
           poe_type: "{{ item.poe_type }}"
           tagged_vlans: []
           untagged_vlan: "{{ { 'vlan_id': item.vlan_id, 'name': item.vlan_name } if item.vlan_id else omit }}" # omit the value if null id found
-          mode: "{{ 'Tagged' if item.is_lag | default(false) else 'Access' }}" # Dynamically assign mode
+          mode: "{{ 'Tagged' if item.is_trunk | default(false) else 'Access' }}" # Dynamically assign mode
         state: present
         update_vc_child: true
       loop: "{{ device_interfaces }}"
@@ -483,6 +530,8 @@
           primary_ip4: "{{ item.ip }}"
         state: present
       loop: "{{ ip_addresses }}"
+
+# ---=== Debugging ===---#
 
     - name: "Debug: Get NetBox ID device lookup for each master in a chassis"
       tags: debug

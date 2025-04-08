@@ -9,7 +9,7 @@ from std_functions import this_folder, main_folder, config_files
 from std_functions import device_type, serial_numbers, convert_interfaces_range
 from std_functions import get_os_version, get_hostname, get_device_role, get_site
 from std_functions import get_trunks, get_interface_names, get_vlans
-from std_functions import get_untagged_vlans, get_vlans_names, get_trunk_stack
+from std_functions import get_untagged_vlans, get_tagged_vlans, get_vlans_names, get_trunk_stack
 from std_functions import get_ip_address, get_modules, module_types_dict
 from std_functions import module_types_dict, modules_interfaces
 from std_functions import convert_range
@@ -160,7 +160,8 @@ def untagged_vlans(config_files):
 
         # Get untagged and tagged vlan sets
         untagged_sets = get_untagged_vlans(t_file)
-        tagged_sets = get_untagged_vlans(t_file, 'tagged')
+
+        tagged_sets = get_tagged_vlans(t_file)
         vlan_names = get_vlans_names(t_file)
 
         # Collect all LAG interfaces from tagged VLANs
@@ -179,7 +180,7 @@ def untagged_vlans(config_files):
             interfaces = convert_interfaces_range(int_range)
 
             for stack_nr, interface in interfaces:
-                is_lag = interface in lags
+                is_trunk = interface in lags
 
                 # For trunk interfaces in stacks, correct stack_nr
                 if is_stack and 'T' in interface:
@@ -198,7 +199,7 @@ def untagged_vlans(config_files):
                     'interface': str(interface),
                     'vlan_id': vlan_id,
                     'vlan_name': vlan_name,
-                    'is_lag': is_lag
+                    'is_trunk': is_trunk
                 })
 
     return data
@@ -221,7 +222,7 @@ def device_interfaces_json(config_files):
             vlan_lookup[(host, entry['interface'])] = {
                 'vlan_id': entry.get('vlan_id'),
                 'vlan_name': entry.get('vlan_name'),
-                'is_lag': entry.get('is_lag', False)
+                'is_trunk': entry.get('is_trunk', False)
             }
 
     for t_file in config_files:
@@ -244,6 +245,12 @@ def device_interfaces_json(config_files):
             if interface == "mgmt":
                 continue
 
+            if interface.lower().startswith('vlan '):
+                i_types["type"][interface] = "Virtual"
+
+            if interface.lower().startswith('lag '):
+                i_types["type"][interface] = "LAG"
+
             i_nr = interface.split('/')[-1]
             stack_nr = interface.split('/')[0] if '/' in interface else '0'
             stack_hostname = hostname.get('0', hostname.get(stack_nr))
@@ -261,7 +268,7 @@ def device_interfaces_json(config_files):
                 i_types["poe_type"].get(i_nr),
                 vlan_info.get('vlan_id'),
                 vlan_info.get('vlan_name'),
-                vlan_info.get('is_lag', False)
+                vlan_info.get('is_trunk', False)
             )
 
             unique_interfaces.add(entry)
@@ -277,9 +284,9 @@ def device_interfaces_json(config_files):
         {
             'hostname': h, 'interface': i, 'name': n, 'type': t,
             'poe_mode': p_mode, 'poe_type': p_type,
-            'vlan_id': v_id, 'vlan_name': v_name, 'is_lag': is_lag
+            'vlan_id': v_id, 'vlan_name': v_name, 'is_trunk': is_trunk
         }
-        for h, i, n, t, p_mode, p_type, v_id, v_name, is_lag in unique_interfaces
+        for h, i, n, t, p_mode, p_type, v_id, v_name, is_trunk in unique_interfaces
     ]
 
     data['delete_interfaces'] = [
@@ -298,7 +305,7 @@ def tagged_vlans_json(config_files):
 
         # get list of tagged vlan tuples like:
         # [('5', 'A23-A24,B10,B20,F1,F4'), ('9', 'A23-A24,B10,B20,F1,F4'), ('50', 'A23-A24,B10,B20,F1,F4')]
-        vlan_sets = get_untagged_vlans(t_file, 'tagged')
+        vlan_sets = get_tagged_vlans(t_file)
 
         trunk_stacks = get_trunk_stack(t_file)
         for vlan_id, interfaces_range in vlan_sets:
@@ -526,6 +533,7 @@ if __name__ == "__main__":
 
     #debug_vlans_json(data_folder)
     #debug_device_interfaces_json(data_folder)
+    debug_untagged_vlans(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
@@ -533,3 +541,4 @@ if __name__ == "__main__":
     #debug_locations_json(data_folder)
     #debug_vlans_json(data_folder)
     #debug_device_interfaces_json(data_folder)
+    debug_untagged_vlans(data_folder)

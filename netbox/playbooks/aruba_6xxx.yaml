@@ -174,6 +174,38 @@
       loop: "{{ devices }}"
       when: chassis # if chassis is not an empty list
 
+    - name: Create LAG interfaces
+      tags:
+        - create_lags
+        - lags
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "lag {{ item.lag_id }}"
+          type: Link Aggregation Group (LAG)
+        state: present
+      loop: "{{ lags }}"
+
+    - name: Assign interfaces to LAGs
+      tags:
+        - ip_to_lags
+        - ip
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        update_vc_child: true
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          lag:
+            name: "lag {{ item.lag_id}}"
+        state: present
+      loop: "{{ lag_interfaces }}"
+
 # TODO: Move this to aruba.yaml
 
     - name: Create VLAN 1 interfaces
@@ -244,38 +276,6 @@
           primary_ip4: "{{ item.ip }}"
         state: present
       loop: "{{ ip_addresses }}"
-
-    - name: Create LAG interfaces
-      tags:
-        - create_lags
-        - lags
-      netbox.netbox.netbox_device_interface:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          device: "{{ item.hostname }}"
-          name: "lag {{ item.lag_id }}"
-          type: Link Aggregation Group (LAG)
-        state: present
-      loop: "{{ lags }}"
-
-    - name: Assign interfaces to LAGs
-      tags:
-        - ip_to_lags
-        - ip
-      netbox.netbox.netbox_device_interface:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        update_vc_child: true
-        data:
-          device: "{{ item.hostname }}"
-          name: "{{ item.interface }}"
-          lag:
-            name: "lag {{ item.lag_id}}"
-        state: present
-      loop: "{{ lag_interfaces }}"
 
     - name: Create new VLANs
       tags: 

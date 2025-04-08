@@ -41,7 +41,7 @@ def recursive_search(pattern, text, start=False):
     return found_lines
 
 # return a tuple (section, value), ex: (interface, interface_name), recursively from a switch config
-def recursive_section_search(text, section, value):
+def recursive_section_search_old(text, section, value):
     names_tuple = []
     section_value = None
 
@@ -60,6 +60,36 @@ def recursive_section_search(text, section, value):
             section_value = None  # Reset section
 
     return names_tuple
+
+def recursive_section_search(text, section, value):
+    """
+    Parses a config text block and returns a list of (section_value, value_found) tuples.
+    Example: [('interface_name', 'interface_description')]
+    """
+    results = []
+    current_section = None
+
+    for line in text:
+        stripped = line.strip()
+
+        # Start of a section
+        if stripped.startswith(section):
+            parts = stripped.split(maxsplit=1)
+            if len(parts) == 2:
+                current_section = parts[1]
+            continue
+
+        # Value found inside section
+        if current_section and stripped.startswith(value):
+            _, val = stripped.split(' ', 1)
+            results.append((current_section, val.strip('"')))
+            continue
+
+        # End of a section
+        if stripped in {"exit", "!"}:
+            current_section = None
+
+    return results
 
 # Return a list of file paths from a folder
 def config_files(data_folder):
@@ -323,11 +353,17 @@ def get_vlans_names(t_file):
         vlans[vlan_id] = vlan_name
     return vlans
 
-def get_untagged_vlans(t_file, pattern = 'untagged'):
+def get_untagged_vlans(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    return recursive_section_search(text, 'vlan', pattern)
+    return recursive_section_search(text, 'vlan', 'untagged')
+
+def get_tagged_vlans(t_file):
+    with open(t_file, "r") as f:
+        text = f.readlines()
+
+    return recursive_section_search(text, 'vlan', 'tagged')
 
 def get_ip_address(t_file):
     with open(t_file, "r") as f:
@@ -755,7 +791,7 @@ if __name__ == "__main__":
     #debug_get_flor_nr(data_folder)
     #debug_get_site(data_folder)
     #debug_get_modules(data_folder)
-    debug_get_untagged_vlans(data_folder)
+    #debug_get_untagged_vlans(data_folder)
 
     print("\n=== Aruba 6100 ===")
     data_folder = main_folder + "/data/aruba_6100/"
@@ -772,6 +808,7 @@ if __name__ == "__main__":
     #debug_get_vlans(data_folder)
     #debug_get_modules(data_folder)
     #debug_get_interface_names(data_folder)
+    debug_get_untagged_vlans(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"

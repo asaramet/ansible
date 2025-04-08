@@ -6,5 +6,5 @@
 SCRIPT_DIR="$(dirname $(realpath $0))"
 
 python3 ${SCRIPT_DIR}/yaml_aruba.py
-python3 ${SCRIPT_DIR}/yaml_aruba_6xxx.py
+python3 ${SCRIPT_DIR}/yaml_aruba_os_cx.py
 #python3 ${SCRIPT_DIR}/yaml_cisco.py
