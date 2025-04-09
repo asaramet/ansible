@@ -147,7 +147,7 @@ def convert_interfaces_range(interfaces_string):
             continue
 
         if '/' in str(el):
-            stack, _ = el.split('/')
+            stack = el.split('/')[0]
         i_list.append((stack,el))
 
     return i_list
@@ -357,13 +357,44 @@ def get_untagged_vlans(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    return recursive_section_search(text, 'vlan', 'untagged')
+    untagged = []
+
+    # --- Aruba OS-style untagged VLANs ---
+    untagged_sets = recursive_section_search(text, 'vlan', 'untagged')
+    if untagged_sets:
+        # Aruba-style configs: (vlan_id, interface_range)
+        untagged.extend((vlan, v_range, None) for vlan, v_range in untagged_sets)
+        return untagged
+
+    # --- Access VLANs ---
+    access_vlan_map = {}
+    for interface, vlan in recursive_section_search(text, 'interface', 'vlan access'):
+        _, vlan_id = vlan.split(' ', 1)  # Get just the vlan ID
+        access_vlan_map.setdefault(vlan_id, []).append(interface)
+
+    for vlan_id, interfaces in access_vlan_map.items():
+        untagged.append((vlan_id, ','.join(interfaces), False))
+
+    # --- Trunk Native VLANs ---
+    native_vlan_map = {}
+    for interface, vlan_line in recursive_section_search(text, 'interface', 'vlan trunk'):
+        parts = vlan_line.split()
+        if len(parts) >= 3 and parts[1] == 'native':
+            vlan_id = parts[2]
+            native_vlan_map.setdefault(vlan_id, []).append(interface)
+
+    for vlan_id, interfaces in native_vlan_map.items():
+        untagged.append((vlan_id, ','.join(interfaces), True))
+
+    return untagged
 
 def get_tagged_vlans(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
     return recursive_section_search(text, 'vlan', 'tagged')
+
+    return "None"
 
 def get_ip_address(t_file):
     with open(t_file, "r") as f:
@@ -817,6 +848,7 @@ if __name__ == "__main__":
     #debug_get_hostname(data_folder)
     #debug_get_vlans(data_folder)
     #debug_get_modules(data_folder)
+    debug_get_untagged_vlans(data_folder)
 
     print("\n=== No files functions ===")
     #debug_convert_range()

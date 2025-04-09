@@ -175,12 +175,13 @@ def untagged_vlans(config_files):
         is_stack = isinstance(hostname_map, dict) and '0' not in hostname_map
         trunk_stacks = get_trunk_stack(t_file) if is_stack else None
 
-        for vlan_id, int_range in untagged_sets:
+        for vlan_id, int_range, is_trunk in untagged_sets:
             vlan_name = vlan_names.get(vlan_id, f"VLAN {vlan_id}")
             interfaces = convert_interfaces_range(int_range)
 
             for stack_nr, interface in interfaces:
-                is_trunk = interface in lags
+                if is_trunk is None:
+                    is_trunk = interface in lags
 
                 # For trunk interfaces in stacks, correct stack_nr
                 if is_stack and 'T' in interface:
@@ -534,11 +535,12 @@ if __name__ == "__main__":
     #debug_vlans_json(data_folder)
     #debug_device_interfaces_json(data_folder)
     debug_untagged_vlans(data_folder)
+    #debug_device_interfaces_json(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
 
     #debug_locations_json(data_folder)
     #debug_vlans_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
-    debug_untagged_vlans(data_folder)
+    #debug_untagged_vlans(data_folder)
+    debug_device_interfaces_json(data_folder)
