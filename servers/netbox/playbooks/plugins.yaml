@@ -5,7 +5,7 @@
   tags: localhost
   vars: 
     clear: &clear false
-    server: &server debian12-ansible
+    server: &server debian
     #server: &server hs_netbox 
 
 - name: Install NetBox plugins

@@ -1,3 +1,4 @@
 ---
 local_src_folder: "{{ inventory_dir }}/src/local"
+local_backup_folder: "{{ inventory_dir }}/data/db_dumps"
 ...

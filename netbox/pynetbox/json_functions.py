@@ -474,7 +474,7 @@ if __name__ == "__main__":
     #debug_vlans_json(data_folder)
     #debug_untagged_vlans(data_folder)
     #debug_tagged_vlans_json(data_folder)
-    #debug_ip_addresses_json(data_folder)
+    debug_ip_addresses_json(data_folder)
 
     #debug_device_interfaces_json(data_folder)
 
@@ -534,8 +534,9 @@ if __name__ == "__main__":
 
     #debug_vlans_json(data_folder)
     #debug_device_interfaces_json(data_folder)
-    debug_untagged_vlans(data_folder)
+    #debug_untagged_vlans(data_folder)
     #debug_device_interfaces_json(data_folder)
+    debug_ip_addresses_json(data_folder)
 
     print("\n=== Aruba 6300 ===")
     data_folder = main_folder + "/data/aruba_6300/"
@@ -543,4 +544,5 @@ if __name__ == "__main__":
     #debug_locations_json(data_folder)
     #debug_vlans_json(data_folder)
     #debug_untagged_vlans(data_folder)
-    debug_device_interfaces_json(data_folder)
+    #debug_device_interfaces_json(data_folder)
+    #debug_ip_addresses_json(data_folder)

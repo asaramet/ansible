@@ -38,7 +38,7 @@ cd $EXEC_DIR
 ansible-playbook playbooks/sync_data.yaml | tee ${logs_folder}/sync_data.logs &&
 
 python3 pynetbox/yaml_aruba.py | tee ${logs_folder}/pynetbox.logs  &&
-python3 pynetbox/yaml_aruba_6xxx.py | tee -a ${logs_folder}/pynetbox.logs &&
+python3 pynetbox/yaml_aruba_os_cx.py | tee -a ${logs_folder}/pynetbox.logs &&
 #python3 pynetbox/yaml_cisco.py | tee -a ${logs_folder}/pynetbox.logs  &&
 
 ansible-playbook playbooks/backup_sql.yaml | tee ${logs_folder}/backup.logs &&

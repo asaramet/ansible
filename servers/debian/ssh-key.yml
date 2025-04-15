@@ -1,10 +1,8 @@
 ---
 - name: Set root login through ssh key only
-  hosts: debian12-ansible
+  hosts: debian
   gather_facts: false
   become: true # run as root
-  vars:
-    ansible_password: 
   tasks: 
     - name: Set authorized ssh key for root, removing all the authorized keys already set
       ansible.posix.authorized_key:

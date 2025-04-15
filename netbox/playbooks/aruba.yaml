@@ -436,8 +436,6 @@
         state: present
       loop: "{{ vlans }}"
 
-# TODO - Integrate aruba_6xxx.yaml from here
-
     - name: Update device interfaces 
       tags:
         - interfaces
@@ -459,6 +457,8 @@
         state: present
         update_vc_child: true
       loop: "{{ device_interfaces }}"
+
+# TODO - Integrate aruba_6xxx.yaml from here
 
     - name: Assign tagged VLANs to interfaces
       tags: 
@@ -486,6 +486,7 @@
         netbox_url: "{{ netbox_url }}"
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
+        update_vc_child: true
         data:
           device: "{{ item.hostname }}"
           name: "vlan {{ item.vlan_id }}"

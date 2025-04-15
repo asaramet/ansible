@@ -1,6 +1,8 @@
 ---
 # Update NetBox version and required Python packages locally
 #
+# ansible-playbook playbooks/update_packages.yaml
+#
 # Constants:
 # 
 # netbox_version - defined in `host_vars/localhost/vars.yaml`
@@ -45,6 +47,8 @@
       ansible.builtin.blockinfile:
         path: "{{ requirements_txt }}"
         block: |
+          setuptools
+          wheel
           netbox-documents
           netbox-plugin-dns
           netbox-qrcode
@@ -63,7 +67,7 @@
         cmd: "python3.11 -m venv {{ venv_path }}"
         executable: /usr/bin/bash
 
-    - name: Download required packaged
+    - name: Download required packages
       ansible.builtin.shell:
         cmd: "source bin/activate && pip download -r {{ requirements_txt }} -d packages"
         executable: /usr/bin/bash

@@ -15,7 +15,7 @@
   tasks:
     - name: Set server 
       set_fact:
-        server: "{{ 'hs_netbox' if  production else 'debian12_ansible' }}"
+        server: "{{ 'hs_netbox' if  production else 'debian' }}"
 
     - name: "Running updates on: "
       debug:
@@ -49,7 +49,7 @@
         - python3-psycopg2
         - redis-server
         - python3-dev 
-        - python3-venv 
+        - python3-virtualenv
         - build-essential 
         - libxml2-dev 
         - libxslt1-dev 

@@ -9,7 +9,7 @@ from std_functions import get_hostname, get_site
 from std_functions import get_location, get_room_location
 
 from extra_functions import get_uplink_vlan, get_interfaces_config
-from extra_functions import get_looback_interface, get_lag_interfaces
+from extra_functions import get_loopback_interface, get_lag_interfaces
 from extra_functions import get_interfaces, get_vlan_names, interfaces_types
 
 # create devices json objects list
@@ -85,7 +85,7 @@ def ip_addresses_json(config_files):
 
     for config_file in config_files:
         hostnames = get_hostname(config_file)
-        loopback_interface = get_looback_interface(config_file)
+        loopback_interface = get_loopback_interface(config_file)
 
         vlan = True # Flag that shows that loopback interface is a vlan
         if len(loopback_interface) == 2:
@@ -205,7 +205,7 @@ if __name__ == "__main__":
 
     #debug_devices_json(data_folder)
     #debug_device_interfaces_json(data_folder)
-    #debug_ip_addresses_json(data_folder)
+    debug_ip_addresses_json(data_folder)
     #debug_lags_json(data_folder)
     #debug_interfaces_json(data_folder)
 

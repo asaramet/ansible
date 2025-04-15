@@ -47,6 +47,15 @@ The server is based on **Debian 12**, which comes with **Python 3.11.2** by defa
 To address this, we use **`pyenv`** to manage Python versions. This allows us to:  
 
 1. Install **Python 3.11** within a controlled environment.  
+
+    ```bash
+    pyenv install -h 
+    pyenv install -l # List all available versions to install
+    pyenv install 3.11.2
+
+    pyenv versions # Lists all versions available on the system
+    ```
+
 2. Set it as the default version for a specific directory where **Ansible update tasks** will run.  
 
 ### Useful `pyenv` Commands  
@@ -63,6 +72,45 @@ pyenv local 3.11.2
 ```
 
 By using **`pyenv local`**, the selected Python version will be automatically activated whenever you enter the designated project directory.  
+
+## Fresh server install with Ansible
+
+Development server, i.e `debian`. For production server, add `-e production=true` option.
+
+1. Update Debian packages
+
+    ```bash
+    ansible-playbook playbooks/update_server.yaml
+    ```
+
+2. Collect required pip packages
+
+    ```bash
+    ansible-playbook playbooks/update_packages.yaml
+    ```
+
+3. Install NetBox
+
+    ```bash
+    ansible-playbook playbooks/install.yaml
+    ```
+
+4. Create `admin` user on the NetBox platform
+
+    ```bash
+    ansible-playbook playbooks/create_admin.yaml
+    ```
+
+5. Restore SQL database.
+
+    Specify the dump file date in `dump_file_date` variable in `restore_sql.yaml` playbook. And run:
+
+    ```bash
+    ansible-playbook playbooks/restore_sql.yaml
+    
+    # Usually a new install will require to copy the dump file from local machine
+    ansible-playbook playbooks/restore_sql.yaml - e from_local=true
+    ```
 
 ## Update NetBox
 

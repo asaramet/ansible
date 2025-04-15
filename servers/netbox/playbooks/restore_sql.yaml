@@ -1,18 +1,45 @@
 ---
+# Restore SQL database from a backup
+# Specify dump file data to restore from in:
+# - `dump_file_date`
+#
+# RUN
+# - development server
+#   ansible-playbook playbooks/restore_sql.yaml
+
+#   - copy the backup from local machine to the server
+#     ansible-playbook playbooks/restore_sql.yaml - e from_local=true
+#
+# - production server
+#    ansible-playbook playbooks/restore_sql.yaml -e production=true
+
 - name: Define global variables
   hosts: localhost
   gather_facts: false
   vars: 
     dump_folder: &dump_folder "/opt/db_dumps"
-    dump_file_date: &dump_file_date 2025-03-16
+    dump_file_date: &dump_file_date 2025-04-15
 
     from_local: &from_local false
     #from_local: &from_local true
-    server: &server debian12_ansible
-    #server: &server hs_netbox 
+
+    production: false
+
+  tasks:
+    - name: Set server 
+      set_fact:
+        server: "{{ 'hs_netbox' if  production else 'debian' }}"
+
+    - name: "Running install on: "
+      debug:
+        msg: "{{ server }}"
+
+    - name: "Is it a production server?"
+      debug:
+        msg: "{{ production }}"
 
 - name: Stop the services
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true 
   tasks:
@@ -21,8 +48,33 @@
         name: netbox
         state: stopped
 
+- name: Copy data from a local dump file
+  hosts: "{{ hostvars['localhost']['server'] }}"
+  gather_facts: false
+  become: true # run as root
+  vars:
+    dump_folder: *dump_folder
+    dump_file_date: *dump_file_date
+    from_local: *from_local
+  tasks: 
+    - name: "Create {{ dump_folder }} on the remote server"
+      file:
+        path: "{{ dump_folder }}"
+        state: directory
+        owner: postgres
+        group: postgres
+      when: from_local
+
+    - name: Copy local dump file to the remote "{{ dump_folder }}"
+      copy:
+        src: "{{ local_backup_folder }}/netbox-{{ dump_file_date }}.sql.gz"
+        dest: "{{ dump_folder }}/"
+        owner: postgres
+        group: postgres
+      when: from_local
+
 - name: Restore PostgreSQL database from a dump file
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true # run as root
   become_method: su
@@ -30,16 +82,7 @@
   vars:
     dump_folder: *dump_folder
     dump_file_date: *dump_file_date
-    from_local: *from_local
-  tasks: 
-    - name: Copy local dump file to the remote "{{ dump_folder }}"
-      copy:
-        src: "{{ local_src_folder }}/db_dumps/netbox-{{ dump_file_date }}.sql.gz"
-        dest: "{{ dump_folder }}/"
-        owner: postgres
-        group: postgres
-      when: from_local
-
+  tasks:
     - name: Drop the 'netbox' database
       community.postgresql.postgresql_db:
         name: netbox
@@ -57,13 +100,13 @@
         target: "{{ dump_folder }}/netbox-{{ dump_file_date }}.sql.gz"
 
 - name: Restore media
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true # run as root
   tags: media
   vars:
     from_local: *from_local
-    archived_data: "{{ local_src_folder }}/db_dumps/localdata.tgz"
+    archived_data: "{{ local_backup_folder }}/localdata.tgz"
   tasks:
     - name: "Restore local data from {{ archived_data }}"
       unarchive:
@@ -71,7 +114,7 @@
         dest: /opt
       when: from_local
 
-    - name: Restore local date from a remote backup
+    - name: Restore local data from a remote backup
       unarchive:
         src: /opt/db_dumps/localdata.tgz
         dest: /opt
@@ -79,7 +122,7 @@
       when: not from_local
 
 - name: Start the services
-  hosts: *server
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true 
   tasks:

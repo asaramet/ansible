@@ -53,7 +53,7 @@ def get_interfaces_config(config_file):
     return interface_configs
 
 # get vlan interface with IP loopback
-def get_looback_interface(config_file):
+def get_loopback_interface(config_file):
     interfaces = get_interfaces_config(config_file)
 
     #loopback_int = interfaces['mgmt'] if 'mgmt' in interfaces.keys() else interfaces['vlan']
@@ -88,7 +88,7 @@ def get_looback_interface(config_file):
 
 # Get uplink vlan
 def get_uplink_vlan(config_file):
-    return get_looback_interface(config_file)[0]
+    return get_loopback_interface(config_file)[0]
 
 def get_interfaces_recursively(config_text_list, interfaces = None, current_interface = None, found_interface_flag = False):
     # initialize interfaces properly if not provided
@@ -260,12 +260,12 @@ def debug_get_interfaces_config(config_file):
                 print(f"    {line}")
             print()
 
-def debug_get_looback_interface(data_folder):
+def debug_get_loopback_interface(data_folder):
     table = []
     headers = ["File Name", "Loopback interface"]
     for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_looback_interface(f)])
-    print("\n== Debug: get_looback_interface ==")
+        table.append([os.path.basename(f), get_loopback_interface(f)])
+    print("\n== Debug: get_loopback_interface ==")
     print(tabulate(table, headers))
 
 def debug_get_uplink_vlan(data_folder):
@@ -316,7 +316,7 @@ if __name__ == "__main__":
     config_file = data_folder + "rggw1018bp"
 
     #debug_get_interfaces_config(config_file)
-    #debug_get_looback_interface(data_folder)
+    #debug_get_loopback_interface(data_folder)
     #debug_get_uplink_vlan(data_folder)
     #debug_get_interfaces(data_folder)
     #debug_get_lag_interfaces(data_folder)
@@ -330,7 +330,7 @@ if __name__ == "__main__":
     config_file = data_folder + "rgcs0006"
 
     #debug_get_interfaces_config(config_file)
-    #debug_get_looback_interface(data_folder)
+    #debug_get_loopback_interface(data_folder)
     #debug_get_uplink_vlan(data_folder)
     #debug_get_interfaces(data_folder)
     #debug_get_lag_interfaces(data_folder)

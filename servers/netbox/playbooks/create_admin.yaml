@@ -1,7 +1,34 @@
 ---
+# Create admin user on a NetBox platform
+#
+# RUN
+# - development server
+#   ansible-playbook playbooks/create_admin.yaml
+#
+# - production server
+#    ansible-playbook playbooks/create_admin.yaml -e production=true
+
+- name: Define global variables
+  hosts: localhost
+  gather_facts: false
+  tags: global
+  vars: 
+    production: false
+  tasks:
+    - name: Set server 
+      set_fact:
+        server: "{{ 'hs_netbox' if  production else 'debian' }}"
+
+    - name: "Running install on: "
+      debug:
+        msg: "{{ server }}"
+
+    - name: "Is it a production server?"
+      debug:
+        msg: "{{ production }}"
+
 - name: Create `admin` super-user with Django `auth` module
-  #hosts: hs_netbox
-  hosts: debian12-ansible
+  hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
   become: true
   tags: admin

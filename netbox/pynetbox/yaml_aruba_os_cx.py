@@ -18,10 +18,10 @@ def to_yaml(data_folder, output_file_path, device_type_slags, devices_tags):
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
-        yaml.dump(device_interfaces_json(files), f)
-        yaml.dump(ip_addresses_json(files), f)
         yaml.dump(lags_json(files), f)
+        yaml.dump(device_interfaces_json(files), f)
         yaml.dump(vlans_json(files), f)
+        yaml.dump(ip_addresses_json(files), f)
         yaml.dump(interfaces_json(files), f)
 
 def main():
