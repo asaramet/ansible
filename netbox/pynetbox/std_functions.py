@@ -342,7 +342,9 @@ def get_vlans(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    return recursive_section_search(text, 'vlan', 'name ')
+    vlans = set(recursive_section_search(text, 'vlan', 'name '))
+    vlans.add(('1', 'DEFAULT_VLAN'))
+    return vlans
 
 def get_vlans_names(t_file):
     with open(t_file, "r") as f:
@@ -764,93 +766,46 @@ def debug_device_type(data_folder):
     print(tabulate(table, headers))
 
 if __name__ == "__main__":
-    print("\n=== Singles ===")
-    #data_folder = main_folder + "/data/aruba-8-ports/"
-    data_folder = main_folder + "/data/aruba-12-ports/"
-    #data_folder = main_folder + "/data/aruba-48-ports/"
-    #data_folder = main_folder + "/data/aruba-48-ports/"
-    #data_folder = main_folder + "/data/aruba-modular/"
-    #data_folder = main_folder + "/data/hpe-8-ports/"
-    #data_folder = main_folder + "/data/hpe-48-ports/"
-    #data_folder = main_folder + "/data/procurve-single/"
+    print("\n=== Debuging ===")
 
-    print("\nData folder: ", data_folder)
-    #debug_get_site(data_folder)
-    #debug_config_files(data_folder)
-    #debug_get_os_version(data_folder)
-    #debug_get_hostname(data_folder)
-    #debug_get_device_role(data_folder)
-    #debug_get_site(data_folder)
-    #debug_get_trunks(data_folder)
-    #debug_get_interface_names(data_folder)
-    #debug_get_vlans(data_folder)
-    #debug_get_vlans_names(data_folder)
-    debug_get_untagged_vlans(data_folder)
-    #debug_get_ip_address(data_folder)
-    #debug_device_type(data_folder)
-    #debug_get_modules(data_folder)
-    #debug_get_location(data_folder)
+    data_folders = [
+        #"/data/aruba-8-ports/",
+        "/data/aruba-12-ports/",
+        # "/data/aruba-48-ports/"
+        # "/data/hpe-8-ports/"
+        # "/data/hpe-48-ports/"
+        # "/data/aruba-stack/"
+        # "/data/aruba-stack-2920/"
+        # "/data/aruba-stack-2930/"
+        # "/data/aruba-modular/"
+        # "/data/aruba-modular-stack/"
+        # "/data/procurve-single/"
+        # "/data/procurve-modular/"
+         "/data/aruba_6100/"
+        # "/data/aruba_6300/"
+    ]
 
-    print("\n=== Stacking ===")
-    data_folder = main_folder + "/data/aruba-stack-2930/"
-    #data_folder = main_folder + "/data/aruba-stack/"
-    #data_folder = main_folder + "/data/hpe-stack/"
-    #data_folder = main_folder + "/data/aruba-modular-stack/"
-    #data_folder = main_folder + "/data/aruba-stack-2920/"
-    print("\nData folder: ", data_folder)
+    for folder in data_folders:
+        data_folder = main_folder + folder
 
-    #debug_get_location(data_folder)
-    #debug_get_room_location(data_folder)
-    #debug_get_flor_nr(data_folder)
-    #debug_get_site(data_folder)
+        print("\n Folder: ", data_folder)
+        #debug_get_hostname(data_folder)
+        #debug_get_site(data_folder)
+        #debug_config_files(data_folder)
+        #debug_get_os_version(data_folder)
+        #debug_get_device_role(data_folder)
+        #debug_get_site(data_folder)
+        #debug_get_trunks(data_folder)
+        #debug_get_interface_names(data_folder)
+        debug_get_vlans(data_folder)
+        #debug_get_vlans_names(data_folder)
+        #debug_get_untagged_vlans(data_folder)
+        #debug_get_ip_address(data_folder)
+        #debug_device_type(data_folder)
+        #debug_get_modules(data_folder)
+        #debug_get_location(data_folder)
 
-    #debug_get_os_version(data_folder)
-    #debug_get_hostname(data_folder)
-    #debug_get_device_role(data_folder)
-    #debug_get_trunks(data_folder)
-    #debug_get_trunk_stack(data_folder)
-    #debug_get_modules(data_folder)
-    debug_get_untagged_vlans(data_folder)
-
-    data_folder = main_folder + "/data/aruba-modular/"
-    print("\nData folder: ", data_folder)
-    #debug_get_modules(data_folder)
-    #debug_get_location(data_folder)
-
-    #debug_get_location(data_folder)
-    #debug_get_room_location(data_folder)
-    #debug_get_flor_nr(data_folder)
-    #debug_get_site(data_folder)
-    #debug_get_modules(data_folder)
-    #debug_get_untagged_vlans(data_folder)
-
-    print("\n=== Aruba 6100 ===")
-    data_folder = main_folder + "/data/aruba_6100/"
-
-    #debug_get_location(data_folder)
-    #debug_get_room_location(data_folder)
-    #debug_get_flor_nr(data_folder)
-    #debug_get_site(data_folder)
-
-    #debug_get_os_version(data_folder)
-    #debug_get_location(data_folder)
-    #debug_get_hostname(data_folder)
-    #debug_get_ip_address(data_folder)
-    #debug_get_vlans(data_folder)
-    #debug_get_modules(data_folder)
-    #debug_get_interface_names(data_folder)
-    debug_get_untagged_vlans(data_folder)
-
-    print("\n=== Aruba 6300 ===")
-    data_folder = main_folder + "/data/aruba_6300/"
-
-    #debug_get_os_version(data_folder)
-    #debug_get_hostname(data_folder)
-    #debug_get_vlans(data_folder)
-    #debug_get_modules(data_folder)
-    debug_get_untagged_vlans(data_folder)
-
-    print("\n=== No files functions ===")
+    #print("\n=== No files functions ===")
     #debug_convert_range()
     #debug_convert_interfaces_range()
 

@@ -37,6 +37,9 @@ def devices_json(config_files, type_slags, tags):
 
         for key in hostnames.keys():
             hostname = hostnames[key]
+            vc_position = int(key)
+            vc_priority = 255 if vc_position == 1 else 128
+            if vc_position == 2: vc_priority = 128
 
             if not clean_name:
                 clean_name = hostname
@@ -47,7 +50,8 @@ def devices_json(config_files, type_slags, tags):
             d_type = type_slags[device_type(clean_name)]
 
             data["devices"].append({"name": hostname, "location": location, "site": site, 
-                "device_role": device_role,
+                "device_role": device_role, 'virtual_chassis': clean_name, 'vc_position': vc_position,
+                'vc_priority': vc_priority,
                 "device_type": d_type, "serial": serial_numbers()[hostname], "tags": tags })
 
     return data
@@ -92,10 +96,18 @@ def ip_addresses_json(config_files):
             vlan = False
 
         hostname = hostnames['0'] if '0' in hostnames.keys() else hostnames['1']
-        name = "vlan " + loopback_interface[0] if vlan else loopback_interface[0]
-        description = loopback_interface[2] if vlan else loopback_interface[0]
+        vlan_id = loopback_interface[0]
+        name = 'vlan ' + vlan_id if vlan else vlan_id
+        vlan_name = loopback_interface[2] if vlan else loopback_interface[0]
 
-        data["ip_addresses"].append({"hostname": hostname, "vlan": vlan, "ip": loopback_interface[1], "name": name, "description": description })
+        data["ip_addresses"].append({
+            "hostname": hostname, 
+            "ip": loopback_interface[1], 
+            "vlan_id": vlan_id, 
+            "vlan_name": vlan_name,
+            "vlan": vlan, 
+            "name": name
+        })
 
     return data
 
@@ -216,6 +228,6 @@ if __name__ == "__main__":
 
     #debug_devices_json(data_folder)
     #debug_device_interfaces_json(data_folder)
-    #debug_ip_addresses_json(data_folder)
+    debug_ip_addresses_json(data_folder)
     #debug_lags_json(data_folder)
     #debug_interfaces_json(data_folder)

@@ -16,6 +16,7 @@ from json_functions_os_cx import ip_addresses_json, lags_json, interfaces_json
 def to_yaml(data_folder, output_file_path, device_type_slags, devices_tags):
     files = config_files(data_folder)
     with open(main_folder + output_file_path, 'w') as f:
+        yaml.dump({"modular": False}, f)
         yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(lags_json(files), f)

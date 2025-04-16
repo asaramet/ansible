@@ -311,72 +311,37 @@ def debug_interfaces_types(data_folder):
 if __name__ == "__main__":
     #main()
 
-    print("\n=== Aruba 6100 ===")
-    data_folder = main_folder + "/data/aruba_6100/"
-    config_file = data_folder + "rggw1018bp"
+    print("\n=== Debuging ===")
+    data_folders = [
+        #"/data/aruba-8-ports/",
+        "/data/aruba-12-ports/",
+        # "/data/aruba-48-ports/"
+        # "/data/hpe-8-ports/"
+        # "/data/hpe-48-ports/"
+        # "/data/aruba-stack/"
+        # "/data/aruba-stack-2920/"
+        # "/data/aruba-stack-2930/"
+        # "/data/aruba-modular/"
+        # "/data/aruba-modular-stack/"
+        # "/data/procurve-single/"
+        # "/data/procurve-modular/"
+         "/data/aruba_6100/"
+        # "/data/aruba_6300/"
+    ]
 
-    #debug_get_interfaces_config(config_file)
-    #debug_get_loopback_interface(data_folder)
-    #debug_get_uplink_vlan(data_folder)
-    #debug_get_interfaces(data_folder)
-    #debug_get_lag_interfaces(data_folder)
-    #debug_get_vlan_names(data_folder)
-    #debug_interfaces_types(data_folder)
+    config_file = main_folder + "/data/aruba_6100/rggw1018bp"
 
-    #debug_get_interfaces_config(config_file)
+    for folder in data_folders:
+        data_folder = main_folder + folder
 
-    print("\n=== Aruba 6300 ===")
-    data_folder = main_folder + "/data/aruba_6300/"
-    config_file = data_folder + "rgcs0006"
+        print("\n Folder: ", data_folder)
 
-    #debug_get_interfaces_config(config_file)
-    #debug_get_loopback_interface(data_folder)
-    #debug_get_uplink_vlan(data_folder)
-    #debug_get_interfaces(data_folder)
-    #debug_get_lag_interfaces(data_folder)
-    #debug_get_vlan_names(data_folder)
-    #debug_interfaces_types(data_folder)
+        #debug_get_interfaces(data_folder)
+        debug_get_loopback_interface(data_folder)
+        #debug_get_lag_interfaces(data_folder)
 
-    #debug_get_interfaces_config(config_file)
+        #debug_get_vlan_names(data_folder)
+        #debug_get_uplink_vlan(data_folder)
 
-    print("\n=== HPE Singles ===")
-    data_folder = main_folder + "/data/procurve-single/"
-    #data_folder = main_folder + "/data/hpe-8-ports/"
-    #data_folder = main_folder + "/data/hpe-48-ports/"
-
-    #debug_interfaces_types(data_folder)
-
-    print("\n=== Aruba 8 Ports ===")
-    #data_folder = main_folder + "/data/aruba-48-ports/"
-    #data_folder = main_folder + "/data/aruba-8-ports/"
-    data_folder = main_folder + "/data/aruba-12-ports/"
-
-    #debug_interfaces_types(data_folder)
-
-    print("\n=== HPE Stacking ===")
-    data_folder = main_folder + "/data/aruba-stack/"
-
-    #debug_interfaces_types(data_folder)
-
-    print("\n=== HPE Stacking 2930 ===")
-    data_folder = main_folder + "/data/aruba-stack-2930/"
-
-    #debug_interfaces_types(data_folder)
-
-    print("\n=== HPE Stacking 2920 ===")
-    data_folder = main_folder + "/data/aruba-stack-2920/"
-
-    #debug_interfaces_types(data_folder)
-    
-    print("\n=== ProCurve Modular ===")
-    data_folder = main_folder + "/data/procurve-modular/"
-
-    debug_interfaces_types(data_folder)
-
-    print("\n=== ProCurve Single ===")
-    data_folder = main_folder + "/data/procurve-single/"
-
-    #debug_interfaces_types(data_folder)
-
-    print("\n=== All ===")
-    config_file = data_folder + "rhsw1u107p"
+        #debug_get_interfaces_config(config_file)
+        #debug_interfaces_types(data_folder)

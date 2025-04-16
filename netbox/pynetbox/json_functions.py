@@ -100,7 +100,8 @@ def devices_json(config_files, device_type_slags, tags):
 
         for h_name in hostname.values(): 
             vc_position = int(h_name[-1])
-            vc_priority = 255 if vc_position == 1 else 128
+            vc_priority = 255 if vc_position == 1 else 64
+            if vc_position == 2: vc_priority = 128
             data['devices'].append({'name': h_name, "location": location, 
                 'device_role': get_device_role(t_file, clean_name), 'device_type': d_label, 
                 'site': site, 'tags': tags, 'serial':serial_numbers()[h_name],
@@ -177,6 +178,7 @@ def untagged_vlans(config_files):
 
         for vlan_id, int_range, is_trunk in untagged_sets:
             vlan_name = vlan_names.get(vlan_id, f"VLAN {vlan_id}")
+            if vlan_name == "VLAN 1": vlan_name = "DEFAULT_VLAN"
             interfaces = convert_interfaces_range(int_range)
 
             for stack_nr, interface in interfaces:
@@ -356,7 +358,14 @@ def ip_addresses_json(config_files):
 
         vlan_id, vlan_name, ip = get_ip_address(t_file)
 
-        data['ip_addresses'].append({'hostname': hostname, 'ip': ip, 'vlan_id': vlan_id, 'vlan_name': vlan_name})
+        data['ip_addresses'].append({
+            'hostname': hostname, 
+            'ip': ip, 
+            'vlan_id': vlan_id, 
+            'vlan_name': vlan_name,
+            'vlan': True,
+            'name': 'vlan ' + vlan_id
+        })
     
     return data
 
@@ -391,13 +400,17 @@ def debug_devices_json(data_folder):
       'JL256A_stack': "hpe-aruba-2930f-48g-poep-4sfpp",
       'JL075A_stack': 'hpe-aruba-3810m-16sfpp-2-slot-switch',
       'JL693A_stack': "hpe-aruba-2930f-12g-poep-2sfpp",
+      'JL693A': "hpe-aruba-2930f-12g-poep-2sfpp",
       'JL322A_stack': 'hpe-aruba-2930m-48g-poep',
       "JL679A": "hpe-aruba-6100-12g-poe4-2sfpp",
       "JL658A_stack": "hpe-aruba-6300m-24sfpp-4sfp56",
       "JL255A": "hpe-aruba-2930f-24g-poep-4sfpp",
       "JL256A": "hpe-aruba-2930f-48g-poep-4sfpp",
       "JL322A": "hpe-aruba-2930m-48g-poep",
-      "JL357A": "hpe-aruba-2540-48g-poep-4sfpp"
+      "JL357A": "hpe-aruba-2540-48g-poep-4sfpp",
+
+      "JL679A": "hpe-aruba-6100-12g-poe4-2sfpp",
+      "JL658A_stack": "hpe-aruba-6300m-24sfpp-4sfp56"
     }
 
     files = config_files(data_folder)
@@ -462,87 +475,42 @@ def debug_modules_json(data_folder):
     print(output)
 
 if __name__ == "__main__":
-    print("\n=== Singles JSON ===")
-    #data_folder = main_folder + "/data/hpe-48-ports/"
-    #data_folder = main_folder + "/data/hpe-8-ports/"
-    data_folder = main_folder + "/data/aruba-48-ports/"
+    print("\n=== Debuging ===")
 
-    #debug_locations_json(data_folder)
-    #debug_devices_json(data_folder)
-    #debug_trunks_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
-    #debug_vlans_json(data_folder)
-    #debug_untagged_vlans(data_folder)
-    #debug_tagged_vlans_json(data_folder)
-    debug_ip_addresses_json(data_folder)
+    data_folders = [
+        #"/data/aruba-8-ports/",
+        "/data/aruba-12-ports/",
+        # "/data/aruba-48-ports/"
+        # "/data/hpe-8-ports/"
+        # "/data/hpe-48-ports/"
+        # "/data/aruba-stack/"
+        # "/data/aruba-stack-2920/"
+        # "/data/aruba-stack-2930/"
+        # "/data/aruba-modular/"
+        # "/data/aruba-modular-stack/"
+        # "/data/procurve-single/"
+        # "/data/procurve-modular/"
 
-    #debug_device_interfaces_json(data_folder)
+        #"/data/aruba_6100/"
+        # "/data/aruba_6300/"
+    ]
 
-    print("\n=== ProCurve Singles JSON ===")
-    data_folder = main_folder + "/data/procurve-single/"
+    for folder in data_folders:
+        data_folder = main_folder + folder
 
-    #debug_locations_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
-    #debug_tagged_vlans_json(data_folder)
+        print("\n Folder: ", data_folder)
 
-    #debug_device_interfaces_json(data_folder)
 
-    print("\n=== Aruba Stacks JSON ===")
-    #data_folder = main_folder + "/data/aruba-stack/"
-    #data_folder = main_folder + "/data/aruba-stack-2920/"
-    data_folder = main_folder + "/data/aruba-stack-2930/"
+        #debug_locations_json(data_folder)
+        #debug_devices_json(data_folder)
+        #debug_device_interfaces_json(data_folder)
+        #debug_trunks_json(data_folder)
 
-    #debug_device_interfaces_json(data_folder)
+        #debug_vlans_json(data_folder)
+        #debug_untagged_vlans(data_folder)
+        #debug_tagged_vlans_json(data_folder)
 
-    #debug_locations_json(data_folder)
-    #debug_devices_json(data_folder)
-    #debug_trunks_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
-    #debug_vlans_json(data_folder)
-    #debug_untagged_vlans(data_folder)
-    #debug_tagged_vlans_json(data_folder)
-    #debug_ip_addresses_json(data_folder)
 
-    #debug_device_interfaces_json(data_folder)
-    #debug_modules_json(data_folder)
+        debug_ip_addresses_json(data_folder)
 
-    print("\n=== ProCurve Modular JSON ===")
-    data_folder = main_folder + "/data/procurve-modular/"
-
-    #debug_locations_json(data_folder)
-    #debug_locations_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
-    #debug_modules_json(data_folder)
-
-    print("\n=== Aruba Modular JSON ===")
-    data_folder = main_folder + "/data/aruba-modular/"
-
-    #debug_locations_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
-    #debug_modules_json(data_folder)
-
-    print("\n=== Aruba Modular Stack JSON ===")
-    data_folder = main_folder + "/data/aruba-modular-stack/"
-
-    #debug_locations_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
-    #debug_modules_json(data_folder)
-    #debug_untagged_vlans(data_folder)
-
-    print("\n=== Aruba 6100 ===")
-    data_folder = main_folder + "/data/aruba_6100/"
-
-    #debug_vlans_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
-    #debug_untagged_vlans(data_folder)
-    #debug_device_interfaces_json(data_folder)
-    debug_ip_addresses_json(data_folder)
-
-    print("\n=== Aruba 6300 ===")
-    data_folder = main_folder + "/data/aruba_6300/"
-
-    #debug_locations_json(data_folder)
-    #debug_vlans_json(data_folder)
-    #debug_untagged_vlans(data_folder)
-    #debug_device_interfaces_json(data_folder)
-    #debug_ip_addresses_json(data_folder)
+        #debug_modules_json(data_folder)

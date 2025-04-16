@@ -268,9 +268,10 @@ def main():
 def debug():
     print('---Debugging---')
 
-    data_folder = main_folder + "/data/aruba-8-ports/"
+    data_folder = main_folder + "/data/aruba-12-ports/"
     device_type_slags = {
-        'JL258A': "hpe-aruba-2930f-8g-poep-2sfpp"
+        'JL258A': "hpe-aruba-2930f-8g-poep-2sfpp",
+        'JL693A': "hpe-aruba-2930f-12g-poep-2sfpp"
     }
     test_single(data_folder, device_type_slags)
     print('---END Debugging---')

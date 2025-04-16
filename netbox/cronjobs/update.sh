@@ -27,8 +27,8 @@ tags=(
     #aruba_modular
     #aruba_modular_stack
 
-    #aruba_6100
-    #aruba_6300
+    aruba_6100
+    aruba_6300
 )
 
 server='production'

@@ -342,10 +342,10 @@
           tags: "{{ item.tags }}"
           tenant: netzadmin
           virtual_chassis: "{{ item.virtual_chassis }}"
-          #vc_position: "{{ item.vc_position }}"
-          #vc_priority: "{{ item.vc_priority }}"
-          vc_position: "{{ item.name[-1:] }}"
-          vc_priority: "{{ '255' if item.name[-1:] == '1' else '128' }}"
+          vc_position: "{{ item.vc_position }}"
+          vc_priority: "{{ item.vc_priority }}"
+          #vc_position: "{{ item.name[-1:] }}"
+          #vc_priority: "{{ '255' if item.name[-1:] == '1' else '128' }}"
         state: present
       loop: "{{ devices }}"
       when: chassis is defined and chassis | length > 0 
@@ -418,6 +418,7 @@
           name: "{{ item.interface }}"
           lag:
             name: "lag {{ item.lag_id}}"
+          type: Link Aggregation Group (LAG)
         state: present
       loop: "{{ lag_interfaces }}"
       when: lags is defined and lags | length > 0
@@ -425,6 +426,7 @@
     - name: Create VLANs
       tags:
         - create_vlans
+        - vlans
         - update
       netbox.netbox.netbox_vlan:
         netbox_url: "{{ netbox_url }}"
@@ -458,7 +460,7 @@
         update_vc_child: true
       loop: "{{ device_interfaces }}"
 
-# TODO - Integrate aruba_6xxx.yaml from here
+# TODO - For Aruba OS_CX switches `tagged_vlans` is not returned
 
     - name: Assign tagged VLANs to interfaces
       tags: 
@@ -475,6 +477,7 @@
           tagged_vlans: "{{ item.tagged_vlans }}"
         update_vc_child: true
       loop: "{{ tagged_vlans }}"
+      when: tagged_vlans is defined and tagged_vlans | length > 0
 
     - name: Create VLAN interfaces for loopback IPs
       tags:
@@ -489,10 +492,11 @@
         update_vc_child: true
         data:
           device: "{{ item.hostname }}"
-          name: "vlan {{ item.vlan_id }}"
+          name: "{{ item.name }}"
           type: Virtual
           description: "{{ item.vlan_name }}"
         state: present
+      when: item.vlan
       loop: "{{ ip_addresses }}"
 
     - name: Assign IP to VLAN interfaces
@@ -511,7 +515,7 @@
           description: "VLAN {{ item.vlan_id }} ({{ item.vlan_name }})"
           assigned_object:
             device: "{{item.hostname }}"
-            name: "vlan {{ item.vlan_id }}"
+            name: "{{ item.name }}"
           role: Loopback
           tenant: netzadmin
         state: present
