@@ -1,6 +1,8 @@
 ---
-- name: Install and configure initial firewall
-  hosts: hs_netbox
+# Firewall rules for Checkmk server
+#
+- name: Install and configure firewall
+  hosts: hs_checkmk
   gather_facts: false
   become: true # run as root
   vars:
@@ -13,12 +15,20 @@
       - 134.108.49.1 # rhlx0023
     ip_list_netz: 
       - 134.108.62.196
+      - 134.108.62.197
       - 134.108.62.217
       - 134.108.62.219
       - 134.108.49.1 # rhlx0023
     ip_list_services:
       - 134.108.34.114
       - 134.108.34.214
+    ip_list_switches:
+      - 192.168.102.0/23
+      - 192.168.104.0/23
+      - 192.168.106.0/23
+      - 134.108.31.0/25
+      - 134.108.95.0/25
+      - 134.108.127.0/25
   tasks: 
     - name: Install ufw package
       apt: 
@@ -86,7 +96,7 @@
         src: "{{ item }}"
       loop: "{{ ip_list_admin }}"
 
-    - name: Delete general HTTP and HTTPS connections, if any
+    - name: Delete unnecessary ports, if any
       community.general.ufw:
         rule: allow
         port: "{{ item }}"
@@ -96,7 +106,35 @@
         - https
         - 80
         - 443
+        - 161
+        - 162
+
+    - name: Delete unnecessary SNMP ports, if any
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        delete: true
+        src: 192.168.104.85
+      loop:
+        - 161
+        - 162
+
+    - name: Allow SNMP 161 connections
+      community.general.ufw:
+        rule: allow
+        port: 161
+        proto: udp
+        src: "{{ item }}"
+      loop: "{{ ip_list_switches }}"
     
+    - name: Allow SNMP 162 connections
+      community.general.ufw:
+        rule: allow
+        port: 162
+        proto: udp
+        src: "{{ item }}"
+      loop: "{{ ip_list_switches }}"
+
     - name: Enable ufw firewall if it's disabled
       community.general.ufw:
         state: enabled

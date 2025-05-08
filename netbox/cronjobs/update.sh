@@ -45,7 +45,7 @@ ansible-playbook playbooks/backup_sql.yaml | tee ${logs_folder}/backup.logs &&
 
 for i in ${tags[@]}; do
     echo "== Updating ${i} - $(date)" &&
-    ansible-playbook playbooks/aruba.yaml --tags ${i},${server},update &> ${logs_folder}/${i}.logs &&
+    ansible-playbook playbooks/aruba.yaml --tags ${i},${server},update &> ${logs_folder}/${i}.logs ;
     echo "== Done updating ${i} - $(date)"
 done
 

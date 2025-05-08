@@ -1,0 +1,83 @@
+---
+# Install checkmk
+#
+# RUN:
+# ansible-playbook playbooks/install.yaml
+
+- name: Download install file
+  hosts: localhost
+  gather_facts: false
+  vars: 
+    version: &version 2.4.0
+    sha256: 4a78dcba515e5c873601bd7ceea4df01ee2d0eefd3147497dcdb5046fd514940
+  tasks:
+    - name: Download the required .deb file and prove the checksum
+      ansible.builtin.get_url:
+        url: "https://download.checkmk.com/checkmk/{{ version }}/check-mk-raw-{{ version }}_0.bookworm_amd64.deb"
+        dest: /tmp/checkmk.deb
+        checksum: "sha256:{{ sha256 }}"
+
+- name: Install checkmk
+  hosts: hs_checkmk
+  gather_facts: false
+  become: true
+  vars:
+    version: *version
+  tasks:
+    - name: Copy the .deb package to the server
+      ansible.builtin.copy:
+        src: /tmp/checkmk.deb
+        dest: /tmp/checkmk.deb
+
+    - name: Update APT package cache 
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Update all packages 
+      ansible.builtin.apt:
+        upgrade: dist
+
+    - name: Install required packages and dependencies
+      ansible.builtin.apt: 
+        pkg: "{{ item }}"
+        state: latest
+        update_cache: true
+      loop:
+        - aptitude
+        - dnsutils
+        - nmap
+        - snmp
+
+    - name: Install the .deb package
+      ansible.builtin.apt:
+        deb: /tmp/checkmk.deb
+        state: present
+
+    - name: Remove unnecessary packages
+      ansible.builtin.apt:
+        autoremove: true
+
+    - name: Clean up APT cache
+      ansible.builtin.apt:
+        autoclean: true
+
+    - name: Get running kernel version
+      ansible.builtin.command: uname -r 
+      register: running_kernel
+      changed_when: false
+
+    - name: Get latest installed kernel version
+      ansible.builtin.shell: "dpkg --list | grep -E 'linux-image-[0-9]+' | awk '{print $2}' | sort -V | tail -n 1"
+      register: installed_kernel
+      changed_when: false
+
+    - name: Show kernels
+      debug:
+        msg: 
+          - "Running Kernel: linux-image-{{ running_kernel.stdout }}" 
+          - "Installed Kernel: {{ installed_kernel.stdout_lines }}"
+
+    - name: Reboot if a new kernel is installed
+      ansible.builtin.reboot:
+      when: "'linux-image-' + running_kernel.stdout not in installed_kernel.stdout_lines"
+...

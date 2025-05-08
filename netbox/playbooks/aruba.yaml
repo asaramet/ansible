@@ -199,7 +199,8 @@
           tenant: netzadmin
         state: present
       loop: "{{ devices }}"
-      when: assigned_racks[item.name]
+      #when: assigned_racks[item.name]
+      when: no
 
     - name: Add switches (not assign to any racks in NetBox)
       tags: 

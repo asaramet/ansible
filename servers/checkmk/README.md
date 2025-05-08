@@ -1,0 +1,63 @@
+# Checkmk
+
+## Install with Ansible
+
+Update the version that has to be downloaded and the sha256 checksum in `playbooks/install.yaml`.
+
+[Download Site](https://checkmk.com/download)
+
+```bash
+ansible-playbook playbooks/install.yaml
+```
+
+This will install checkmk on `rzlx8753` server.
+
+## Create a Checkmk monitoring site on the server
+
+As `root`:
+
+```bash
+omd create monitoring
+omd start monitoring
+```
+
+This will create a monitoring site, will start it and create an admin user with the id - `cmkadmin` and a self generated password.
+
+Change the password:
+
+```bash
+# Enter omd command line mode
+omd su monitoring
+
+# Change the password
+OMD[monitoring]:~$ cmk-passwd cmkadmin
+hG...8753
+```
+
+## Extra cmds
+
+```bash
+omd status
+```
+
+## SNMP connection
+
+On the the switch SNMP should be enabled and the server allowed:
+
+```aruba_os
+config
+
+ip authorized-managers 192.168.111.196 255.255.255.255 access manager access-method snmp
+
+snmp enable
+snmp-server community "pubno" operator
+```
+
+On the server UDP ports 161 and 162 have to be opened. Take care in the ACLs UDP 161,162 from the server to the switch has to be allowed and all UDP traffic from the switch to the server too.
+
+Check snmp responces on the server over SNMP version 2c:
+
+```bash
+apt install snmp
+snmpwalk -v2c -c pubno <HOSTNAME OR IP> 1.3.6.1.2.1.1
+```
