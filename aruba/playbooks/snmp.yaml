@@ -1,0 +1,47 @@
+- name: Add rules to SWITCH-ACCESS ACL (AOS-CX)
+  hosts: aruba
+  gather_facts: false
+  collections:
+    - arubanetworks.aoscx
+  vars:
+    ansible_connection: network_cli
+  vars_files:
+    - "{{ playbook_dir }}/../host_vars/aruba/vault"
+  tasks:
+    - name: Add ICMP, SNMP, and SNMP-TRAP rules to ACL and SNMPv3 credentials
+      aoscx_command:
+        commands:
+          - configure terminal
+          - access-list ip SWITCH-ACCESS
+          - 150 permit icmp 192.168.111.196 any
+          - 160 permit udp 192.168.111.196 any eq snmp
+          - 170 permit udp 192.168.111.196 any eq snmp-trap
+
+    - name: Add SNMPv3 credentials
+      aoscx_command:
+        commands: >
+          {{
+            [
+              'configure terminal',
+              'snmpv3 security-level auth',
+              'snmpv3 user checkmk auth md5 auth-pass plaintext ' ~ vault_snmp_pass,
+              'snmpv3 user checkmk auth md5 auth-pass plaintext ' ~ vault_snmp_pass ~ ' access-level ro',
+            ]
+          }}
+    
+    - name: Commands
+      debug:
+        msg: >
+          {{
+            [
+              'configure terminal',
+              'access-list ip SWITCH-ACCESS',
+              '150 permit icmp 192.168.111.196 any',
+              '160 permit udp 192.168.111.196 any eq snmp',
+              '170 permit udp 192.168.111.196 any eq snmp-trap',
+              'configure terminal',
+              'snmpv3 security-level auth',
+              'snmpv3 user checkmk auth md5 auth-pass plaintext ' ~ vault_snmp_pass,
+              'snmpv3 user checkmk auth md5 auth-pass plaintext ' ~ vault_snmp_pass ~ ' access-level ro'
+            ]
+          }}

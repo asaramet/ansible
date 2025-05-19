@@ -36,8 +36,16 @@ hG...8753
 
 ## Extra cmds
 
+- OMD status
+
 ```bash
 omd status
+```
+
+- Scan the whole network
+
+```bash
+nmap -T5 -sn 192.168.105.0-255
 ```
 
 ## SNMP connection
@@ -53,11 +61,24 @@ snmp enable
 snmp-server community "pubno" operator
 ```
 
-On the server UDP ports 161 and 162 have to be opened. Take care in the ACLs UDP 161,162 from the server to the switch has to be allowed and all UDP traffic from the switch to the server too.
+On the server ICMP and UDP ports 161 and 162 have to be opened. Take care in the ACLs UDP 161,162 from the server to the switch has to be allowed and all UDP traffic from the switch to the server too.
 
 Check snmp responces on the server over SNMP version 2c:
 
 ```bash
 apt install snmp
 snmpwalk -v2c -c pubno <HOSTNAME OR IP> 1.3.6.1.2.1.1
+snmpwalk -v3 -a MD5 -u checkmk -l authNoPriv -A <PASSPHRASE> <HOSTNAME OR IP> 1.3.6.1.2.1.1
+```
+
+## Redirect FQDN
+
+Redirect FQDN so when you point in the browser `https://<checkmd fqdn>` it will point to `https://<checmd_fqdn>/monitoring`
+
+```bash
+# Update the main apache2 conf
+vim /etc/apache2/apache2.conf
+
+# Add the following line
+RedirectMatch ^/$ /monitoring/
 ```
