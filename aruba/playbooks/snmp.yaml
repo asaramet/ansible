@@ -14,8 +14,8 @@
           - configure terminal
           - access-list ip SWITCH-ACCESS
           - 150 permit icmp 192.168.111.196 any
-          - 160 permit udp 192.168.111.196 any eq snmp
-          - 170 permit udp 192.168.111.196 any eq snmp-trap
+          - 160 permit udp 192.168.111.196 any eq 161
+          - 170 permit udp 192.168.111.196 any eq 162
 
     - name: Add SNMPv3 credentials
       aoscx_command:
@@ -26,10 +26,17 @@
               'snmpv3 security-level auth',
               'snmpv3 user checkmk auth md5 auth-pass plaintext ' ~ vault_snmp_pass,
               'snmpv3 user checkmk auth md5 auth-pass plaintext ' ~ vault_snmp_pass ~ ' access-level ro',
+              'write memory'
             ]
           }}
     
-    - name: Commands
+- name: Debug
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/../host_vars/aruba/vault"
+  tasks:
+    - name: Sent commands
       debug:
         msg: >
           {{
@@ -37,11 +44,12 @@
               'configure terminal',
               'access-list ip SWITCH-ACCESS',
               '150 permit icmp 192.168.111.196 any',
-              '160 permit udp 192.168.111.196 any eq snmp',
-              '170 permit udp 192.168.111.196 any eq snmp-trap',
+              '160 permit udp 192.168.111.196 any eq 161',
+              '170 permit udp 192.168.111.196 any eq 162',
               'configure terminal',
               'snmpv3 security-level auth',
               'snmpv3 user checkmk auth md5 auth-pass plaintext ' ~ vault_snmp_pass,
-              'snmpv3 user checkmk auth md5 auth-pass plaintext ' ~ vault_snmp_pass ~ ' access-level ro'
+              'snmpv3 user checkmk auth md5 auth-pass plaintext ' ~ vault_snmp_pass ~ ' access-level ro',
+              'write memory'
             ]
           }}

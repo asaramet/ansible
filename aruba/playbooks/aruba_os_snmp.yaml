@@ -1,0 +1,26 @@
+---
+# The play will set SNMPv3 configs and credentials on ArubaOS Switches.
+# It will output errors if the configs already exist on the switch
+
+- name: Run commands on ArubaOS (ProVision) switches
+  hosts: aruba_os
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/../host_vars/aruba/vault"
+  tasks:
+    - name: Set SNMPv3 credentials, if they don't already exist
+      ansible.netcommon.cli_command:
+        command: |
+          config
+          snmpv3 enable
+          123456789
+          123456789
+          n
+          y
+          snmpv3 user checkmk auth md5 {{ vault_snmp_pass }}
+          snmpv3 group operatorauth user checkmk sec-model ver3
+          no snmpv3 user "initial"
+          no ip authorized-managers 134.108.0.77 
+          ip authorized-managers 192.168.111.196 255.255.255.255 access operator
+          ip authorized-managers 192.168.111.196 255.255.255.255 access operator access-method snmp
+          write memory
