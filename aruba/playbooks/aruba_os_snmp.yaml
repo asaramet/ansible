@@ -3,7 +3,8 @@
 # It will output errors if the configs already exist on the switch
 
 - name: Run commands on ArubaOS (ProVision) switches
-  hosts: aruba_os
+  #hosts: aruba_os
+  hosts: bb_hze_aos
   gather_facts: false
   vars_files:
     - "{{ playbook_dir }}/../host_vars/aruba/vault"
