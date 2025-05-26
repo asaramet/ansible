@@ -1,0 +1,33 @@
+---
+# Deploy a downloaded Server certificate
+# The install_harica_certs.sh script exist on the remote server
+- name: Deploy HARICA certificate to Checkmk server
+  hosts: hs_checkmk
+  become: true
+  vars:
+    domain: checkmk.hs-esslingen.de
+    local_cert: "{{ playbook_dir }}/../src/certs/Cert_bundle-2025-05-23.pem"
+    remote_cert: /opt/certs/harica/harica_bundle.pem
+    install_script: /opt/certs/install_harica_certs.sh
+  tasks:
+    - name: Ensure target directory exists
+      file:
+        path: /opt/certs/harica
+        state: directory
+        mode: '0755'
+
+    - name: Copy HARICA bundle to remote host
+      copy:
+        src: "{{ local_cert }}"
+        dest: "{{ remote_cert }}"
+        mode: '0644'
+
+    - name: Ensure install script is executable
+      file:
+        path: "{{ install_script }}"
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Run the HARICA install script
+      command: "{{ install_script }}"

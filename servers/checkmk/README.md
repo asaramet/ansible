@@ -82,3 +82,58 @@ vim /etc/apache2/apache2.conf
 # Add the following line
 RedirectMatch ^/$ /monitoring/
 ```
+
+## Deploy a Server Certificate
+
+- Create a `server.csr` and `server.key` with
+
+```bash
+cd /opt/certs/harica
+openssl req -new -newkey rsa:2048bits -sha512 -nodes -keyout server.key -out server.csr
+```
+
+- Create a valid server certificate on [Harica CertManager](https://cm.harica.gr/).
+
+- Download it to `src/certs`
+- Run Ansible playbook `deploy_cert.yaml`
+
+## Configure Mail server
+
+We will be using Exim4 as a Relay Mail via External Mail Server.
+
+You're essentially setting up Exim4 as a smart relay, which accepts local mail (e.g., from Checkmk, cron, etc.) and forwards it to a real SMTP server (e.g., your organization's mail server or a service like Gmail, Office365, etc.).
+
+1. Install Exim4 (if not already):
+
+    ```bash
+    apt update
+    apt install exim4
+    ```
+
+2. Run the configuration wizard
+
+    ```bash
+    dpkg-reconfigure exim4-config
+    ```
+
+3. During the wizard:
+
+    - Choose: `mail sent by smarthost; no local mail`
+    - System mail name: e.g., `checkmk.hs-esslingen.de`
+    - IPs to listen on: `127.0.0.1 ; ::1`
+    - Other destinations: leave blank or `localhost.localdomain`
+    - Visible domain name for local users: `checkmk.hs-esslingen.de`
+    - Mail server configuration. IP address or host name of the outgoing smarthost `mail.hs-esslingen.de`
+    - Keep number of DNS-queries minimal: `No`
+    - Split configuration into small files? `No`
+
+Now checkmk will send mails to the specific users.
+
+To verify if relay is working send a mail to a known user with:
+
+```bash
+echo -e "Subject: Test Mail\n\nHello from Ansible!" | sendmail -v knownUser@hs-esslingen.de
+```
+
+To configure Notifications on host or also services go to:
+`Setup -> Notifications` and edit `Global notification rules`.

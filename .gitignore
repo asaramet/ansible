@@ -1,2 +1,3 @@
 servers/netbox/src/
 servers/netbox/pip_packages
+servers/checkmk/src/
