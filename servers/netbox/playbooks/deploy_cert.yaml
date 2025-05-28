@@ -1,14 +1,15 @@
 ---
 # Deploy a downloaded Server certificate
 # The install_harica_certs.sh script exist on the remote server
-- name: Deploy HARICA certificate to Checkmk server
-  hosts: hs_checkmk
+
+- name: Deploy HARICA certificate
+  hosts: hs_netbox
   become: true
   vars:
-    domain: checkmk.hs-esslingen.de
-    local_cert: "{{ playbook_dir }}/../src/certs/Cert_bundle-2025-05-23.pem"
+    domain: netbox-bb.hs-esslingen.de
+    local_cert: "{{ playbook_dir }}/../src/certs/Cert_bundle-2025-05-28.pem"
     remote_cert: /opt/certs/harica/harica_bundle.pem
-    install_script: /opt/certs/install_harica_certs_apache.sh
+    install_script: /opt/certs/install_harica_certs_nginx.sh
   tasks:
     - name: Ensure target directory exists
       file:
