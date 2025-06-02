@@ -137,3 +137,45 @@ echo -e "Subject: Test Mail\n\nHello from Ansible!" | sendmail -v knownUser@hs-e
 
 To configure Notifications on host or also services go to:
 `Setup -> Notifications` and edit `Global notification rules`.
+
+## Auto restart OMD Site with systemd
+
+Automatically restart the OMD site if it fails by wrapping it in a `systemd` service. This allows automatic recovery, and integration with `journalctl`, `systemctl`, and other monitoring tools.
+
+- Update the `systemd` service unit for the OMD site, with the line `Restart=on-failure`.
+
+```bash
+vim /etc/systemd/system/omd.service
+```
+
+Add the following, line `Restart=on-failure` in `Service` section:
+
+```ini
+[Unit]
+Description=Checkmk Monitoring
+Documentation=https://docs.checkmk.com/latest/en/
+Wants=network-online.target
+After=syslog.target time-sync.target network.target network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/omd start
+ExecStop=/usr/bin/omd stop
+ExecReload=/usr/bin/omd reload
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.targe
+```
+
+- Reload `systemd` and enable the service
+
+```bash
+systemctl daemon-reexec
+systemctl daemon-reload
+systemctl enable omd-monitoring
+systemctl start omd-monitoring
+```
+
+- If getting wired warning, try to reboot the VM.

@@ -22,7 +22,7 @@
     ip_list_services:
       - 134.108.34.114
       - 134.108.34.214
-    ip_list_switches:
+    ip_list_snmp_clients:
       - 192.168.102.0/23 # BB-HZE
       - 192.168.104.0/23 # BB-SM
       - 192.168.106.0/23 # BB-GP
@@ -35,6 +35,11 @@
       - 192.168.108.0/24 # RSM-HZE
       - 192.168.109.0/24 # RSM-SM
       - 192.168.110.0/24 # RSM-GP
+      - 192.168.96.0/23 # APM-HZE-new
+      - 192.168.98.0/23 # APM-SM-new
+      - 192.168.100.0/23 # APM-GP-new
+      - 134.108.31.128/25 # APM-HZE
+      - 134.108.95.128/25 # APM-SM (old)
   tasks: 
     - name: Install ufw package
       apt: 
@@ -121,7 +126,7 @@
         port: 161
         proto: udp
         src: "{{ item }}"
-      loop: "{{ ip_list_switches }}"
+      loop: "{{ ip_list_snmp_clients }}"
     
     - name: Allow SNMP 162 connections
       community.general.ufw:
@@ -129,7 +134,7 @@
         port: 162
         proto: udp
         src: "{{ item }}"
-      loop: "{{ ip_list_switches }}"
+      loop: "{{ ip_list_snmp_clients }}"
 
     - name: Enable ufw firewall if it's disabled
       community.general.ufw:
