@@ -120,7 +120,7 @@ Development server, i.e `debian`. For production server, add `-e production=true
 
     Set the NetBox version in `host_vars/localhost/vars.yaml`
 
-    Run the playbook:
+    Run the playbook that will download the specified version, create the requirements file and download pip packages:
 
     ```bash
     ansible-playbook playbooks/update_packages.yaml

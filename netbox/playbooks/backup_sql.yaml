@@ -20,7 +20,7 @@
   tasks:
     - name: Set server 
       set_fact:
-        server: "{{ 'hs_netbox' if  production else 'debian12_ansible' }}"
+        server: "{{ 'hs_netbox' if  production else 'local' }}"
 
     - name: "Backup data from: "
       debug:

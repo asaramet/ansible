@@ -51,7 +51,6 @@
           wheel
           netbox-documents
           netbox-plugin-dns
-          netbox-qrcode
           netbox-reorder-rack
           netbox-topology-views
           netbox-inventory
