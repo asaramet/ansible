@@ -16,7 +16,8 @@
           - 150 permit icmp 192.168.111.196 any
           - 160 permit udp 192.168.111.196 any eq 161
           - 170 permit udp 192.168.111.196 any eq 162
-          - 180 permit tcp 134.108.49.9 any eq snmp
+          - 180 permit udp 134.108.49.9 any eq 161
+          - 190 permit udp 134.108.49.9 any eq 162
 
     - name: Add SNMPv3 credentials
       aoscx_command:
@@ -47,7 +48,8 @@
               '150 permit icmp 192.168.111.196 any',
               '160 permit udp 192.168.111.196 any eq 161',
               '170 permit udp 192.168.111.196 any eq 162',
-              '180 permit tcp 134.108.49.9 any eq snmp',
+              '180 permit udp 134.108.49.9 any eq 161',
+              '190 permit udp 134.108.49.9 any eq 162',
               'configure terminal',
               'snmpv3 security-level auth',
               'snmpv3 user checkmk auth md5 auth-pass plaintext ' ~ vault_snmp_pass,
