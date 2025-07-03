@@ -1,6 +1,9 @@
 ---
+# RUN:
+# ansible-playbook playbooks/ssh_key.yaml -l <hosts>
+
 - name: Set root login through ssh key only
-  hosts: local
+  hosts: all
   gather_facts: false
   become: true # run as root
   tasks: 

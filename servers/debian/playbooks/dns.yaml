@@ -1,6 +1,6 @@
 ---
 - name: Update DNS resolver configuration
-  hosts: hs_checkmk # You can override this with -l yourhost
+  hosts: all # You can override this with -l yourhost
   become: true
   gather_facts: false
 
