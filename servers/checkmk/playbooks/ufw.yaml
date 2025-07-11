@@ -19,6 +19,8 @@
       - 134.108.62.217
       - 134.108.62.219
       - 134.108.49.1 # rhlx0023
+    ip_list_extra_servers:
+      - 192.168.111.194
     ip_list_services:
       - 134.108.34.114
       - 134.108.34.214
@@ -99,6 +101,13 @@
         port: http
         src: "{{ item }}"
       loop: "{{ ip_list_netz }}"
+
+    - name: Allow HTTP connections for extra servers (Grafana)
+      community.general.ufw:
+        rule: allow
+        port: http
+        src: "{{ item }}"
+      loop: "{{ ip_list_extra_servers }}"
 
     - name: Allow HTTPS connections for HE admins
       community.general.ufw:
