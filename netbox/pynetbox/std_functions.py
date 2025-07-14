@@ -770,19 +770,19 @@ if __name__ == "__main__":
 
     data_folders = [
         #"/data/aruba-8-ports/",
-        "/data/aruba-12-ports/",
-        # "/data/aruba-48-ports/"
-        # "/data/hpe-8-ports/"
-        # "/data/hpe-48-ports/"
-        # "/data/aruba-stack/"
-        # "/data/aruba-stack-2920/"
-        # "/data/aruba-stack-2930/"
-        # "/data/aruba-modular/"
-        # "/data/aruba-modular-stack/"
-        # "/data/procurve-single/"
-        # "/data/procurve-modular/"
-         "/data/aruba_6100/"
-        # "/data/aruba_6300/"
+        #"/data/aruba-12-ports/",
+        # "/data/aruba-48-ports/",
+        #"/data/hpe-8-ports/",
+         "/data/hpe-24-ports/",
+        # "/data/aruba-stack/",
+         "/data/aruba-stack-2920/",
+        # "/data/aruba-stack-2930/",
+        # "/data/aruba-modular/",
+        # "/data/aruba-modular-stack/",
+        # "/data/procurve-single/",
+        # "/data/procurve-modular/",
+        #"/data/aruba_6100/"
+         "/data/aruba_6300/"
     ]
 
     for folder in data_folders:
@@ -797,11 +797,11 @@ if __name__ == "__main__":
         #debug_get_site(data_folder)
         #debug_get_trunks(data_folder)
         #debug_get_interface_names(data_folder)
-        debug_get_vlans(data_folder)
+        #debug_get_vlans(data_folder)
         #debug_get_vlans_names(data_folder)
         #debug_get_untagged_vlans(data_folder)
         #debug_get_ip_address(data_folder)
-        #debug_device_type(data_folder)
+        debug_device_type(data_folder)
         #debug_get_modules(data_folder)
         #debug_get_location(data_folder)
 

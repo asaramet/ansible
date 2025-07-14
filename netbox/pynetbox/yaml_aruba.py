@@ -129,13 +129,14 @@ def main():
     single(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # HPE 24 and 48 Ports Switches
-    data_folder = main_folder + "/data/hpe-48-ports/"
-    output_file_path = "/data/yaml/hpe_48_ports.yaml"
+    data_folder = main_folder + "/data/hpe-24-ports/"
+    output_file_path = "/data/yaml/hpe_24_ports.yaml"
 
     device_type_slags = {
       'J9623A': 'hpe-aruba-2620-24',
       'J9772A': 'hpe-aruba-2530-48g-poep',
-      'J9853A': 'hpe-aruba-2530-48g-poep-2sfpp'
+      'J9853A': 'hpe-aruba-2530-48g-poep-2sfpp',
+      'J9145A': 'hpe-procurve-2910al-24g'
     }
 
     print("Update data for HPE 24 and 48 port Switches into the file: ", output_file_path) 
@@ -190,7 +191,8 @@ def main():
         'J8773A': 'hpe-procurve-4208vl',
         'J9850A': 'hpe-5406r-zl2',
         'J9851A': 'hpe-5412r-zl2',
-        'J9729A': 'hpe-aruba-2920-48g-poep'
+        'J9729A': 'hpe-aruba-2920-48g-poep',
+        'J9729A_stack': 'hpe-aruba-2920-48g-poep'
     }
 
     print("Update data for ProCurve modular Switches into the file: ", output_file_path) 
@@ -242,7 +244,7 @@ def main():
     output_file_path = "/data/yaml/aruba_stack_2920.yaml"
 
     device_type_slags = {
-        'J9729A_stack': 'hpe-aruba-2920-48g-poep',
+        'J9729A_stack': 'hpe-aruba-2920-48g-poep'
     }
 
     devices_tags = ["switch", "stack"]

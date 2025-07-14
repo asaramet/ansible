@@ -397,6 +397,7 @@ def debug_devices_json(data_folder):
       'J9623A': 'hpe-aruba-2620-24',
       'J9772A': 'hpe-aruba-2530-48g-poep',
       'J9853A': 'hpe-aruba-2530-48g-poep-2sfpp',
+      'J9729A_stack': ' hpe-aruba-2920-48g-poep',
       'JL256A_stack': "hpe-aruba-2930f-48g-poep-4sfpp",
       'JL075A_stack': 'hpe-aruba-3810m-16sfpp-2-slot-switch',
       'JL693A_stack': "hpe-aruba-2930f-12g-poep-2sfpp",
@@ -484,7 +485,7 @@ if __name__ == "__main__":
         # "/data/hpe-8-ports/"
         # "/data/hpe-48-ports/"
         # "/data/aruba-stack/"
-        # "/data/aruba-stack-2920/"
+         "/data/aruba-stack-2920/"
         # "/data/aruba-stack-2930/"
         # "/data/aruba-modular/"
         # "/data/aruba-modular-stack/"
@@ -502,7 +503,7 @@ if __name__ == "__main__":
 
 
         #debug_locations_json(data_folder)
-        #debug_devices_json(data_folder)
+        debug_devices_json(data_folder)
         #debug_device_interfaces_json(data_folder)
         #debug_trunks_json(data_folder)
 
@@ -511,6 +512,6 @@ if __name__ == "__main__":
         #debug_tagged_vlans_json(data_folder)
 
 
-        debug_ip_addresses_json(data_folder)
+        #debug_ip_addresses_json(data_folder)
 
         #debug_modules_json(data_folder)

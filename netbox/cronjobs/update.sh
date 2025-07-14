@@ -32,6 +32,7 @@ tags=(
 )
 
 server='production'
+#server='development'
 
 cd $EXEC_DIR
 

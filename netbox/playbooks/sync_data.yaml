@@ -33,9 +33,9 @@
     - name: Sync HP 24+ ports switches config files from rhlx99
       fetch:
         src: "/tftpboot/{{ item }}/running-config"
-        dest: "{{ inventory_dir }}/data/hpe-48-ports/{{ item }}"
+        dest: "{{ inventory_dir }}/data/hpe-24-ports/{{ item }}"
         flat: yes
-      loop: "{{ J9623A + J9772A + J9853A }}"
+      loop: "{{ J9623A + J9772A + J9853A + J9145A }}"
 
     - name: Sync Aruba 24+ ports switches config files from rhlx99
       fetch:
