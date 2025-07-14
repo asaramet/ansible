@@ -469,6 +469,17 @@ def get_modules(t_file):
             modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': module, 'stack': stack})
         return modules
 
+    # ProCurve 2910al
+    module_2910al = {
+        'rsgw2u127ap': [('A', 'j9008a')],
+        'rsgw2u127bp': [('A', 'j9008a')]
+    }
+
+    if clean_hostname in module_2910al.keys():
+        for module, m_type in module_2910al[clean_hostname]:
+            modules.append({'hostname': clean_hostname, 'module': module, 'type': m_type})
+        return modules
+
     # HPE OS
     flexible_modules = recursive_search("flexible-module", text)
     if len(flexible_modules) > 0:
@@ -775,7 +786,7 @@ if __name__ == "__main__":
         #"/data/hpe-8-ports/",
          "/data/hpe-24-ports/",
         # "/data/aruba-stack/",
-         "/data/aruba-stack-2920/",
+        # "/data/aruba-stack-2920/",
         # "/data/aruba-stack-2930/",
         # "/data/aruba-modular/",
         # "/data/aruba-modular-stack/",
@@ -801,8 +812,8 @@ if __name__ == "__main__":
         #debug_get_vlans_names(data_folder)
         #debug_get_untagged_vlans(data_folder)
         #debug_get_ip_address(data_folder)
-        debug_device_type(data_folder)
-        #debug_get_modules(data_folder)
+        #debug_device_type(data_folder)
+        debug_get_modules(data_folder)
         #debug_get_location(data_folder)
 
     #print("\n=== No files functions ===")

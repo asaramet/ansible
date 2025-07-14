@@ -19,7 +19,7 @@
 # aruba_48
 # aruba_modular
 # hpe_8
-# hpe_48
+# hpe_24
 # procurve_modular
 # procurve_single
 #
@@ -67,9 +67,9 @@
         file: ../data/yaml/hpe_8_ports.yaml
 
     - name: Include data for 24 and 48 Ports old HP switches
-      tags: hpe_48
+      tags: hpe_24
       include_vars:
-        file: ../data/yaml/hpe_48_ports.yaml
+        file: ../data/yaml/hpe_24_ports.yaml
 
     - name: Include data for 24 and 48 Ports Aruba switches
       tags: aruba_48
