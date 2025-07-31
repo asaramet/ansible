@@ -6,10 +6,10 @@
 #
 # ansible-playbook playbooks/aruba.yaml --tags aruba_stack,development,chassis
 #
-# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,trunks
 # ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,create_vlans
-
 # ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,interfaces
+# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,trunks
+
 # ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,tagged_vlans
 # ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,ip
 #

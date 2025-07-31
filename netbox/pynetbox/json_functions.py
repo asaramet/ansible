@@ -276,9 +276,9 @@ def device_interfaces_json(config_files):
 
             unique_interfaces.add(entry)
 
-        # Interfaces to delete for stack slaves
+        # Interfaces to delete
         for stack_nr, stack_name in hostname.items():
-            if int(stack_nr) > 1:
+            if int(stack_nr) > 0:
                 for interface in i_types['type']:
                     unique_delete_interfaces.add((stack_name, prefix + interface))
 
@@ -503,7 +503,7 @@ if __name__ == "__main__":
 
 
         #debug_locations_json(data_folder)
-        debug_devices_json(data_folder)
+        #debug_devices_json(data_folder)
         #debug_device_interfaces_json(data_folder)
         #debug_trunks_json(data_folder)
 
@@ -514,4 +514,4 @@ if __name__ == "__main__":
 
         #debug_ip_addresses_json(data_folder)
 
-        #debug_modules_json(data_folder)
+        debug_modules_json(data_folder)

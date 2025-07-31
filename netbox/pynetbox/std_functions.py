@@ -433,7 +433,7 @@ def get_modules(t_file):
 
     # Modules for Aruba 2920 stacks
     module_2920 = {
-        'rsgw7009sp': [('1', 'A', 'j9731a'), ('1', 'B', 'j9731a')],
+        'rsgw7009p': [('1', 'A', 'j9731a'), ('1', 'B', 'j9731a')],
         'rsgw5313sp': [('1', 'A', 'j9731a'), ('2', 'A', 'j9731a'), ('3', 'A', 'j9731a')], # ('1', 'STK', 'j9733a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a')
         'rsgw10118sp': [('1', 'A', 'j9731a'), ('2', 'A', 'j9731a')], #('1', 'STK', 'j9733a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ], 
         'rsgw1u140sp': [('1', 'A', 'j9731a'), ('2', 'A', 'j9731a')], #('1', 'STK', 'j9733a'), ('2', 'STK', 'j9733a'), ('3', 'STK', 'j9733a') ],
@@ -784,14 +784,14 @@ if __name__ == "__main__":
         #"/data/aruba-12-ports/",
         # "/data/aruba-48-ports/",
         #"/data/hpe-8-ports/",
-         "/data/hpe-24-ports/",
-        # "/data/aruba-stack/",
+        # "/data/hpe-24-ports/",
+         "/data/aruba-stack/",
         # "/data/aruba-stack-2920/",
         # "/data/aruba-stack-2930/",
         # "/data/aruba-modular/",
         # "/data/aruba-modular-stack/",
         # "/data/procurve-single/",
-        # "/data/procurve-modular/",
+         "/data/procurve-modular/",
         #"/data/aruba_6100/"
          "/data/aruba_6300/"
     ]
@@ -813,8 +813,8 @@ if __name__ == "__main__":
         #debug_get_untagged_vlans(data_folder)
         #debug_get_ip_address(data_folder)
         #debug_device_type(data_folder)
-        debug_get_modules(data_folder)
-        #debug_get_location(data_folder)
+        #debug_get_modules(data_folder)
+        debug_get_location(data_folder)
 
     #print("\n=== No files functions ===")
     #debug_convert_range()
