@@ -7,9 +7,8 @@ from tabulate import tabulate
 from std_functions import main_folder, config_files
 
 from json_functions import locations_json, vlans_json
-from json_functions import device_interfaces_json
+from json_functions import device_interfaces_json, devices_json
 
-from json_functions_os_cx import devices_json
 from json_functions_os_cx import ip_addresses_json, lags_json, interfaces_json
 
 # Collect all the data and saved it to a YAML file

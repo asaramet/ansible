@@ -351,6 +351,43 @@
       loop: "{{ devices }}"
       when: chassis is defined and chassis | length > 0 
 
+    - name: Create VLANs
+      tags:
+        - create_vlans
+        - vlans
+        - update
+      netbox.netbox.netbox_vlan:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          name: "{{ item.name }}"
+          vid: "{{ item.id }}"
+        state: present
+      loop: "{{ vlans }}"
+
+    - name: Update device interfaces 
+      tags:
+        - interfaces
+        - update
+      netbox.netbox.netbox_device_interface:
+        netbox_url: "{{ netbox_url }}"
+        netbox_token: "{{ netbox_token }}"
+        validate_certs: false
+        data:
+          device: "{{ item.hostname }}"
+          name: "{{ item.interface }}"
+          description: "{{ item.name }}"
+          type: "{{ item.type }}"
+          poe_mode: "{{ item.poe_mode }}"
+          poe_type: "{{ item.poe_type }}"
+          tagged_vlans: []
+          untagged_vlan: "{{ { 'vlan_id': item.vlan_id, 'name': item.vlan_name } if item.vlan_id else omit }}" # omit the value if null id found
+          mode: "{{ 'Tagged' if item.is_trunk | default(false) else 'Access' }}" # Dynamically assign mode
+        state: present
+        update_vc_child: true
+      loop: "{{ device_interfaces }}"
+
     - name: Create Trunk interfaces as LAG
       tags:
         - trunks
@@ -423,43 +460,6 @@
         state: present
       loop: "{{ lag_interfaces }}"
       when: lags is defined and lags | length > 0
-
-    - name: Create VLANs
-      tags:
-        - create_vlans
-        - vlans
-        - update
-      netbox.netbox.netbox_vlan:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          name: "{{ item.name }}"
-          vid: "{{ item.id }}"
-        state: present
-      loop: "{{ vlans }}"
-
-    - name: Update device interfaces 
-      tags:
-        - interfaces
-        - update
-      netbox.netbox.netbox_device_interface:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          device: "{{ item.hostname }}"
-          name: "{{ item.interface }}"
-          description: "{{ item.name }}"
-          type: "{{ item.type }}"
-          poe_mode: "{{ item.poe_mode }}"
-          poe_type: "{{ item.poe_type }}"
-          tagged_vlans: []
-          untagged_vlan: "{{ { 'vlan_id': item.vlan_id, 'name': item.vlan_name } if item.vlan_id else omit }}" # omit the value if null id found
-          mode: "{{ 'Tagged' if item.is_trunk | default(false) else 'Access' }}" # Dynamically assign mode
-        state: present
-        update_vc_child: true
-      loop: "{{ device_interfaces }}"
 
 # TODO - For Aruba OS_CX switches `tagged_vlans` is not returned
 

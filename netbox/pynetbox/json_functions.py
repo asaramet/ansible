@@ -409,6 +409,7 @@ def debug_devices_json(data_folder):
       "JL256A": "hpe-aruba-2930f-48g-poep-4sfpp",
       "JL322A": "hpe-aruba-2930m-48g-poep",
       "JL357A": "hpe-aruba-2540-48g-poep-4sfpp",
+      'JL258A': "hpe-aruba-2930f-8g-poep-2sfpp",
 
       "JL679A": "hpe-aruba-6100-12g-poe4-2sfpp",
       "JL658A_stack": "hpe-aruba-6300m-24sfpp-4sfp56"
@@ -479,21 +480,21 @@ if __name__ == "__main__":
     print("\n=== Debuging ===")
 
     data_folders = [
-        #"/data/aruba-8-ports/",
-        "/data/aruba-12-ports/",
+        "/data/aruba-8-ports/",
+        #"/data/aruba-12-ports/",
         # "/data/aruba-48-ports/"
         # "/data/hpe-8-ports/"
         # "/data/hpe-48-ports/"
         # "/data/aruba-stack/"
-         "/data/aruba-stack-2920/"
+        #"/data/aruba-stack-2920/"
         # "/data/aruba-stack-2930/"
         # "/data/aruba-modular/"
         # "/data/aruba-modular-stack/"
         # "/data/procurve-single/"
         # "/data/procurve-modular/"
 
-        #"/data/aruba_6100/"
-        # "/data/aruba_6300/"
+        "/data/aruba_6100/",
+        "/data/aruba_6300/"
     ]
 
     for folder in data_folders:
@@ -503,7 +504,7 @@ if __name__ == "__main__":
 
 
         #debug_locations_json(data_folder)
-        #debug_devices_json(data_folder)
+        debug_devices_json(data_folder)
         #debug_device_interfaces_json(data_folder)
         #debug_trunks_json(data_folder)
 
@@ -514,4 +515,4 @@ if __name__ == "__main__":
 
         #debug_ip_addresses_json(data_folder)
 
-        debug_modules_json(data_folder)
+        #debug_modules_json(data_folder)

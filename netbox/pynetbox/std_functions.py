@@ -41,26 +41,6 @@ def recursive_search(pattern, text, start=False):
     return found_lines
 
 # return a tuple (section, value), ex: (interface, interface_name), recursively from a switch config
-def recursive_section_search_old(text, section, value):
-    names_tuple = []
-    section_value = None
-
-    for line in text:
-        stripped_line = line.strip()
-
-        if stripped_line.startswith(section):
-            section_value = stripped_line.split()[1]  # Extract interface name
-            continue
-
-        if section_value and stripped_line.startswith(value):
-            found_value = stripped_line.split(' ', 1)[1].strip('"')
-            names_tuple.append((section_value, found_value))
-
-        if stripped_line in ["exit", "!"]:  # Common section termination keywords
-            section_value = None  # Reset section
-
-    return names_tuple
-
 def recursive_section_search(text, section, value):
     """
     Parses a config text block and returns a list of (section_value, value_found) tuples.
@@ -78,7 +58,7 @@ def recursive_section_search(text, section, value):
             if len(parts) == 2:
                 current_section = parts[1]
             continue
-
+        
         # Value found inside section
         if current_section and stripped.startswith(value):
             _, val = stripped.split(' ', 1)
@@ -351,7 +331,7 @@ def get_vlans_names(t_file):
         text = f.readlines()
 
     vlans = {}
-    for vlan_id, vlan_name in recursive_section_search(text, 'vlan', 'name'):
+    for vlan_id, vlan_name in recursive_section_search(text, 'vlan', 'name '):
         vlans[vlan_id] = vlan_name
     return vlans
 
@@ -398,19 +378,47 @@ def get_tagged_vlans(t_file):
 
     return "None"
 
+def extract_ip_from_mgmt(text):
+    result = recursive_section_search(text, 'interface mgmt', 'ip static')
+    if result:
+        return result[0][1].split()[1]  # 'static 1.2.3.4'
+    return None
+
+def extract_ip_from_aoscx_vlan(text):
+    result = recursive_section_search(text, 'interface vlan', 'ip address')
+    if result:
+        vlan_id = result[0][0].split()[1]  # 'vlan 101'
+        ip = result[0][1].split()[1]       # 'address 1.2.3.4/24'
+        return vlan_id, ip
+    return None
+
+def extract_ip_from_aruba_vlan(text):
+    result = recursive_section_search(text, 'vlan', 'ip address')
+    if result:
+        vlan_id, ip_string = result[0]
+        _, ip, netmask = ip_string.split()  # 'address 1.2.3.4 255.255.254.0'
+        prefix = sum(bin(int(octet)).count('1') for octet in netmask.split('.'))
+        return vlan_id, f'{ip}/{prefix}'
+    return None
+
 def get_ip_address(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    vlan_id, ip_string = recursive_section_search(text, 'vlan', 'ip address')[0]
-    vlan_name = get_vlans_names(t_file)[vlan_id]
+    # Try management interface first
+    mgmt_ip = extract_ip_from_mgmt(text)
+    if mgmt_ip:
+        return None, None, mgmt_ip
 
-    _, ip, netmask = ip_string.split(' ')
+    # Try AOS_CX VLAN interfaces
+    vlan_info = extract_ip_from_aoscx_vlan(text)
+    if not vlan_info:
+        vlan_info = extract_ip_from_aruba_vlan(text)
 
-    # count 1-bits in the binary representation of the netmask
-    ip_bits = sum(bin(int(x)).count('1') for x in netmask.split('.'))
+    vlan_id, ip = vlan_info
+    vlan_name = get_vlans_names(t_file).get(vlan_id, "UNKNOWN")
 
-    return vlan_id, vlan_name, ip + '/' + str(ip_bits)
+    return vlan_id, vlan_name, ip
 
 def get_modules(t_file):
     modules = []
@@ -780,19 +788,19 @@ if __name__ == "__main__":
     print("\n=== Debuging ===")
 
     data_folders = [
-        #"/data/aruba-8-ports/",
+        "/data/aruba-8-ports/",
         #"/data/aruba-12-ports/",
         # "/data/aruba-48-ports/",
         #"/data/hpe-8-ports/",
         # "/data/hpe-24-ports/",
-         "/data/aruba-stack/",
+        # "/data/aruba-stack/",
         # "/data/aruba-stack-2920/",
         # "/data/aruba-stack-2930/",
         # "/data/aruba-modular/",
         # "/data/aruba-modular-stack/",
         # "/data/procurve-single/",
-         "/data/procurve-modular/",
-        #"/data/aruba_6100/"
+        # "/data/procurve-modular/",
+        "/data/aruba_6100/",
          "/data/aruba_6300/"
     ]
 
@@ -811,10 +819,10 @@ if __name__ == "__main__":
         #debug_get_vlans(data_folder)
         #debug_get_vlans_names(data_folder)
         #debug_get_untagged_vlans(data_folder)
-        #debug_get_ip_address(data_folder)
+        debug_get_ip_address(data_folder)
         #debug_device_type(data_folder)
         #debug_get_modules(data_folder)
-        debug_get_location(data_folder)
+        #debug_get_location(data_folder)
 
     #print("\n=== No files functions ===")
     #debug_convert_range()

@@ -12,77 +12,6 @@ from extra_functions import get_uplink_vlan, get_interfaces_config
 from extra_functions import get_loopback_interface, get_lag_interfaces
 from extra_functions import get_interfaces, get_vlan_names, interfaces_types
 
-# create devices json objects list
-def devices_json(config_files, type_slags, tags):
-    data = {"devices":[], "chassis":[]}
-    rsm_vlans = ['102','202','302']
-
-    for file in config_files:
-
-        location, room, _ = get_location(file)
-        location = get_room_location(location)
-        
-        site = get_site(file)
-        uplink_vlan = get_uplink_vlan(file)
-        
-        device_role = "bueroswitch" if uplink_vlan in rsm_vlans else "access-layer-switch"
-
-        hostnames = get_hostname(file)
-        clean_name = None
-
-        if '0' not in hostnames.keys():
-            hostname = hostnames['1']
-            clean_name = hostname[:-2]
-            data['chassis'].append({'master': hostname, 'name': clean_name})
-
-        for key in hostnames.keys():
-            hostname = hostnames[key]
-            vc_position = int(key)
-            vc_priority = 255 if vc_position == 1 else 128
-            if vc_position == 2: vc_priority = 128
-
-            if not clean_name:
-                clean_name = hostname
-
-            if hostname[2:4] == "cs":
-                device_role = "distribution-layer-switch"
-
-            d_type = type_slags[device_type(clean_name)]
-
-            data["devices"].append({"name": hostname, "location": location, "site": site, 
-                "device_role": device_role, 'virtual_chassis': clean_name, 'vc_position': vc_position,
-                'vc_priority': vc_priority,
-                "device_type": d_type, "serial": serial_numbers()[hostname], "tags": tags })
-
-    return data
-
-#def device_interfaces_json(config_files):
-#    data = {"device_interfaces":[]}
-
-#    for f in config_files:
-#        interfaces = get_interfaces_config(f)["physical"].keys()
-
-#        hostnames = get_hostname(f)
-#        if '0' in hostnames.keys():
-#            hostnames['1'] = hostnames['0']
-
-#        i_types = interfaces_types(f)
-
-#        for value in interfaces:
-#            _, interface = value.split()
-
-#            stack_nr, _, pos_nr = interface.split('/')
-
-#            poe_mode = i_types['poe_mode'][pos_nr] if i_types['poe_mode'] else None
-#            poe_type = i_types['poe_type'][pos_nr] if i_types['poe_type'] else None
-            
-#            data["device_interfaces"].append({
-#                'device': hostnames[stack_nr], 'type': i_types['type'][pos_nr],
-#                'interface': interface, 'stack_nr': stack_nr, 
-#                'poe_mode': poe_mode, 'poe_type': poe_type })
-
-#    return data
-
 # create ip_addresses json objects list
 def ip_addresses_json(config_files):
     data = {"ip_addresses":[]}
@@ -215,9 +144,9 @@ if __name__ == "__main__":
 
     config_file = data_folder + "rggw1018bp"
 
-    #debug_devices_json(data_folder)
+    debug_devices_json(data_folder)
     #debug_device_interfaces_json(data_folder)
-    debug_ip_addresses_json(data_folder)
+    #debug_ip_addresses_json(data_folder)
     #debug_lags_json(data_folder)
     #debug_interfaces_json(data_folder)
 
@@ -226,8 +155,6 @@ if __name__ == "__main__":
 
     config_file = data_folder + "rgcs0006"
 
-    #debug_devices_json(data_folder)
-    #debug_device_interfaces_json(data_folder)
     debug_ip_addresses_json(data_folder)
     #debug_lags_json(data_folder)
     #debug_interfaces_json(data_folder)
