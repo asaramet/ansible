@@ -358,13 +358,19 @@ def ip_addresses_json(config_files):
 
         vlan_id, vlan_name, ip = get_ip_address(t_file)
 
+        is_vlan = False
+        name = None
+        if vlan_id:
+            is_vlan = True
+            name = 'vlan ' + vlan_id
+
         data['ip_addresses'].append({
             'hostname': hostname, 
             'ip': ip, 
             'vlan_id': vlan_id, 
             'vlan_name': vlan_name,
-            'vlan': True,
-            'name': 'vlan ' + vlan_id
+            'vlan': is_vlan,
+            'name': name
         })
     
     return data
@@ -504,7 +510,7 @@ if __name__ == "__main__":
 
 
         #debug_locations_json(data_folder)
-        debug_devices_json(data_folder)
+        #debug_devices_json(data_folder)
         #debug_device_interfaces_json(data_folder)
         #debug_trunks_json(data_folder)
 
@@ -513,6 +519,6 @@ if __name__ == "__main__":
         #debug_tagged_vlans_json(data_folder)
 
 
-        #debug_ip_addresses_json(data_folder)
+        debug_ip_addresses_json(data_folder)
 
         #debug_modules_json(data_folder)

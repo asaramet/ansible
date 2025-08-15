@@ -1,0 +1,15 @@
+---
+#
+# RUN:
+# ansible-playbook playbooks/dnf_install.yaml -l <hosts>
+
+- name: Debuging
+  hosts: hs_23
+  gather_facts: false
+  tags: update
+  #become: true
+  tasks:
+    - name: Display variables on {{ inventory_hostname }}
+      debug:
+        msg: "{{ hostvars[inventory_hostname] }}"
+...

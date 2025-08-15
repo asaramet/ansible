@@ -36,9 +36,9 @@
   tags: copy_remote
   vars:
     work_dir: *work_dir
-    ansible_become: true # elevate privileges on the remote machine, if necessary
-    ansible_become_method: sudo
-    ansible_become_pass: "{{ vault_ansible_become_pass }}"
+    #ansible_become: true # elevate privileges on the remote machine, if necessary
+    #ansible_become_method: sudo
+    #ansible_become_pass: "{{ vault_ansible_become_pass }}"
   tasks:
     - name: Get the sub groups/folders in the "aruba" hosts group
       set_fact:
@@ -50,9 +50,9 @@
       copy:
         src: "{{ work_dir }}/data/{{ item }}"
         dest: "/tftpboot/"
-        owner: root
         group: rz
-        mode: 0666
+        #owner: root
+        #mode: 0666
       loop: "{{ subgroups }}"
       run_once: true
 ...

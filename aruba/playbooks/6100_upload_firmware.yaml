@@ -8,7 +8,7 @@
   vars: 
     work_dir: "/home/asaramet/Ansible/aruba"
     tftp_server: "134.108.49.9"
-    firmware: "ArubaOS-CX_6100-6000_10_11_0001.swi"
+    firmware: "ArubaOS-CX_6100-6000_10_13_1020.swi"
   tasks:
     - name: "Create group subfolder (ex: {{ group_names[1] }}) if it doesn't exits"
       file:
@@ -36,9 +36,9 @@
         lines:
           - "copy tftp://{{ tftp_server }}/software/{{ firmware }} primary"
 
-    - name: Boot into primary partition
-      tags: boot_primary
-      aosx_boot_firmware:
-        aoscx_boot_firmware:
-          partition_name: primary
+#    - name: Boot into primary partition
+#      tags: boot_primary
+#      aosx_boot_firmware:
+#        aoscx_boot_firmware:
+#          partition_name: primary
 ...
