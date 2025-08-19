@@ -9,13 +9,28 @@
   gather_facts: false
   tags: wget
   vars:
-    el: "EL_10"
-    version: "24.0.5"
-    rpm_nr: "pre32.7c5f79a1e-91.el10.x86_64"
     bareos_common: &bareos_common "{{ inventory_dir }}/rpm/bareos-common.rpm"
     bareos_filedaemon: &bareos_filedaemon "{{ inventory_dir }}/rpm/bareos-filedaemon.rpm"
     
   tasks:
+    - name: Update current Bareos variables
+      ansible.builtin.command: "python3 {{ inventory_dir }}/python/get_bareos.py --main_folder {{ inventory_dir }}"
+      register: bareos_out
+
+    - name: Parse YAML output and save as facts
+      ansible.builtin.set_fact:
+        bareos_vars: "{{ bareos_out.stdout | from_yaml }}"
+
+    - name: Expose Bareos vars as top-level facts
+      ansible.builtin.set_fact:
+        el: "{{ bareos_vars.el }}"
+        rpm_nr: "{{ bareos_vars.rpm_nr }}"
+        version: "{{ bareos_vars.version }}"
+
+    - name: Found Bareos variables
+      ansible.builtin.debug:
+        msg: "{{ el, version, rpm_nr }}" 
+
     - name: Download Bareos common rpm.
       ansible.builtin.get_url:
         url: "https://download.bareos.org/current/{{ el }}/x86_64/bareos-common-{{ version }}~{{ rpm_nr }}.rpm"
@@ -29,7 +44,6 @@
 - name: Install Bareos RPM on the server
   hosts: hs_23
   gather_facts: false
-  #become: true
   tags: install 
   vars:
     user: asaramet
