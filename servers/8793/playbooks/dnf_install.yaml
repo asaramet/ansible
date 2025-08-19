@@ -23,6 +23,20 @@
         update_cache: true
       loop:
         - vim
+        - epel-release
+        - ufw
+        - postfix
+        - chrony
+        - rsyslog
+        - rpcbind
+        - avahi
+        - tftp-server
+        - at
+        - screen
+        - dnf-automatic 
+        - plocate
+        - munin-node
+        - nrpe
     
     - name: Remove unnecessary packages
       ansible.builtin.dnf:

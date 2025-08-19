@@ -1,0 +1,60 @@
+---
+# Install bareos by downloading the rpm from the local machine
+#
+# RUN:
+# ansible-playbook playbooks/bareos_install.yaml -l <hosts>
+
+- name: Get Bareos RPM from the official repository
+  hosts: localhost
+  gather_facts: false
+  tags: wget
+  vars:
+    el: "EL_10"
+    version: "24.0.5"
+    rpm_nr: "pre32.7c5f79a1e-91.el10.x86_64"
+    bareos_common: &bareos_common "{{ inventory_dir }}/rpm/bareos-common.rpm"
+    bareos_filedaemon: &bareos_filedaemon "{{ inventory_dir }}/rpm/bareos-filedaemon.rpm"
+    
+  tasks:
+    - name: Download Bareos common rpm.
+      ansible.builtin.get_url:
+        url: "https://download.bareos.org/current/{{ el }}/x86_64/bareos-common-{{ version }}~{{ rpm_nr }}.rpm"
+        dest: "{{ bareos_common }}"
+
+    - name: Download Bareos filedaemon rpm.
+      ansible.builtin.get_url:
+        url: "https://download.bareos.org/current/{{ el }}/x86_64/bareos-filedaemon-{{ version }}~{{ rpm_nr }}.rpm"
+        dest: "{{ bareos_filedaemon }}"
+
+- name: Install Bareos RPM on the server
+  hosts: hs_23
+  gather_facts: false
+  #become: true
+  tags: install 
+  vars:
+    user: asaramet
+    bareos_common: *bareos_common
+    bareos_common_rpm: "/home/asaramet/bareos/bareos-common.rpm"
+    bareos_filedaemon: *bareos_filedaemon
+    bareos_filedaemon_rpm: "/home/asaramet/bareos/bareos-filedaemon.rpm"
+  tasks:
+    - name: Copy downloaded bareos-common.rpm to the server
+      ansible.builtin.copy:
+        src: "{{ bareos_common }}"
+        dest: "{{ bareos_common_rpm }}"
+
+    - name: Copy downloaded bareos-filedaemon.rpm to the server
+      ansible.builtin.copy:
+        src: "{{ bareos_filedaemon }}"
+        dest: "{{ bareos_filedaemon_rpm }}"
+
+    - name: Install bareos from the local rpms
+      become: true
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+        disable_gpg_check: true
+      loop:
+        - "{{ bareos_common_rpm }}"
+        - "{{ bareos_filedaemon_rpm }}"
+...
