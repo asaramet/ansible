@@ -58,16 +58,18 @@
   become: true # run as root
   tags: apps
   vars:
-    netbox_version: &netbox_version "{{ hostvars['localhost']['netbox_version'] }}" # inherit the variable from localhost
+    release_yaml: &release_yaml "{{ inventory_dir }}/src/releases/release.yaml"
+  vars_files: &vars_files
+    - "{{ release_yaml }}"
   tasks:
-    - name: Unpack the netbox package version "{{ netbox_version }}" from local folder to '/opt'
+    - name: Unpack the netbox package version "{{ version }}" from local folder to '/opt'
       unarchive:
-        src: "{{ inventory_dir }}/src/releases/netbox-{{ netbox_version }}.tar.gz"
+        src: "{{ inventory_dir }}/src/releases/netbox-{{ version }}.tar.gz"
         dest: /opt
 
     - name: Create a relative symlink to the 'netbox' folder
       file:
-        src: "/opt/netbox-{{ netbox_version }}"
+        src: "/opt/netbox-{{ version }}"
         dest: /opt/netbox
         state: link
 
@@ -111,11 +113,12 @@
   become: true # run as root
   tags: pip
   vars: 
-    netbox_version: *netbox_version
+    release_yaml: *release_yaml
+  vars_files: *vars_files
   tasks:
     - name: Copy local requirements.txt to the remote 'netbox' virtual environment
       copy:
-        src: "{{ inventory_dir }}/src/releases/requirements-{{ netbox_version }}.txt"
+        src: "{{ inventory_dir }}/src/releases/requirements-{{ version }}.txt"
         dest: /opt/netbox/requirements.txt
         owner: root
         mode: 664
@@ -273,7 +276,7 @@
       loop:
         - pem_pass.txt
         - rzlx8750_serverkey.pem
-      when: production
+      when: production | bool
 
     - name: Copy the SSL key for a local test machine
       copy:
@@ -281,7 +284,7 @@
         dest:  /etc/ssl/private/
         owner: root
         mode: 0600
-      when: not production
+      when: not production | bool
 
     - name: Copy the SSL certificate
       copy:
@@ -289,7 +292,7 @@
         dest: /etc/ssl/certs/
         owner: root
         mode: 0600
-      when: production
+      when: production | bool
 
     - name: Copy the SSL certificate for a local test machine
       copy:
@@ -297,7 +300,7 @@
         dest: /etc/ssl/certs/
         owner: root
         mode: 0600
-      when: not production
+      when: not production | bool
 
     - name: Copy nginx config file
       copy: 

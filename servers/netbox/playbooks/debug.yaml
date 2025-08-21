@@ -1,0 +1,24 @@
+--- 
+- name: Debugging first play
+  hosts: local
+  gather_facts: false
+  vars:
+    release_yaml: &release_yaml "{{ inventory_dir }}/src/releases/release.yaml"
+  vars_files: &vars_files
+    - "{{ release_yaml }}"
+  tasks:
+    - name: Display netbox version 
+      ansible.builtin.debug:
+        msg: "{{ version }}"
+
+- name: Debugging second play  
+  hosts: local 
+  gather_facts: false
+  vars:
+    release_yaml: *release_yaml
+  vars_files: *vars_files
+  tasks:
+    - name: Display netbox version 
+      ansible.builtin.debug:
+        msg: "{{ version }}"
+... 
