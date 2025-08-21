@@ -25,8 +25,24 @@ ansible-playbook playbooks/ufw.yml
 ansible-playbook playbooks/ipv6.yaml 
 ```
 
+## Update DNS resolver
+
+```bash
+ansible-playbook playbooks/dns.yaml 
+```
+
 ## Install default packages
 
 ```bash
 ansible-playbook playbooks/dnf_install.yaml
+```
+
+## Install extra packages
+
+The host has no Internet connection, so no access to repositories outside official EPEL and Rocky that he get's from local mirror. So packages will have to be downloaded on the local machine, uploaded to the server and installed there.
+
+- Install Bareos (Backup & Recovery Open Source Software)
+
+```bash
+ansible-playbook playbooks/bareos_install.yaml
 ```
