@@ -20,3 +20,10 @@ Ansible playbooks and tools for different types of Linux servers.
     ```bash
     sudo virsh net-start default 
     ```
+
+    Or let it start automatically:
+
+    ```bash
+    sudo virsh net-autostart default
+    sudo virsh net-list
+    ```
