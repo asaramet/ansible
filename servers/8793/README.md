@@ -46,3 +46,9 @@ The host has no Internet connection, so no access to repositories outside offici
 ```bash
 ansible-playbook playbooks/bareos_install.yaml
 ```
+
+- Configure postfix mail messanger to send emails for system notifications
+
+```bash
+ansible-playbook playbooks/postfix.yaml
+```
