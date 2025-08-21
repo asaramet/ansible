@@ -1,0 +1,51 @@
+---
+- name: Configure postfix - mail handling agent
+  hosts: hs_23 # You can override this with -l yourhost
+  become: true
+  gather_facts: false
+
+  vars:
+    postfix_main_cf: /etc/postfix/main.cf
+    postfix_settings:
+      myhostname: "rzlx8793.hs-esslingen.de"
+      myorigin: "hs-esslingen.de"
+      mydestination: "localhost"
+      inet_interfaces: "loopback-only"
+      relayhost: "[mail.hs-esslingen.de]"
+
+  tasks:
+    - name: Ensure Postfix is installed
+      package:
+        name: postfix
+        state: present
+
+    - name: Remove old conflicting lines (commented or uncommented)
+      ansible.builtin.replace:
+        path: "{{ postfix_main_cf }}"
+        regexp: '^(#\s*)?({{ item.key }})\s*=.*'
+        replace: ''
+      loop: "{{ postfix_settings | dict2items }}"
+
+    - name: Add or update Postfix settings
+      ansible.builtin.lineinfile:
+        path: "{{ postfix_main_cf }}"
+        line: "{{ item.key }} = {{ item.value }}"
+        insertafter: EOF
+      loop: "{{ postfix_settings | dict2items }}"
+
+    - name: Ensure Postfix service is enabled and started
+      ansible.builtin.service:
+        name: postfix
+        state: started
+        enabled: yes
+
+    - name: Reload Postfix after configuration change
+      ansible.builtin.command: postfix reload
+      notify: Restart Postfix
+
+  handlers:
+    - name: Restart Postfix
+      ansible.builtin.service:
+        name: postfix
+        state: restarted
+...
