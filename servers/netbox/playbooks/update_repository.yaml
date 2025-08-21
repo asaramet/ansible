@@ -1,49 +1,44 @@
 ---
 # Update NetBox version and required Python packages locally
 #
-# ansible-playbook playbooks/update_packages.yaml
+# ansible-playbook playbooks/update_repository.yaml
 #
-# Constants:
-# 
-# netbox_version - defined in `host_vars/localhost/vars.yaml`
 
 - name: Download required files to localhost
   hosts: localhost
   gather_facts: false
   tags: global
   vars: 
-    inventory_dir: "{{ playbook_dir }}/.."
     releases_dir: "{{ inventory_dir }}/src/releases"
-    netbox_src_dir: "{{ releases_dir }}/netbox-{{ netbox_version }}"
-    requirements_txt: "{{ releases_dir }}/requirements-{{ netbox_version }}.txt"
+    release_yaml: "{{ releases_dir }}/release.yaml"
     venv_path: "{{ inventory_dir }}/pip_packages" 
   
   tasks:
-    - name: Download the new NetBox release
+    - name: Get current release YAML file from the official git repository
       ansible.builtin.get_url:
-        url: "https://github.com/netbox-community/netbox/archive/refs/tags/v{{ netbox_version }}.tar.gz"
+        url: "https://raw.githubusercontent.com/netbox-community/netbox/refs/heads/main/netbox/release.yaml"
+        dest: "{{ release_yaml }}"
+      
+    - name: Include variables from 'release.yaml' into 'release' dictionary
+      ansible.builtin.include_vars:
+        file: "{{ release_yaml }}"
+        name: release
+
+    - name: Set the new 'requirements.txt' file path
+      ansible.builtin.set_fact:
+        requirements_txt: "{{ releases_dir }}/requirements-{{ release.version }}.txt"
+
+    - name: Get the new NetBox release
+      ansible.builtin.get_url:
+        url: "https://github.com/netbox-community/netbox/archive/refs/tags/v{{ release.version }}.tar.gz"
         dest: "{{ releases_dir }}"
 
-    - name: Temporary extract contents of tar.gz to "{{ releases_dir }}"
-      ansible.builtin.unarchive:
-        src: "{{ netbox_src_dir }}.tar.gz"
-        dest: "{{ releases_dir }}"
-
-    - name: Get requirements.txt
-      ansible.builtin.copy:
-        src: "{{ netbox_src_dir }}/requirements.txt"
+    - name: Get the new 'requirements.txt'
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/netbox-community/netbox/refs/heads/main/requirements.txt"
         dest: "{{ requirements_txt }}"
 
-    - name: Remove temporary extracted "{{ netbox_src_dir }}"
-      ansible.builtin.file:
-        path: "{{ netbox_src_dir }}"
-        state: absent
-
-    - name: Append required plugins to requirements-{{ netbox_version }}.txt
-      ansible.builtin.blockinfile:
-        path: "{{ requirements_txt }}"
-
-    - name: Append plugins to requirements-{{ netbox_version }}.txt
+    - name: Append dependencies and plugins to the requirements file
       ansible.builtin.blockinfile:
         path: "{{ requirements_txt }}"
         block: |

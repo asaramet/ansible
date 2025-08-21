@@ -83,10 +83,10 @@ Development server, i.e `debian`. For production server, add `-e production=true
     ansible-playbook playbooks/update_server.yaml
     ```
 
-2. Collect required pip packages
+2. Collect required pip packages into a local repository
 
     ```bash
-    ansible-playbook playbooks/update_packages.yaml
+    ansible-playbook playbooks/update_repository.yaml
     ```
 
 3. Install NetBox
@@ -157,7 +157,7 @@ Development server, i.e `debian`. For production server, add `-e production=true
 5. All in one
 
 ```bash
-ansible-playbook playbooks/update_packages.yaml
+ansible-playbook playbooks/update_repository.yaml
 ansible-playbook playbooks/update_server.yaml
 ansible-playbook playbooks/install.yaml
 
