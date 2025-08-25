@@ -20,10 +20,10 @@
         state: present
 
     - name: Remove old conflicting lines (commented or uncommented)
-      ansible.builtin.replace:
+      ansible.builtin.lineinfile:
         path: "{{ postfix_main_cf }}"
         regexp: '^(#\s*)?({{ item.key }})\s*=.*'
-        replace: ''
+        state: absent
       loop: "{{ postfix_settings | dict2items }}"
 
     - name: Add or update Postfix settings
@@ -33,19 +33,20 @@
         insertafter: EOF
       loop: "{{ postfix_settings | dict2items }}"
 
-    - name: Ensure Postfix service is enabled and started
-      ansible.builtin.service:
-        name: postfix
-        state: started
-        enabled: yes
-
-    - name: Reload Postfix after configuration change
-      ansible.builtin.command: postfix reload
-      notify: Restart Postfix
-
-  handlers:
-    - name: Restart Postfix
+    - name: Ensure Postfix service is enabled and restart it
       ansible.builtin.service:
         name: postfix
         state: restarted
+        enabled: true
+
+    - name: Update '/etc/aliases'
+      ansible.builtin.lineinfile:
+        path: /etc/aliases
+        regexp: '^root:'
+        line: "root: {{ postfix_aliases }}"
+        state: present
+
+    - name: Run newaliases after update
+      ansible.builtin.command: newaliases
+
 ...

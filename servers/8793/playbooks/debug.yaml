@@ -12,4 +12,8 @@
     - name: Display variables on {{ inventory_hostname }}
       debug:
         msg: "{{ hostvars[inventory_hostname] }}"
+
+    - name: Display postfix aliases 
+      debug:
+        msg: "{{ postfix_aliases }}"
 ...

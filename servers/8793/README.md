@@ -52,3 +52,9 @@ ansible-playbook playbooks/bareos_install.yaml
 ```bash
 ansible-playbook playbooks/postfix.yaml
 ```
+
+- Configure chrony service - NTP handler
+
+```bash
+ansible-playbook playbooks/chrony.yaml
+```

@@ -1,0 +1,32 @@
+---
+- name: Configure chrony - the NTP server
+  hosts: hs_23 # You can override this with -l yourhost
+  become: true
+  gather_facts: false
+
+  vars:
+    chrony_file: /etc/chrony.conf
+    servers_block: | 
+      server ntp1.hs-esslingen.de iburst
+      server ntp2.hs-esslingen.de iburst
+      server ntp3.hs-esslingen.de iburst
+
+  tasks:
+    - name: Remove existing pool lines
+      ansible.builtin.lineinfile:
+        path: "{{ chrony_file }}"
+        regexp: '^pool\s+.*'
+        state: absent
+
+    - name: Add custom NTP servers to the config file
+      ansible.builtin.blockinfile:
+        path: "{{ chrony_file }}"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK: HE NTP servers"
+        block: "{{ servers_block }}"
+
+    - name: Restart chronyd service
+      ansible.builtin.service:
+        name: chronyd
+        state: restarted
+        enabled: true
+...
