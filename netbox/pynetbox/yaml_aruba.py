@@ -40,7 +40,17 @@ def single(data_folder, output_file_path, device_type_slags, devices_tags):
 # Collect modular switches data and saved it to a YAML file
 def modular(data_folder, output_file_path, device_type_slags, devices_tags):
     files = config_files(data_folder)
-    with open(main_folder + output_file_path, 'w') as f:
+
+    # For debugging output_file_path will be stdout
+    if output_file_path == sys.stdout:
+        f = sys.stdout
+    else:
+        output_file = main_folder + output_file_path
+        # ensure the folder exists
+        os.makedirs(os.path.dirname(output_file), exist_ok = True)
+        f = open(output_file, 'w')
+
+    try:
         yaml.dump({"modular": True}, f)
         yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
@@ -50,6 +60,9 @@ def modular(data_folder, output_file_path, device_type_slags, devices_tags):
         yaml.dump(vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)
+    finally:
+        if f is not sys.stdout: # Don't close stdout
+            f.close()
 
 def assign_sfp_modules(t_file):
     with open(main_folder + "/host_vars/99/sfp_modules.yaml", 'r' ) as f:
@@ -88,15 +101,6 @@ def stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
         yaml.dump(ip_addresses_json(files), f)
 
         yaml.dump(modules_json(files), f)
-
-#----- Debugging -------
-def test_single(data_folder, device_type_slags):
-    print("Testing - ", data_folder)
-
-    devices_tags = ["switch"]
-
-    single(data_folder, sys.stdout, device_type_slags, devices_tags)
-    
 
 def main():
     # ProCurve Single Switches
@@ -153,7 +157,7 @@ def main():
       'JL357A': "hpe-aruba-2540-48g-poep-4sfpp"
     }
 
-    print("Update data for Aruba 24 and 48 port Switches into the file: ", output_file_path) 
+    print("Update data for Aruba 24 and 48 port Switches into the file: ", output_file_path)
     single(data_folder, output_file_path, device_type_slags, devices_tags)
 
     # Aruba 8 Ports Switches
@@ -267,17 +271,44 @@ def main():
     print("Update data for Aruba modular stacks into the file: ", output_file_path)
     stack_module(data_folder, output_file_path, device_type_slags, devices_tags)
 
-def debug():
-    print('---Debugging---')
-
-    data_folder = main_folder + "/data/aruba-12-ports/"
+#----- Debugging -------
+def debug_single():
+    #data_folder = main_folder + "/data/aruba-12-ports/"
+    data_folder = main_folder + "/data/hpe-8-ports/"
     device_type_slags = {
         'JL258A': "hpe-aruba-2930f-8g-poep-2sfpp",
-        'JL693A': "hpe-aruba-2930f-12g-poep-2sfpp"
+        'JL693A': "hpe-aruba-2930f-12g-poep-2sfpp",
+
+        'J9562A': 'hpe-procurve-2915-8-poe',
+        'J9565A': 'hpe-procurve-2615-8-poe',
+        'J9774A': 'hpe-aruba-2530-8g-poep',
+        'J9780A': 'hpe-aruba-2530-8-poep'
     }
-    test_single(data_folder, device_type_slags)
+
+    print('---Debugging ', data_folder)
+    single(data_folder, sys.stdout, device_type_slags, ["switch"])
+    print('---END Debugging---')
+
+def debug_modular():
+    data_folder = main_folder + "/data/procurve-modular/"
+
+    device_type_slags = { 
+        'J8697A': 'hpe-procurve-5406zl',
+        'J8698A': 'hpe-procurve-5412zl',
+        'J8770A': 'hpe-procurve-4204vl',
+        'J8773A': 'hpe-procurve-4208vl',
+        'J9850A': 'hpe-5406r-zl2',
+        'J9851A': 'hpe-5412r-zl2',
+        'J9729A': 'hpe-aruba-2920-48g-poep',
+        'J9729A_stack': 'hpe-aruba-2920-48g-poep'
+    }
+
+    print("---Debugging ", data_folder)
+    modular(data_folder, sys.stdout, device_type_slags, ["switch", "modular-switch"])
     print('---END Debugging---')
 
 if __name__ == "__main__":
-    #debug()
+    #debug_single()
+    #debug_modular()
+
     main()

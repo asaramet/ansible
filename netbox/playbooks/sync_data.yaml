@@ -1,7 +1,37 @@
 ---
+- name: Clean old data
+  hosts: localhost
+  gather_facts: false
+  tags: clean
+  vars:
+    dest_folder: "{{ inventory_dir }}/data"
+  tasks:
+    - name: Find matching data folders
+      ansible.builtin.find:
+        paths: "{{ dest_folder }}"
+        patterns: '^(aruba|hpe|procurve|cisco).*'
+        file_type: directory
+        use_regex: true 
+      register: data_dirs
+
+    - name: Delete old folders
+      ansible.builtin.file:
+        path: "{{ item.path }}" 
+        state: absent
+      loop: "{{ data_dirs.files }}"
+
+    - name: Recreate empty folders
+      ansible.builtin.file:
+        path: "{{ item.path }}" 
+        state: directory
+        mode: '0775'
+      loop: "{{ data_dirs.files }}"
+
 - name: Sync data from rhlx99
   hosts: rhlx99
   gather_facts: false
+  vars:
+    dest_folder: "{{ inventory_dir }}/data"
   tasks:
     - name: Sync Aruba 6xxx config files from rhlx99
       ansible.posix.synchronize:
@@ -99,19 +129,3 @@
         dest: "{{ inventory_dir }}/data/cisco/{{ item }}"
         flat: yes
       loop: "{{ cisco }}"
-
-    - name: Debug
-      vars:
-        aruba_sws:
-          - aruba_6100
-          - aruba_6300
-      debug:
-        msg: |-
-          [
-            {% for item in aruba_sws %} 
-              "/tftpboot/{{ item }}",
-            {% endfor %}
-          ]
-      loop: "{{ aruba_sws }}"
-      #when: false
-      when: true
