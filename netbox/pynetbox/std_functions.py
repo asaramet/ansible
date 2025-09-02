@@ -7,6 +7,7 @@ from tabulate import tabulate
 
 this_folder = os.path.dirname(os.path.realpath(__file__))
 main_folder = os.path.dirname(this_folder)
+data_folder = os.path.join(main_folder, 'data')
 
 # --- Base functions ---
 def search_line(expression, t_file):

@@ -5,7 +5,7 @@
 import re, os, yaml
 from tabulate import tabulate
 
-from std_functions import this_folder, main_folder, config_files
+from std_functions import main_folder, config_files
 from std_functions import device_type, serial_numbers, convert_interfaces_range
 from std_functions import get_os_version, get_hostname, get_device_role, get_site
 from std_functions import get_trunks, get_interface_names, get_vlans

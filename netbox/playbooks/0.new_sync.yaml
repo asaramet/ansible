@@ -1,0 +1,72 @@
+---
+# - sync raw running-config files 
+# - sort them into right data folders
+# - create the devices.yaml list accordingly
+#
+# RUN 
+#    ansible-playbook playbooks/backup_sql.yaml
+
+- name: Create the raw data folder 
+  hosts: localhost
+  gather_facts: false
+  tags: clean
+  vars:
+    dest_dir: &dest_dir "{{ inventory_dir }}/data/raw"
+    temp_dir: &temp_dir "{{ dest_dir }}/temp"
+  tasks:
+    - name: Create the raw data folder if it doesn't exist
+      ansible.builtin.file:
+        path: "{{ temp_dir }}"
+        state: directory
+
+- name: Sync data from rhlx99
+  hosts: rhlx99
+  gather_facts: false
+  vars:
+    tftp_dir: "/tftpboot"
+    dest_dir: *dest_dir
+    temp_dir: *temp_dir
+  tasks:
+    - name: Synchronize running-config files from "{{ tftp_dir }}"
+      ansible.posix.synchronize:
+        src: "{{ tftp_dir }}/"
+        dest: "{{ temp_dir }}/"
+        mode: pull
+        rsync_opts:
+          - "--include=rs*/"
+          - "--include=rs*/running-config"
+          - "--include=rh*/"
+          - "--include=rh*/running-config"
+          - "--include=rg*/"
+          - "--include=rg*/running-config"
+          - "--include=rw*/"
+          - "--include=rw*/running-config"
+          - "--exclude=*"
+          - "--prune-empty-dirs"
+
+#  name: Modify gathered files locally
+#  hosts: localhost
+#  gather_facts: false
+#  vars:
+#    dest_dir: *dest_dir
+#    temp_dir: *temp_dir
+#  tasks:
+#    - name: Find all the running-config files
+#      ansible.builtin.find:
+#        paths: "{{ temp_dir }}"
+#        file_type: file
+#        patterns: "running-config"
+#        recurse: yes
+#      register: local_configs
+
+#    - name: Copy running-config files to respective device named ones
+#      ansible.posix.synchronize:
+#        src: "{{ item.path }}"
+#        dest: "{{ dest_dir }}/{{ item.path | regex_replace('.*/([^/]+)/running-config', '\\1') }}"
+#      loop: "{{ local_configs.files }}"
+
+#    - name: Remove temp folder after moving files
+#      ansible.builtin.file:
+#        path: "{{ temp_dir }}"
+#        state: absent
+...
