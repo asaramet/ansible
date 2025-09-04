@@ -36,7 +36,9 @@ server='production'
 
 cd $EXEC_DIR
 
-ansible-playbook playbooks/sync_data.yaml | tee ${logs_folder}/sync_data.logs &&
+#ansible-playbook playbooks/sync_data.yaml | tee ${logs_folder}/sync_data.logs &&
+ansible-playbook playbooks/0.new_sync.yaml | tee ${logs_folder}/sync_data.logs &&
+python3 pynetbox/sort_data.py | tee ${logs_folder}/sync_data.logs  &&
 
 python3 pynetbox/yaml_aruba.py | tee ${logs_folder}/pynetbox.logs  &&
 #python3 pynetbox/yaml_aruba_os_cx.py | tee -a ${logs_folder}/pynetbox.logs &&
