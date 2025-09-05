@@ -3,10 +3,13 @@
 # Extra reusable functions
 
 import re, os, yaml
+
+from sort_data import get_switch_type
+
 from tabulate import tabulate
 from std_functions import main_folder, config_files, search_line
 from std_functions import convert_range
-from std_functions import device_type, get_hostname, interfaces_dict
+from std_functions import get_hostname, interfaces_dict
 
 # get the interfaces configuration from a config file
 def get_interfaces_config(config_file):
@@ -223,7 +226,9 @@ def interfaces_types(config_file):
     hostnames = get_hostname(config_file)
     hostname = hostnames['0'] if '0' in hostnames.keys() else hostnames['1'][:-2]
 
-    d_type = device_type(hostname).split('_')[0]
+    d_type = get_switch_type(config_file)
+
+    if isinstance(d_type, dict): d_type = d_type['1']
 
     #print(d_type)
     # create interface type dictionary

@@ -9,6 +9,56 @@ this_folder = os.path.dirname(os.path.realpath(__file__))
 main_folder = os.path.dirname(this_folder)
 data_folder = os.path.join(main_folder, 'data')
 
+device_type_slags = {
+    'J9085A': 'hpe-procurve-2610-24',
+    'J9086A': 'hpe-procurve-2610-24-12-pwr',
+    'J9089A': 'hpe-procurve-2610-48-pwr',
+
+    'J9562A': 'hpe-procurve-2915-8-poe',
+    'J9565A': 'hpe-procurve-2615-8-poe',
+    'J9774A': 'hpe-aruba-2530-8g-poep',
+    'J9780A': 'hpe-aruba-2530-8-poep',
+
+    'J9623A': 'hpe-aruba-2620-24',
+    'J9772A': 'hpe-aruba-2530-48g-poep',
+    'J9853A': 'hpe-aruba-2530-48g-poep-2sfpp',
+    'J9145A': 'hpe-procurve-2910al-24g',
+
+    'JL255A': "hpe-aruba-2930f-24g-poep-4sfpp", 
+    'JL256A': "hpe-aruba-2930f-48g-poep-4sfpp",
+    'JL322A': "hpe-aruba-2930m-48g-poep",
+    'JL357A': "hpe-aruba-2540-48g-poep-4sfpp",
+
+    'JL258A': "hpe-aruba-2930f-8g-poep-2sfpp",
+    'JL693A': "hpe-aruba-2930f-12g-poep-2sfpp",
+
+    'J8697A': 'hpe-procurve-5406zl',
+    'J8698A': 'hpe-procurve-5412zl',
+    'J8770A': 'hpe-procurve-4204vl',
+    'J8773A': 'hpe-procurve-4208vl',
+    'J9850A': 'hpe-5406r-zl2',
+    'J9851A': 'hpe-5412r-zl2',
+    'J9729A': 'hpe-aruba-2920-48g-poep',
+    'J9729A_stack': 'hpe-aruba-2920-48g-poep',
+
+    'JL256A_stack': "hpe-aruba-2930f-48g-poep-4sfpp",
+    'JL075A_stack': 'hpe-aruba-3810m-16sfpp-2-slot-switch',
+    'JL693A_stack': "hpe-aruba-2930f-12g-poep-2sfpp",
+
+    'J9729A_stack': 'hpe-aruba-2920-48g-poep',
+
+    'JL322A_module': "hpe-aruba-2930m-48g-poep",
+
+    'JL322A_stack': 'hpe-aruba-2930m-48g-poep',
+
+    'J9850A_stack': 'hpe-5406r-zl2', 
+
+    'J9137A': 'hpe-procurve-2520-8-poe',
+    'J9776A': 'hpe-aruba-2530-24g',
+    'J9779A': 'hpe-aruba-2530-24-poep',
+    'JL075A': 'hpe-aruba-3810m-16sfpp-2-slot-switch'
+}
+
 # --- Base functions ---
 def search_line(expression, t_file):
     with open(t_file, "r") as f:
@@ -237,6 +287,7 @@ def get_flor_nr(room_nr):
 # get flor name from room number
 def get_flor_name(room_nr):
     flor_name = {
+        "-3": "Untergeschoss 3",
         "-2": "Untergeschoss 2",
         "-1": "Untergeschoss",
         "0": "Erdgeschoss"
@@ -266,6 +317,7 @@ def get_room_location(location):
 
     # s01-2-etage-2
     flor_tags = {
+        "-3": "untergeschoss-3",
         "-2": "untergeschoss-2",
         "-1": "untergeschoss",
         "0": "erdgeschoss"
@@ -535,7 +587,7 @@ def serial_numbers():
             for key, value in v_dict.items():
                 s_dict[key] = value
 
-    return s_dict
+    return s_dict 
 
 # Return a list of devices dictionary
 def devices():
@@ -790,7 +842,7 @@ if __name__ == "__main__":
 
     data_folders = [
         "/data/aruba-8-ports/",
-        #"/data/aruba-12-ports/",
+        "/data/aruba-12-ports/",
         # "/data/aruba-48-ports/",
         #"/data/hpe-8-ports/",
         # "/data/hpe-24-ports/",
@@ -799,7 +851,7 @@ if __name__ == "__main__":
         # "/data/aruba-stack-2930/",
         # "/data/aruba-modular/",
         # "/data/aruba-modular-stack/",
-        # "/data/procurve-single/",
+         "/data/procurve-single/",
         # "/data/procurve-modular/",
         "/data/aruba_6100/",
          "/data/aruba_6300/"
@@ -820,8 +872,8 @@ if __name__ == "__main__":
         #debug_get_vlans(data_folder)
         #debug_get_vlans_names(data_folder)
         #debug_get_untagged_vlans(data_folder)
-        debug_get_ip_address(data_folder)
-        #debug_device_type(data_folder)
+        #debug_get_ip_address(data_folder)
+        debug_device_type(data_folder)
         #debug_get_modules(data_folder)
         #debug_get_location(data_folder)
 

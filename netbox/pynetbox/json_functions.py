@@ -5,8 +5,10 @@
 import re, os, yaml
 from tabulate import tabulate
 
-from std_functions import main_folder, config_files
-from std_functions import device_type, serial_numbers, convert_interfaces_range
+from sort_data import get_switch_type
+
+from std_functions import device_type_slags, main_folder, config_files
+from std_functions import serial_numbers, convert_interfaces_range
 from std_functions import get_os_version, get_hostname, get_device_role, get_site
 from std_functions import get_trunks, get_interface_names, get_vlans
 from std_functions import get_untagged_vlans, get_tagged_vlans, get_vlans_names, get_trunk_stack
@@ -68,6 +70,8 @@ def locations_json(config_files):
 def devices_json(config_files, device_type_slags, tags):
     #data = {'devices':[]}
     data = {'devices':[], 'chassis':[]}
+    serials = serial_numbers()
+
     for t_file in config_files:
         hostname = get_hostname(t_file)
 
@@ -83,16 +87,19 @@ def devices_json(config_files, device_type_slags, tags):
         if '0' in hostname.keys():
             hostname = hostname['0']
 
-            d_label = device_type_slags[device_type(hostname)]
+            d_label = device_type_slags[get_switch_type(t_file)]
+
+            serial = serials[hostname] if hostname in serials.keys() else None
 
             data['devices'].append({'name': hostname, "location": location, 
                 'device_role': get_device_role(t_file, hostname), 'device_type': d_label, 
-                'site': site, 'tags': tags, 'serial':serial_numbers()[hostname]})
+                'site': site, 'tags': tags, 'serial':serial})
             continue
 
         # update data for stacks 
         clean_name = hostname['1'][:-2]
-        d_label = device_type_slags[device_type(clean_name)]
+        d_label = device_type_slags[get_switch_type(t_file)['1']]
+
 
         master = hostname['1']
 
@@ -101,10 +108,13 @@ def devices_json(config_files, device_type_slags, tags):
         for h_name in hostname.values(): 
             vc_position = int(h_name[-1])
             vc_priority = 255 if vc_position == 1 else 64
+
+            serial = serials[h_name] if h_name in serials.keys() else None
+
             if vc_position == 2: vc_priority = 128
             data['devices'].append({'name': h_name, "location": location, 
                 'device_role': get_device_role(t_file, clean_name), 'device_type': d_label, 
-                'site': site, 'tags': tags, 'serial':serial_numbers()[h_name],
+                'site': site, 'tags': tags, 'serial':serial,
                 'virtual_chassis': clean_name, 'vc_position': vc_position, 
                 'vc_priority': vc_priority
             })
@@ -314,14 +324,16 @@ def tagged_vlans_json(config_files):
         for vlan_id, interfaces_range in vlan_sets:
             vlan_name = get_vlans_names(t_file)[vlan_id]
 
+            vlan_stacks = set()
+
             # iterate through all the interfaces that belong to a vlan
             for stack_nr, interface in convert_interfaces_range(interfaces_range):
                 
                 interface = str(interface)
-                vlan_stacks = set()
 
                 if '0' in hostnames.keys():
                     vlan_stacks.add(hostnames['0'])
+                    continue
 
                 # Find stack number for Trunks
                 if 'T' in interface: 
@@ -332,20 +344,20 @@ def tagged_vlans_json(config_files):
                 else: 
                     vlan_stacks.add(hostnames[str(stack_nr)])
 
-                for hostname in vlan_stacks:
-                    interface_exists = False # flag to notify that the interface exist in data['tagged_vlans'][hostname]
-                    for v_dict in data['tagged_vlans']:
-                        if v_dict['hostname'] == hostname and v_dict['interface'] == interface:
-                            # update the interface list with vlan data
-                            v_dict['tagged_vlans'].append({'name': vlan_name, 'vlan_id': vlan_id})
-                            interface_exists = True # update flag
-                            break # exit the loop with updated flag
+            for hostname in vlan_stacks:
+                interface_exists = False # flag to notify that the interface exist in data['tagged_vlans'][hostname]
+                for v_dict in data['tagged_vlans']:
+                    if v_dict['hostname'] == hostname and v_dict['interface'] == interface:
+                        # update the interface list with vlan data
+                        v_dict['tagged_vlans'].append({'name': vlan_name, 'vlan_id': vlan_id})
+                        interface_exists = True # update flag
+                        break # exit the loop with updated flag
 
-                    # create a new dictionary entry if the interface vlan list does not exists
-                    if not interface_exists:
-                        data['tagged_vlans'].append({ 'hostname': hostname, 'interface': interface, 
-                            'tagged_vlans': [{'name': vlan_name, 'vlan_id': vlan_id}] })
-                        interface_exists = False
+                # create a new dictionary entry if the interface vlan list does not exists
+                if not interface_exists:
+                    data['tagged_vlans'].append({ 'hostname': hostname, 'interface': interface, 
+                        'tagged_vlans': [{'name': vlan_name, 'vlan_id': vlan_id}] })
+                    interface_exists = False
     return data
 
 def ip_addresses_json(config_files):
@@ -399,27 +411,6 @@ def debug_locations_json(data_folder):
     print(yaml.dump(locations_json(config_files(data_folder))))
 
 def debug_devices_json(data_folder):
-    device_type_slags = {
-      'J9623A': 'hpe-aruba-2620-24',
-      'J9772A': 'hpe-aruba-2530-48g-poep',
-      'J9853A': 'hpe-aruba-2530-48g-poep-2sfpp',
-      'J9729A_stack': ' hpe-aruba-2920-48g-poep',
-      'JL256A_stack': "hpe-aruba-2930f-48g-poep-4sfpp",
-      'JL075A_stack': 'hpe-aruba-3810m-16sfpp-2-slot-switch',
-      'JL693A_stack': "hpe-aruba-2930f-12g-poep-2sfpp",
-      'JL693A': "hpe-aruba-2930f-12g-poep-2sfpp",
-      'JL322A_stack': 'hpe-aruba-2930m-48g-poep',
-      "JL679A": "hpe-aruba-6100-12g-poe4-2sfpp",
-      "JL658A_stack": "hpe-aruba-6300m-24sfpp-4sfp56",
-      "JL255A": "hpe-aruba-2930f-24g-poep-4sfpp",
-      "JL256A": "hpe-aruba-2930f-48g-poep-4sfpp",
-      "JL322A": "hpe-aruba-2930m-48g-poep",
-      "JL357A": "hpe-aruba-2540-48g-poep-4sfpp",
-      'JL258A': "hpe-aruba-2930f-8g-poep-2sfpp",
-
-      "JL679A": "hpe-aruba-6100-12g-poe4-2sfpp",
-      "JL658A_stack": "hpe-aruba-6300m-24sfpp-4sfp56"
-    }
 
     files = config_files(data_folder)
     devices_tags = ["switch"]
@@ -489,7 +480,7 @@ if __name__ == "__main__":
         "/data/aruba-8-ports/",
         #"/data/aruba-12-ports/",
         # "/data/aruba-48-ports/"
-        # "/data/hpe-8-ports/"
+         "/data/hpe-8-ports/",
         # "/data/hpe-48-ports/"
         # "/data/aruba-stack/"
         #"/data/aruba-stack-2920/"
@@ -497,10 +488,10 @@ if __name__ == "__main__":
         # "/data/aruba-modular/"
         # "/data/aruba-modular-stack/"
         # "/data/procurve-single/"
-        # "/data/procurve-modular/"
+         "/data/procurve-modular/"
 
-        "/data/aruba_6100/",
-        "/data/aruba_6300/"
+        #"/data/aruba_6100/",
+        #"/data/aruba_6300/"
     ]
 
     for folder in data_folders:
@@ -510,7 +501,7 @@ if __name__ == "__main__":
 
 
         #debug_locations_json(data_folder)
-        #debug_devices_json(data_folder)
+        debug_devices_json(data_folder)
         #debug_device_interfaces_json(data_folder)
         #debug_trunks_json(data_folder)
 
@@ -519,6 +510,6 @@ if __name__ == "__main__":
         #debug_tagged_vlans_json(data_folder)
 
 
-        debug_ip_addresses_json(data_folder)
+        #debug_ip_addresses_json(data_folder)
 
         #debug_modules_json(data_folder)

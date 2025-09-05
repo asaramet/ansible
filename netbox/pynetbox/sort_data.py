@@ -170,16 +170,16 @@ def get_switch_type(config_file):
         
         # If no stack found, check for single switch patterns
 
-        # Pattern 1: Look for "module X type SWITCH_TYPE" pattern
-        module_pattern = r'module\s+\d+\s+type\s+([A-Z0-9]+[A-Z])'
-        match = re.search(module_pattern, content, re.IGNORECASE)
+        # Pattern 1: Look for "; SWITCH_TYPE Configuration Editor" in header
+        header_pattern = r';\s*([A-Z0-9]+[A-Z])\s+Configuration\s+Editor'
+        match = re.search(header_pattern, content, re.IGNORECASE)
         
         if match:
             return match.group(1).upper()
         
-        # Pattern 2: Look for "; SWITCH_TYPE Configuration Editor" in header
-        header_pattern = r';\s*([A-Z0-9]+[A-Z])\s+Configuration\s+Editor'
-        match = re.search(header_pattern, content, re.IGNORECASE)
+        # Pattern 2: Look for "module X type SWITCH_TYPE" pattern
+        module_pattern = r'module\s+\d+\s+type\s+([A-Z0-9]+[A-Z])'
+        match = re.search(module_pattern, content, re.IGNORECASE)
         
         if match:
             return match.group(1).upper()
@@ -254,13 +254,14 @@ def debug():
     #debug_configs_dir = Path(data_folder) / 'aruba-modular'
     #debug_configs_dir = Path(data_folder) / 'aruba-modular-stack'
     #debug_configs_dir = Path(data_folder) / 'aruba-stack-2930'
-    #debug_configs_dir = Path(data_folder) / 'aruba-stack'
+    debug_configs_dir = Path(data_folder) / 'aruba-stack'
 
     #debug_configs_dir = Path(data_folder) / 'aruba-48-ports'
 
     #debug_configs_dir = Path(data_folder) / 'hpe-24-ports'
 
     #debug_configs_dir = Path(data_folder) / 'procurve-single'
+    #debug_configs_dir = Path(data_folder) / 'procurve-modular'
 
     config_files = get_files(debug_configs_dir)
     debug_get_switch_type(config_files)
@@ -274,7 +275,7 @@ def main():
         sort_file(f)
 
 if __name__ == "__main__":
-    main()
+    #main()
 
     debug()
 

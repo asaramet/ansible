@@ -97,6 +97,7 @@
         src: /opt/netbox/contrib/netbox-housekeeping.sh 
         dest: /etc/cron.daily/netbox-housekeeping
         state: link
+        force: yes
 
     - name: Copy gunicorn configs 
       copy:
