@@ -9,6 +9,7 @@ envs.sh
 pynetbox
 playbooks
 host_vars
+group_vars
 cronjobs
 src
 "
