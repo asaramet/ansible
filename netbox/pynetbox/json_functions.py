@@ -9,15 +9,15 @@ from sort_data import get_switch_type
 
 from std_functions import device_type_slags, main_folder, config_files
 from std_functions import serial_numbers, convert_interfaces_range
-from std_functions import get_os_version, get_hostname, get_device_role, get_site
+from std_functions import get_os_version, get_hostname, get_device_role
 from std_functions import get_trunks, get_interface_names, get_vlans
 from std_functions import get_untagged_vlans, get_tagged_vlans, get_vlans_names, get_trunk_stack
 from std_functions import get_ip_address, get_modules, module_types_dict
 from std_functions import module_types_dict, modules_interfaces
 from std_functions import convert_range
 
-from std_functions import get_location, get_room_location, get_flor_name
-from std_functions import get_parent_location
+from std_functions import get_location, get_flor_name
+from std_functions import get_parent_location, location_slug, site_slug
 
 from extra_functions import interfaces_types
 
@@ -37,7 +37,7 @@ def locations_json(config_files):
         location, room, is_rack = location
         locations.add(location)
         rooms.update({location: room})
-        sites.update({location: get_site(file)})
+        sites.update({location: site_slug(file)})
         is_racks.update({location: is_rack})
 
     for location in locations:
@@ -77,11 +77,11 @@ def devices_json(config_files, device_type_slags, tags):
 
         # get room location
         location = get_location(t_file)
-        site = get_site(t_file)
+        site = site_slug(t_file)
 
         if location: # Not None
             location, _, _ = location # ignore room and rack
-            location = get_room_location(location)
+            location = location_slug(location)
 
         # update data for single switches 
         if '0' in hostname.keys():

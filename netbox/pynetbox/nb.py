@@ -41,8 +41,8 @@ NETBOX_TOKEN_DEV = vault_dict['vault_local_token']
 NETBOX_URL = "https://netbox-bb.hs-esslingen.de"
 NETBOX_TOKEN = vault_dict['vault_hs_netbox_token']
 
-development = pynetbox.api( NETBOX_URL_DEV, token=NETBOX_TOKEN_DEV)
-production = pynetbox.api( NETBOX_URL, token=NETBOX_TOKEN)
+development = pynetbox.api(NETBOX_URL_DEV, token=NETBOX_TOKEN_DEV)
+production = pynetbox.api(NETBOX_URL, token=NETBOX_TOKEN)
 
 if __name__ == '__main__':
     import textwrap

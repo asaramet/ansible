@@ -227,7 +227,7 @@ def get_hostname(t_file):
 
     return hostnames
 
-def get_site(t_file):
+def site_slug(t_file):
 
     hostnames = get_hostname(t_file)
     hostname = hostnames['0'] if '0' in hostnames.keys() else hostnames['1']
@@ -311,9 +311,13 @@ def get_parent_location(location):
     building = location.split(".")[0]
     return prefixes[building[0]] + "-" + "gebude" + "-" + building[1:]
 
-# get room location
-def get_room_location(location): 
+# define room location slug
+def location_slug(location):
+#def get_room_location(location): 
     if not location: return None
+
+    if isinstance(location, tuple):
+        location = location[0]
 
     # s01-2-etage-2
     flor_tags = {
@@ -329,6 +333,7 @@ def get_room_location(location):
 
     return building.lower() + "-" + flor_fx + "-" + flor_tag
     
+
 def get_device_role(t_file, hostname):
     role_code = hostname[2:4]
     if role_code == "cs":
@@ -719,13 +724,13 @@ def debug_get_hostname(data_folder):
     print("\n== Debug: get_hostname ==")
     print(tabulate(table, headers, "github"))
 
-def debug_get_site(data_folder):
+def debug_site_slug(data_folder):
     table = []
     headers = ["File Name", "Location", "Site"]
     for f in config_files(data_folder):
         hostname = os.path.basename(f)
-        table.append([ hostname, get_location(f), get_site(f) ])
-    print("\n== Debug: get_site ==")
+        table.append([ hostname, get_location(f), site_slug(f) ])
+    print("\n== Debug: site_slug ==")
     print(tabulate(table, headers, "github"))
 
 def debug_get_location(data_folder):
@@ -837,6 +842,18 @@ def debug_device_type(data_folder):
     print("\n== Debug: device_type ==")
     print(tabulate(table, headers))
 
+def debug_location_slug(data_folder):
+    table = []
+    headers = ["File name", "Location", "Slug"]
+
+    for f in config_files(data_folder):
+        hostname = os.path.basename(f)
+        location = get_location(f)
+        slug = location_slug(location)
+        table.append([hostname, location, slug])
+    print("\n== Debug: location_slug ==")
+    print(tabulate(table, headers, "github"))
+
 if __name__ == "__main__":
     print("\n=== Debuging ===")
 
@@ -862,20 +879,21 @@ if __name__ == "__main__":
 
         print("\n Folder: ", data_folder)
         #debug_get_hostname(data_folder)
-        #debug_get_site(data_folder)
+        debug_site_slug(data_folder)
         #debug_config_files(data_folder)
         #debug_get_os_version(data_folder)
         #debug_get_device_role(data_folder)
-        #debug_get_site(data_folder)
+        #debug_site_slug(data_folder)
         #debug_get_trunks(data_folder)
         #debug_get_interface_names(data_folder)
         #debug_get_vlans(data_folder)
         #debug_get_vlans_names(data_folder)
         #debug_get_untagged_vlans(data_folder)
         #debug_get_ip_address(data_folder)
-        debug_device_type(data_folder)
+        #debug_device_type(data_folder)
         #debug_get_modules(data_folder)
         #debug_get_location(data_folder)
+        #debug_location_slug(data_folder)
 
     #print("\n=== No files functions ===")
     #debug_convert_range()
