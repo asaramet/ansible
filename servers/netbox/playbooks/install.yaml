@@ -268,17 +268,6 @@
         state: latest
         update_cache: true
 
-    - name: Copy the SSL key
-      copy:
-        src: "{{ local_src_folder }}/{{ item }}"
-        dest:  /etc/ssl/private/
-        owner: root
-        mode: 0600
-      loop:
-        - pem_pass.txt
-        - rzlx8750_serverkey.pem
-      when: production | bool
-
     - name: Copy the SSL key for a local test machine
       copy:
         src: "{{ local_src_folder }}/netbox.key"
@@ -286,14 +275,6 @@
         owner: root
         mode: 0600
       when: not production | bool
-
-    - name: Copy the SSL certificate
-      copy:
-        src: "{{ local_src_folder }}/netbox-bb.hs-esslingen.de.cer"
-        dest: /etc/ssl/certs/
-        owner: root
-        mode: 0600
-      when: production | bool
 
     - name: Copy the SSL certificate for a local test machine
       copy:
