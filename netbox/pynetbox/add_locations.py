@@ -1,0 +1,295 @@
+#!/usr/bin/env python3
+
+'''
+Add collected locations data to NetBox servers using `pynetbox` library
+Main function, to import:
+
+- add_locations(nb_session, data):
+    - nb_session - NetBox HTTPS session
+    - data - data (yaml format)
+'''
+
+import pynetbox, yaml
+from pathlib import Path
+from sys import stdout
+
+from nb import development, production
+from std_functions import main_folder, floor_slug, room_slug
+
+# Disable warnings about self-signed certificates
+from urllib3 import disable_warnings, exceptions
+disable_warnings(exceptions.InsecureRequestWarning)
+
+def read_data(nb):
+    for device in nb.dcim.devices.all():
+        print(f"- {device.name} ({device.device_type.display}) in {device.site.name}")
+
+def load_yaml(file_path):
+    yaml_file = Path(file_path)
+
+    with yaml_file.open('r') as f:
+        return yaml.safe_load(f)
+
+# --- bulk create with fallback to per-item create ---
+def _bulk_create_with_fallback(endpoint, payloads, kind):
+    if not payloads: return []
+
+    created = []
+
+    try:
+        # pynetbox accepts a list as the first argument to create()
+        created = endpoint.create(payloads)
+        print(f"|+ Bulk-created {len(created)} {kind}(s).")
+        return created
+    except Exception as exc:
+        print(f"|- Bulk create for {kind} failed ({exc}), falling back to per-item create.")
+        created = []
+        for payload in payloads:
+            try: 
+                obj = endpoint.create(payload)
+                created.append(obj)
+            except Exception as exc2:
+                print(f"|- ERROR: Failed to create {kind} {payload.get('name')}: {exc2}")
+        return created
+
+
+def add_locations(nb_session, data):
+    print("|* Add some locations")
+    nb_locations = nb_session.dcim.locations
+    nb_sites = nb_session.dcim.sites   
+    nb_racks = nb_session.dcim.racks
+
+    # --- cache existing sites and locations ---
+    sites = list(nb_sites.all())
+    sites_cache = {s.slug: s for s in sites}
+    sites_id_to_slug = {s.id: s.slug for s in sites}
+
+    locations_cache = {(loc.site.slug, loc.name): loc for loc in nb_locations.all()}
+
+    # --- payload collectors ---
+    floors_to_create, rooms_to_create, racks_to_create = [], [], []
+
+    for item in data.get('locations', []):
+        site_slug = item['site']
+        site = sites_cache.get(site_slug) or nb_site.get(slug = site_slug)
+
+        if not site: 
+            print(f"|- ! Site {site_slug} not found, skipping {item.get('floor')}")
+            continue
+
+        # Add floor payload, if missing
+        floor_name = item.get('floor')
+        floor_key = (site_slug, floor_name)
+        if floor_key not in locations_cache:
+            parent_obj = None
+            if item.get('parent_location'):
+                parent_obj = nb_locations.get(slug = item.get('parent_location'))
+            payload = {
+                'name': floor_name,
+                'site': site.id,
+                'slug': floor_slug(floor_name)
+            }
+
+            if parent_obj:
+                payload['parent'] = parent_obj.id
+            
+            floors_to_create.append(payload)
+
+        # Handle room (room can be "name" or tuple (name, rack))
+        room_name, rack_name = item.get('room'), None
+        if isinstance(room_name, tuple):
+            room_name, rack_name = room_name
+
+        room_key = (site.slug, room_name)
+        if room_key not in locations_cache:
+            # floor will exist after bulk_create, so just reference it by slug later
+            rooms_to_create.append({ 
+                "name": room_name,
+                "site": site.id,
+                "slug": room_slug(room_name),
+                "parent_floor_name": floor_name
+            })
+
+            # add rack if given in the room label
+            if rack_name:
+                racks_to_create.append({
+                    "name": f"V.{room_name}.{rack_name}",
+                    "site": site.id,
+                    "parent_room_name": room_name
+                })
+
+    # --- create floors in bulk ---
+    new_floors = _bulk_create_with_fallback(nb_locations, floors_to_create, "floor")
+    if new_floors:
+        # refresh cache after changes
+        locations_cache = {(loc.site.slug, loc.name): loc for loc in nb_locations.all()}
+
+    # --- resolve rooms parent (floor) and create rooms in bulk
+    resolved_rooms_payloads = []
+    for r in rooms_to_create:
+        site_slug = sites_id_to_slug.get(r.get('site'))
+        parent_floor_name = r.pop('parent_floor_name')
+        parent_floor = locations_cache.get((site_slug, parent_floor_name))
+        if not parent_floor:
+            print(f"|-- Skipping: couldn't resolve parent floor {parent_floor_name} for room {r.get('name')}.")
+            continue
+        r['parent'] = parent_floor.id
+        resolved_rooms_payloads.append(r)
+
+    new_rooms = _bulk_create_with_fallback(nb_locations, resolved_rooms_payloads, 'room')
+    if new_rooms:
+        locations_cache = {(loc.site.slug, loc.name): loc for loc in nb_locations.all()}
+
+    # --- resolve racks and create them in bulk ---
+    resolved_racks_payloads = []
+    for rk in racks_to_create:
+        site_slug = sites_id_to_slug.get(rk.get('site'))
+        parent_room = locations_cache.get((site_slug, rk.get('parent_room_name')))
+        if not parent_room:
+            print(f"|- Skipping: Couldn't resolve parent room {rk["[parent_room_name]"]} for rack {rk['name']}.")
+            continue
+        rk['location'] = parent_room.id
+        resolved_racks_payloads.append(rk)
+
+    new_racks = _bulk_create_with_fallback(nb_racks, resolved_racks_payloads, 'rack')
+
+    # Output messages
+    if not (new_floors or new_rooms or new_racks):
+        print("\t\tNo new locations created. *|")
+        return
+    if new_floors:
+        for f in new_floors:
+            print(f"|+ New floor added: {f.name}")
+    if new_rooms:
+        for r in new_rooms:
+            print(f"|+ New room added: {r.name}")
+    if new_racks:
+        for rk in new_racks:
+            print(f"|+ New rack added: {rk.name}")
+
+#------------------
+# Delete some data
+#------------------
+def _delete_netbox_obj(obj):
+    # Delete a provided Netox object (obj), as a response.Record 
+    done_flag = False
+
+    if not isinstance(obj, pynetbox.core.response.Record): 
+        return 
+    try: 
+        obj.delete()
+        done_flag = True
+        print(f"| Removed {obj.name}, with id {obj.id}")
+    except pynetbox.core.query.RequestError as e:
+        if hasattr(e, "req") and getattr(e.req, "status_code", None) == 409:
+            print(f"|-- Skipped {obj.name} (has dependencies).")
+        else:
+            print(f"|-- Failed to delete {obj.name}: {e}")
+
+    return done_flag
+
+
+def delete_locations(nb_session, data_file_path):
+    print("|* Remove some rooms from locations")
+
+    nb_locations = nb_session.dcim.locations
+    data = load_yaml(data_file_path)
+
+    rooms = [loc.get('room') for loc in data.get('locations') if 'room' in loc]
+    floors = [loc.get('floor') for loc in data.get('locations') if 'floor' in loc]
+
+    if not rooms:
+        print("\t\tNo rooms defined in data *|")
+
+    if not floors:
+        print("\t\tNo floors defined in data *|")
+        return
+
+    # fetch all location at once
+    existing_locs = {loc.name: loc for loc in nb_locations.filter(name = rooms)}
+    existing_locs.update({loc.name: loc for loc in nb_locations.filter(name = floors)})
+
+    done_flag = False
+
+    for room in rooms:
+        done_flag = _delete_netbox_obj(existing_locs.get(room))
+
+    for floor in floors:
+        done_flag = _delete_netbox_obj(existing_locs.get(floor))
+
+    if not done_flag:
+        print("\t\tNothing was removed *|")
+
+#------------------
+# Main function
+#------------------
+def main():
+    #------------------
+    # Initialize NetBox API with custom session
+    #------------------
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Add collected locations data to a NetBox server"
+    )
+
+    parser.add_argument(
+        '-s', "--server",
+        choices = ["development", "production"],
+        default= "development",
+        help = "Select which NetBox server to connect to (default: development)"
+    )
+
+    args = parser.parse_args()
+
+    if args.server == "development":
+        nb = development
+    elif args.server == "production":
+        nb = production
+
+    nb.http_session.verify = False # Disable SSL verification
+
+    #------------------
+    #  Run functions
+    #------------------
+
+    files_yaml = [
+        #"aruba_8_ports.yaml",
+        "aruba_stack_2930.yaml",
+        #"aruba_6300.yaml"
+    ]
+    
+    for file_name in files_yaml:
+        data_file_path = f"{main_folder}/data/yaml/{file_name}"
+
+        data = load_yaml(data_file_path)
+        add_locations(nb, data)
+
+        #delete_locations(nb, data_file_path)
+
+#------------------
+# Debugging
+#------------------
+
+def debug_locations(nb_session, data_yaml_file):
+    data = load_yaml(data_yaml_file)
+
+    return_list = []
+    for location in data['locations']:
+        if not location['is_rack']:
+            return_list.append(location)
+
+    return return_list
+
+def main_debug():
+
+    data_yaml_file = 'aruba_8_ports.yaml'
+    #data_yaml_file = 'aruba_stack_2930.yaml'
+
+    data_file_path = f"{main_folder}/data/yaml/{data_yaml_file}"
+
+    yaml.dump(debug_locations(None, data_file_path), stdout)
+
+if __name__ == '__main__':
+    main()
+
+   # main_debug()

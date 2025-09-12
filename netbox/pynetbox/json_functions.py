@@ -17,7 +17,7 @@ from std_functions import module_types_dict, modules_interfaces
 from std_functions import convert_range
 
 from std_functions import get_location, get_flor_name
-from std_functions import get_parent_location, location_slug, site_slug
+from std_functions import get_parent_location, floor_slug, site_slug
 
 from extra_functions import interfaces_types
 
@@ -48,8 +48,13 @@ def locations_json(config_files):
         site = sites[location]
         is_rack = is_racks[location]
 
-        data["locations"].append({"name": building + "." + flor_tuple[0] + " - " + flor_tuple[1], 
-            "site": site, "parent_location": get_parent_location(location), 'is_rack': is_rack})
+        data["locations"].append({
+            "room": location,
+            "floor": f"{building}.{flor_tuple[0]} - {flor_tuple[1]}", 
+            "site": site, 
+            "parent_location": get_parent_location(location), 
+            'is_rack': is_rack
+        })
 
     return data
 
@@ -81,7 +86,7 @@ def devices_json(config_files, device_type_slags, tags):
 
         if location: # Not None
             location, _, _ = location # ignore room and rack
-            location = location_slug(location)
+            location = floor_slug(location)
 
         # update data for single switches 
         if '0' in hostname.keys():
@@ -477,18 +482,17 @@ if __name__ == "__main__":
     print("\n=== Debuging ===")
 
     data_folders = [
-        "/data/aruba-8-ports/",
+        #"/data/aruba-8-ports/",
         #"/data/aruba-12-ports/",
         # "/data/aruba-48-ports/"
          "/data/hpe-8-ports/",
-        # "/data/hpe-48-ports/"
         # "/data/aruba-stack/"
         #"/data/aruba-stack-2920/"
-        # "/data/aruba-stack-2930/"
+         "/data/aruba-stack-2930/",
         # "/data/aruba-modular/"
         # "/data/aruba-modular-stack/"
         # "/data/procurve-single/"
-         "/data/procurve-modular/"
+        # "/data/procurve-modular/"
 
         #"/data/aruba_6100/",
         #"/data/aruba_6300/"
@@ -500,8 +504,8 @@ if __name__ == "__main__":
         print("\n Folder: ", data_folder)
 
 
-        #debug_locations_json(data_folder)
-        debug_devices_json(data_folder)
+        debug_locations_json(data_folder)
+        #debug_devices_json(data_folder)
         #debug_device_interfaces_json(data_folder)
         #debug_trunks_json(data_folder)
 

@@ -116,7 +116,7 @@
       include_vars:
         file: ../data/yaml/aruba_6300.yaml
 
-    - name: Create a Room (location)
+    - name: Create a floor (location)
       tags: 
         - location
         - add_switches
@@ -127,7 +127,7 @@
         netbox_token: "{{ netbox_token }}"
         validate_certs: false
         data:
-          name: "{{ item.name }}"
+          name: "{{ item.floor }}"
           site: "{{ item.site }}"
           parent_location: "{{ item.parent_location }}"
         state: present

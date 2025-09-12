@@ -311,15 +311,14 @@ def get_parent_location(location):
     building = location.split(".")[0]
     return prefixes[building[0]] + "-" + "gebude" + "-" + building[1:]
 
-# define room location slug
-def location_slug(location):
-#def get_room_location(location): 
+# define floor location slug
+def floor_slug(location):
     if not location: return None
 
     if isinstance(location, tuple):
         location = location[0]
 
-    # s01-2-etage-2
+    # ex: s01-2-etage-2
     flor_tags = {
         "-3": "untergeschoss-3",
         "-2": "untergeschoss-2",
@@ -331,7 +330,27 @@ def location_slug(location):
     flor_fx = str(abs(int(flor))) # string to use in the label
     flor_tag = flor_tags[flor] if int(flor) < 1 else "etage-" + flor
 
-    return building.lower() + "-" + flor_fx + "-" + flor_tag
+    return f"{building.lower()}-{flor_fx}-{flor_tag}"
+
+def room_slug(location):
+    if not location: return None
+
+    if isinstance(location, tuple):
+        location = location[0]
+
+    # ex: s08-u105-c2
+    building, room_nr = location.split(".", 1)
+
+    # convert '-' to 'u'
+    if room_nr[0] == '-':
+        room_nr = f"u{room_nr[1:]}"
+
+    # return tuple if rack number is mentioned
+    if len(room_nr.split(".")) > 1:
+        room_nr, rack = room_nr.split(".", 1)
+        return (f"{building.lower()}-{room_nr.lower()}", rack.lower())
+
+    return f"{building.lower()}-{room_nr.lower()}"
     
 
 def get_device_role(t_file, hostname):
@@ -842,16 +861,28 @@ def debug_device_type(data_folder):
     print("\n== Debug: device_type ==")
     print(tabulate(table, headers))
 
-def debug_location_slug(data_folder):
+def debug_floor_slug(data_folder):
     table = []
     headers = ["File name", "Location", "Slug"]
 
     for f in config_files(data_folder):
         hostname = os.path.basename(f)
         location = get_location(f)
-        slug = location_slug(location)
+        slug = floor_slug(location)
         table.append([hostname, location, slug])
-    print("\n== Debug: location_slug ==")
+    print("\n== Debug: floor_slug ==")
+    print(tabulate(table, headers, "github"))
+
+def debug_room_slug(data_folder):
+    table = []
+    headers = ["File name", "Location", "Slug"]
+
+    for f in config_files(data_folder):
+        hostname = os.path.basename(f)
+        location = get_location(f)
+        slug = room_slug(location)
+        table.append([hostname, location, slug])
+    print("\n== Debug: room_slug ==")
     print(tabulate(table, headers, "github"))
 
 if __name__ == "__main__":
@@ -859,19 +890,19 @@ if __name__ == "__main__":
 
     data_folders = [
         "/data/aruba-8-ports/",
-        "/data/aruba-12-ports/",
+        #"/data/aruba-12-ports/",
         # "/data/aruba-48-ports/",
         #"/data/hpe-8-ports/",
         # "/data/hpe-24-ports/",
         # "/data/aruba-stack/",
-        # "/data/aruba-stack-2920/",
-        # "/data/aruba-stack-2930/",
+         "/data/aruba-stack-2920/",
+         "/data/aruba-stack-2930/",
         # "/data/aruba-modular/",
         # "/data/aruba-modular-stack/",
-         "/data/procurve-single/",
+        # "/data/procurve-single/",
         # "/data/procurve-modular/",
-        "/data/aruba_6100/",
-         "/data/aruba_6300/"
+        #"/data/aruba_6100/",
+        "/data/aruba_6300/"
     ]
 
     for folder in data_folders:
@@ -879,7 +910,7 @@ if __name__ == "__main__":
 
         print("\n Folder: ", data_folder)
         #debug_get_hostname(data_folder)
-        debug_site_slug(data_folder)
+        #debug_site_slug(data_folder)
         #debug_config_files(data_folder)
         #debug_get_os_version(data_folder)
         #debug_get_device_role(data_folder)
@@ -893,7 +924,8 @@ if __name__ == "__main__":
         #debug_device_type(data_folder)
         #debug_get_modules(data_folder)
         #debug_get_location(data_folder)
-        #debug_location_slug(data_folder)
+        #debug_floor_slug(data_folder)
+        debug_room_slug(data_folder)
 
     #print("\n=== No files functions ===")
     #debug_convert_range()
