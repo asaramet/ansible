@@ -172,22 +172,30 @@ def add_locations(nb_session, data):
 #------------------
 def _delete_netbox_obj(obj):
     # Delete a provided Netox object (obj), as a response.Record 
-    done_flag = False
+    if not obj: return False
 
     if not isinstance(obj, pynetbox.core.response.Record): 
-        return 
+        print(f"|-- Skiping non-Record object: {obj!r}")
+        return  False
+
     try: 
         obj.delete()
-        done_flag = True
         print(f"| Removed {obj.name}, with id {obj.id}")
+        return True
     except pynetbox.core.query.RequestError as e:
-        if hasattr(e, "req") and getattr(e.req, "status_code", None) == 409:
-            print(f"|-- Skipped {obj.name} (has dependencies).")
+        # safe access to underlying HTTP response status code
+        status = getattr(getattr(e, "req", None), "status_code", None)
+        # try to get the server-provided error detail if present
+        detail = getattr(e, "error", None) or getattr(e, "args", None)
+
+        if status == 409:
+            print(f"|-- Skipped {obj.name} (has dependencies). Detail: {detail}")
         else:
-            print(f"|-- Failed to delete {obj.name}: {e}")
-
-    return done_flag
-
+            print(f"|-- Failed to delete {obj.name}: {detail or e}")
+        return False
+    except Exception as exc:
+        print(f"|-- Unexpected error deleting {getattr(obj, 'name', obj)}: {exc}")
+        return False
 
 def delete_locations(nb_session, data_file_path):
     print("|* Remove some rooms from locations")
@@ -195,27 +203,46 @@ def delete_locations(nb_session, data_file_path):
     nb_locations = nb_session.dcim.locations
     data = load_yaml(data_file_path)
 
-    rooms = [loc.get('room') for loc in data.get('locations') if 'room' in loc]
-    floors = [loc.get('floor') for loc in data.get('locations') if 'floor' in loc]
+    rooms = [loc.get('room') for loc in data.get('locations', []) if loc.get('room')]
+    floors = [loc.get('floor') for loc in data.get('locations', []) if loc.get('floor')]
 
-    if not rooms:
-        print("\t\tNo rooms defined in data *|")
-
-    if not floors:
-        print("\t\tNo floors defined in data *|")
+    if not rooms and not floors:
+        print("\t\tNo rooms or floors defined in data *|")
         return
 
-    # fetch all location at once
-    existing_locs = {loc.name: loc for loc in nb_locations.filter(name = rooms)}
-    existing_locs.update({loc.name: loc for loc in nb_locations.filter(name = floors)})
+    combined_names = list({*(rooms or []), *(floors or [])}) # unique set
+
+    # try fetch all matching locations in one call; fall back to per-name fetch if not supported
+    existing_locs = {}
+
+    try:
+        # many pynetbox combinations accept name__in for multi-value filter
+        records = nb_locations.filter(name__in = combined_names)
+        existing_locs = {r.name: r for r in records}
+
+    except Exception:
+        # fallback: query one-by-one
+        for n in combined_names:
+            r = nb_locations.get(name = n)
+            if r: existing_locs[n] = r
 
     done_flag = False
 
+    # Delete rooms first to reduce dependencies
     for room in rooms:
-        done_flag = _delete_netbox_obj(existing_locs.get(room))
+        obj = existing_locs.get(room)
+        if not obj:
+            print(f"|-- Skipping: Room {room} not found")
+            continue
+
+        done_flag = _delete_netbox_obj(obj) or done_flag
 
     for floor in floors:
-        done_flag = _delete_netbox_obj(existing_locs.get(floor))
+        obj = existing_locs.get(floor)
+        if not obj:
+            print(f"|-- Skipping: Floor {floor} not found")
+            continue
+        done_flag = _delete_netbox_obj(obj) or done_flag
 
     if not done_flag:
         print("\t\tNothing was removed *|")
