@@ -80,6 +80,24 @@ def cache_switches(nb_session, method = "role"):
 
     return switches_cache
 
+def _switch_dependencies(nb_session, switch_dict):
+    """
+    Generate all dependencies for a new switch, from a switch_dict, such as:
+      - device_role: switch
+        device_type: hpe-aruba-2930f-8g-poep-2sfpp
+        location: s09-0-1
+        name: rsgw9001
+        serial: CN8AAAAAAA
+        site: campus-stadtmitte
+        tags: switch
+
+    Returns a dict with resolved IDs
+    """
+
+    dependencies = {}
+    dependencies = switch_dict
+
+    return dependencies
 
 def add_switches(nb_session, data):
     print("|* Add switches")
@@ -89,21 +107,42 @@ def add_switches(nb_session, data):
 
     # --- payload collector ---
     switches_to_create = []
+    skipped_count, error_count = 0, 0
+
     for item in data.get('devices', []):
         i_name = item.get('name')
+        i_serial = item.get('serial')
 
-        # skip if switch with the right serial number already exists
-        if switches_cache.get(i_name) and item.get('serial') == switches_cache.get(i_name)[1]: 
+        # skip if switch with the same name and serial number already exists
+        if switches_cache.get(i_name):
+            cached_id, cached_serial = switches_cache[i_name]
+
+            # Compare serials (handle None values)
+            if (i_serial == cached_serial) or (not i_serial and not cached_serial):
+                print(f"|-- Skipping {i_name}: already exists with matching serial")
+                skipped_count += 1
+                continue
+            else:
+                print(f"|-- Warrning: {i_name} exists but serial differs (cached: {cached_serial}, new: {i_serial})")
+
+        # Resolve dependencies    
+        dependencies = _switch_dependencies(nb_session, item)
+        if not dependencies:
+            print(f"|-- Skipping {i_name}: missing dependencies")
+            error_count += 1
             continue
 
-        switches_to_create.append(item)
+        
+        switches_to_create.append(dependencies)
 
     # --- create switches in bulk ---
-    new_switches = _bulk_create_with_fallback(nb_devices, switches_to_create, 'switch')
+    #new_switches = _bulk_create_with_fallback(nb_devices, switches_to_create, 'switch')
+    import yaml, sys
+    print(yaml.dump(switches_to_create, sys.stdout))
 
-    if new_switches:
-        for s in new_switches:
-            print(f"|+ New switch added: {s.name}")
+#    if new_switches:
+#        for s in new_switches:
+#            print(f"|+ New switch added: {s.name}")
         
 #------------------
 # Main function
