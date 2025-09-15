@@ -9,49 +9,15 @@ Main function, to import:
     - data - data (yaml format)
 '''
 
-import pynetbox, yaml
-from pathlib import Path
-from sys import stdout
+import pynetbox
 
 from nb import development, production
 from std_functions import main_folder, floor_slug, room_slug
+from pynetbox_functions import load_yaml, _bulk_create_with_fallback
 
 # Disable warnings about self-signed certificates
 from urllib3 import disable_warnings, exceptions
 disable_warnings(exceptions.InsecureRequestWarning)
-
-def read_data(nb):
-    for device in nb.dcim.devices.all():
-        print(f"- {device.name} ({device.device_type.display}) in {device.site.name}")
-
-def load_yaml(file_path):
-    yaml_file = Path(file_path)
-
-    with yaml_file.open('r') as f:
-        return yaml.safe_load(f)
-
-# --- bulk create with fallback to per-item create ---
-def _bulk_create_with_fallback(endpoint, payloads, kind):
-    if not payloads: return []
-
-    created = []
-
-    try:
-        # pynetbox accepts a list as the first argument to create()
-        created = endpoint.create(payloads)
-        print(f"|+ Bulk-created {len(created)} {kind}(s).")
-        return created
-    except Exception as exc:
-        print(f"|- Bulk create for {kind} failed ({exc}), falling back to per-item create.")
-        created = []
-        for payload in payloads:
-            try: 
-                obj = endpoint.create(payload)
-                created.append(obj)
-            except Exception as exc2:
-                print(f"|- ERROR: Failed to create {kind} {payload.get('name')}: {exc2}")
-        return created
-
 
 def add_locations(nb_session, data):
     print("|* Add some locations")
@@ -217,11 +183,13 @@ def delete_locations(nb_session, data_file_path):
 
     try:
         # many pynetbox combinations accept name__in for multi-value filter
+        #print("_________name_in COMBINED NAMES________")
         records = nb_locations.filter(name__in = combined_names)
         existing_locs = {r.name: r for r in records}
 
     except Exception:
         # fallback: query one-by-one
+        #print("_________FALLBACK: ONE-BY-ONE___________")
         for n in combined_names:
             r = nb_locations.get(name = n)
             if r: existing_locs[n] = r
@@ -308,6 +276,8 @@ def debug_locations(nb_session, data_yaml_file):
     return return_list
 
 def main_debug():
+    import yaml
+    from sys import stdout
 
     data_yaml_file = 'aruba_8_ports.yaml'
     #data_yaml_file = 'aruba_stack_2930.yaml'
