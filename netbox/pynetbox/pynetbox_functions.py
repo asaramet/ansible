@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-Specific pynetbox functions
+Project specific functions for pynetbox based apps
 '''
 
 import pynetbox, yaml, logging, argparse

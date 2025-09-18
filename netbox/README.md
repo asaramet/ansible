@@ -60,12 +60,17 @@ sudo pacman -Syu python-pynetbox python-packaging
 
 ### Python scripts
 
-- `std_functions.py` - standard functions used in multiple python scripts.
+- `add_loations.py` - add collected locations data to a NetBox platform using `pynetbox` library.
+- `add_switches.py` - add switches to a NetBox platform using `pynetbox` library.
+- `chassis.py` - process chassis on a NetBox platform using `pynetbox` library.
 - `extra_functions.py` - more functions used in multiple python scripts.
-- `json_functions.py` - functions to return JSON objects for Aruba OS switches.
 - `json_functions_os_cx.py` - functions to return JSON objects for Aruba OS-CX switches.
-- `yaml_aruba_6xxx.py` - Collect Aruba 6100 and 6300 data from config files and generate a yaml data file.
-- `yaml_hpe_modular.py` - Collect HPE modular switches data from config files and generate a yaml data file.
-- `yaml_singles.py` - Collect Aruba switches data from config files and generate a yaml data file.
-- `yaml_stacks.py` - Collect Aruba stacked switches data from config files and generate a yaml data file.
+- `json_functions.py` - functions to return JSON objects for Aruba OS switches.
+- `nb.py` - in house `pynetbox` API session initialization.
+- `pynetbox_functions.py` - project specific functions for `pynetbox` based apps.
+- `sort_data.py` - Sort collected running config files according to the switch type.
+- `std_functions.py` - standard functions used in multiple python scripts.
+- `update_data.py` - run yaml data collection scripts.
+- `yaml_aruba_os_cx.py` - Collect Aruba OS-CX devices data from config files and generate a yaml data file.
+- `yaml_aruba.py` - Collect Aruba OS devices data from config files and generate a yaml data file.
 - `yaml_cisco.py` - Collect Cisco devices data from config files and generate a yaml data file.

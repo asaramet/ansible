@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
 '''
-Initialize NetBox APIs with custom session
-- development - for local development server, i.e 192.168.122.140
-- production - for production server
+In house pynetbox API session initialization
+Options:
+    development - for local development server, i.e 192.168.122.140
+    production - for production server
 '''
 
 import pynetbox, yaml

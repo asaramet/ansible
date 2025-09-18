@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Update devices yaml data files
+# Update devices yaml data files by running data collection scripts
 
 # Get the scripts directory
 SCRIPT_DIR="$(dirname $(realpath $0))"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-Add switches to NetBox servers with efficient caching and error handling
+Add switches to a NetBox platform using `pynetbox` library
 Main function, to import:
 
 - add_switches(nb_session, data):

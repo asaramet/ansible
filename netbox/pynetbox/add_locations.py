@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-Add collected locations data to NetBox servers using `pynetbox` library
+Add collected locations data to a NetBox platform using `pynetbox` library
 Main function, to import:
 
 - add_locations(nb_session, data):
