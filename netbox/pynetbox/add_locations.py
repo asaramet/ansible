@@ -19,8 +19,18 @@ from pynetbox_functions import load_yaml, _bulk_create_with_fallback
 from urllib3 import disable_warnings, exceptions
 disable_warnings(exceptions.InsecureRequestWarning)
 
+# Configure logging
+logging.basicConfig(level = logging.INFO)
+logger = logging.getLogger(__name__)
+
 def add_locations(nb_session, data):
-    print("|* Add some locations")
+    """
+    Add locations to a NetBox server from YAML data.
+
+    Args:
+        nb_session: pynetbox API session
+        data: Dictionary containing 'locations' list
+    """
     nb_locations = nb_session.dcim.locations
     nb_sites = nb_session.dcim.sites   
     nb_racks = nb_session.dcim.racks
@@ -40,7 +50,7 @@ def add_locations(nb_session, data):
         site = sites_cache.get(site_slug) or nb_site.get(slug = site_slug)
 
         if not site: 
-            print(f"|- ! Site {site_slug} not found, skipping {item.get('floor')}")
+            logger.warning(f"Site {site_slug} not found, skipping {item.get('floor')}")
             continue
 
         # Add floor payload, if missing
@@ -97,7 +107,7 @@ def add_locations(nb_session, data):
         parent_floor_name = r.pop('parent_floor_name')
         parent_floor = locations_cache.get((site_slug, parent_floor_name))
         if not parent_floor:
-            print(f"|-- Skipping: couldn't resolve parent floor {parent_floor_name} for room {r.get('name')}.")
+            logger.warning(f"Skipping: Couldn't resolve parent floor {parent_floor_name} for room {r.get('name')}.")
             continue
         r['parent'] = parent_floor.id
         resolved_rooms_payloads.append(r)
@@ -112,7 +122,7 @@ def add_locations(nb_session, data):
         site_slug = sites_id_to_slug.get(rk.get('site'))
         parent_room = locations_cache.get((site_slug, rk.get('parent_room_name')))
         if not parent_room:
-            print(f"|- Skipping: Couldn't resolve parent room {rk["[parent_room_name]"]} for rack {rk['name']}.")
+            logger.warning(f"Skipping: Couldn't resolve parent room {rk["[parent_room_name]"]} for rack {rk['name']}.")
             continue
         rk['location'] = parent_room.id
         resolved_racks_payloads.append(rk)
@@ -121,17 +131,17 @@ def add_locations(nb_session, data):
 
     # Output messages
     if not (new_floors or new_rooms or new_racks):
-        print("\t\tNo new locations created. *|")
+        logger.info("No new locations created.")
         return
     if new_floors:
         for f in new_floors:
-            print(f"|+ New floor added: {f.name}")
+            logger.info(f"New floor added: {f.name}")
     if new_rooms:
         for r in new_rooms:
-            print(f"|+ New room added: {r.name}")
+            logger.info(f"New room added: {r.name}")
     if new_racks:
         for rk in new_racks:
-            print(f"|+ New rack added: {rk.name}")
+            logger.info(f"|+ New rack added: {rk.name}")
 
 #------------------
 # Delete some data
@@ -141,12 +151,12 @@ def _delete_netbox_obj(obj):
     if not obj: return False
 
     if not isinstance(obj, pynetbox.core.response.Record): 
-        print(f"|-- Skiping non-Record object: {obj!r}")
+        logger.info(f"Skiping non-Record object: {obj!r}")
         return  False
 
     try: 
         obj.delete()
-        print(f"| Removed {obj.name}, with id {obj.id}")
+        logger.info(f"Removed {obj.name}, with id {obj.id}")
         return True
     except pynetbox.core.query.RequestError as e:
         # safe access to underlying HTTP response status code
@@ -155,25 +165,29 @@ def _delete_netbox_obj(obj):
         detail = getattr(e, "error", None) or getattr(e, "args", None)
 
         if status == 409:
-            print(f"|-- Skipped {obj.name} (has dependencies). Detail: {detail}")
+            logger.info(f"Skipped {obj.name} (has dependencies). Detail: {detail}")
         else:
-            print(f"|-- Failed to delete {obj.name}: {detail or e}")
+            logger.error(f"Failed to delete {obj.name}: {detail or e}")
         return False
     except Exception as exc:
-        print(f"|-- Unexpected error deleting {getattr(obj, 'name', obj)}: {exc}")
+        logger.error(f"Unexpected error deleting {getattr(obj, 'name', obj)}: {exc}")
         return False
 
-def delete_locations(nb_session, data_file_path):
-    print("|* Remove some rooms from locations")
-
+def delete_locations(nb_session, data):
+    """
+    Remove locations from a NetBox database over pynetbox API
+    Args:
+        nb_session: pynetbox API Session 
+        data: Dictionary containing 'locations' list
+    """
+    logger.info("Remove locations (rooms, floors)")
     nb_locations = nb_session.dcim.locations
-    data = load_yaml(data_file_path)
 
     rooms = [loc.get('room') for loc in data.get('locations', []) if loc.get('room')]
     floors = [loc.get('floor') for loc in data.get('locations', []) if loc.get('floor')]
 
     if not rooms and not floors:
-        print("\t\tNo rooms or floors defined in data *|")
+        logger.info("No rooms or floors defined in data")
         return
 
     combined_names = list({*(rooms or []), *(floors or [])}) # unique set
@@ -183,13 +197,11 @@ def delete_locations(nb_session, data_file_path):
 
     try:
         # many pynetbox combinations accept name__in for multi-value filter
-        #print("_________name_in COMBINED NAMES________")
         records = nb_locations.filter(name__in = combined_names)
         existing_locs = {r.name: r for r in records}
 
     except Exception:
         # fallback: query one-by-one
-        #print("_________FALLBACK: ONE-BY-ONE___________")
         for n in combined_names:
             r = nb_locations.get(name = n)
             if r: existing_locs[n] = r
@@ -200,7 +212,7 @@ def delete_locations(nb_session, data_file_path):
     for room in rooms:
         obj = existing_locs.get(room)
         if not obj:
-            print(f"|-- Skipping: Room {room} not found")
+            logger.info(f"Skipping: Room {room} not found")
             continue
 
         done_flag = _delete_netbox_obj(obj) or done_flag
@@ -208,12 +220,12 @@ def delete_locations(nb_session, data_file_path):
     for floor in floors:
         obj = existing_locs.get(floor)
         if not obj:
-            print(f"|-- Skipping: Floor {floor} not found")
+            logger.info(f"Skipping: Floor {floor} not found")
             continue
         done_flag = _delete_netbox_obj(obj) or done_flag
 
     if not done_flag:
-        print("\t\tNothing was removed *|")
+        logger.info("Nothing was removed *|")
 
 #------------------
 # Main function
