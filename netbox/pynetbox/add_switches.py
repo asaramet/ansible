@@ -11,13 +11,7 @@ Main function, to import:
 
 import pynetbox, re, logging
 
-from nb import development, production
-from std_functions import main_folder
-from pynetbox_functions import load_yaml, _bulk_create_with_fallback
-
-# Disable warnings about self-signed certificates
-from urllib3 import disable_warnings, exceptions
-disable_warnings(exceptions.InsecureRequestWarning)
+from pynetbox_functions import load_yaml, _bulk_create_with_fallback, _main
 
 # Configure logging
 logging.basicConfig(level = logging.INFO)
@@ -263,49 +257,5 @@ def add_switches(nb_session, data):
     logger.info("No new switches created")
     return new_switches
             
-#------------------
-# Main function
-#------------------
-def main():
-    #------------------
-    # Initialize NetBox API with custom session
-    #------------------
-    import argparse
-    parser = argparse.ArgumentParser(
-        description="Add switches to a NetBox server"
-    )
-
-    parser.add_argument(
-        '-s', "--server",
-        choices = ["development", "production"],
-        default= "development",
-        help = "Select which NetBox server to connect to (default: development)"
-    )
-
-    args = parser.parse_args()
-
-    if args.server == "development":
-        nb = development
-    elif args.server == "production":
-        nb = production
-
-    nb.http_session.verify = False # Disable SSL verification
-
-    #------------------
-    #  Run functions
-    #------------------
-
-    files_yaml = [
-        #"aruba_8_ports.yaml",
-        "aruba_stack_2930.yaml",
-        #"aruba_6300.yaml"
-    ]
-    
-    for file_name in files_yaml:
-        data_file_path = f"{main_folder}/data/yaml/{file_name}"
-
-        data = load_yaml(data_file_path)
-        add_switches(nb, data)
-
 if __name__ == '__main__':
-    main()
+    _main("Add switches to a NetBox server", add_switches)

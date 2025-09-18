@@ -9,15 +9,10 @@ Main function, to import:
     - data - data (yaml format)
 '''
 
-import pynetbox
+import pynetbox, logging
 
-from nb import development, production
-from std_functions import main_folder, floor_slug, room_slug
-from pynetbox_functions import load_yaml, _bulk_create_with_fallback
-
-# Disable warnings about self-signed certificates
-from urllib3 import disable_warnings, exceptions
-disable_warnings(exceptions.InsecureRequestWarning)
+from std_functions import floor_slug, room_slug
+from pynetbox_functions import load_yaml, _bulk_create_with_fallback, _delete_netbox_obj, _main
 
 # Configure logging
 logging.basicConfig(level = logging.INFO)
@@ -146,33 +141,6 @@ def add_locations(nb_session, data):
 #------------------
 # Delete some data
 #------------------
-def _delete_netbox_obj(obj):
-    # Delete a provided Netox object (obj), as a response.Record 
-    if not obj: return False
-
-    if not isinstance(obj, pynetbox.core.response.Record): 
-        logger.info(f"Skiping non-Record object: {obj!r}")
-        return  False
-
-    try: 
-        obj.delete()
-        logger.info(f"Removed {obj.name}, with id {obj.id}")
-        return True
-    except pynetbox.core.query.RequestError as e:
-        # safe access to underlying HTTP response status code
-        status = getattr(getattr(e, "req", None), "status_code", None)
-        # try to get the server-provided error detail if present
-        detail = getattr(e, "error", None) or getattr(e, "args", None)
-
-        if status == 409:
-            logger.info(f"Skipped {obj.name} (has dependencies). Detail: {detail}")
-        else:
-            logger.error(f"Failed to delete {obj.name}: {detail or e}")
-        return False
-    except Exception as exc:
-        logger.error(f"Unexpected error deleting {getattr(obj, 'name', obj)}: {exc}")
-        return False
-
 def delete_locations(nb_session, data):
     """
     Remove locations from a NetBox database over pynetbox API
@@ -228,52 +196,6 @@ def delete_locations(nb_session, data):
         logger.info("Nothing was removed *|")
 
 #------------------
-# Main function
-#------------------
-def main():
-    #------------------
-    # Initialize NetBox API with custom session
-    #------------------
-    import argparse
-    parser = argparse.ArgumentParser(
-        description="Add collected locations data to a NetBox server"
-    )
-
-    parser.add_argument(
-        '-s', "--server",
-        choices = ["development", "production"],
-        default= "development",
-        help = "Select which NetBox server to connect to (default: development)"
-    )
-
-    args = parser.parse_args()
-
-    if args.server == "development":
-        nb = development
-    elif args.server == "production":
-        nb = production
-
-    nb.http_session.verify = False # Disable SSL verification
-
-    #------------------
-    #  Run functions
-    #------------------
-
-    files_yaml = [
-        #"aruba_8_ports.yaml",
-        "aruba_stack_2930.yaml",
-        #"aruba_6300.yaml"
-    ]
-    
-    for file_name in files_yaml:
-        data_file_path = f"{main_folder}/data/yaml/{file_name}"
-
-        data = load_yaml(data_file_path)
-        add_locations(nb, data)
-
-        #delete_locations(nb, data_file_path)
-
-#------------------
 # Debugging
 #------------------
 
@@ -299,6 +221,6 @@ def main_debug():
     yaml.dump(debug_locations(None, data_file_path), stdout)
 
 if __name__ == '__main__':
-    main()
+    _main("Add collected locations data to a NetBox server", add_locations)
 
    # main_debug()
