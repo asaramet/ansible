@@ -11,14 +11,17 @@ Main function, to import:
 
 import pynetbox, logging
 
-from std_functions import floor_slug, room_slug
+from typing import Dict, List
+from pynetbox.core.api import Api as NetBoxApi
+
+from std_functions import main_folder, floor_slug, room_slug
 from pynetbox_functions import load_yaml, _bulk_create_with_fallback, _delete_netbox_obj, _main
 
 # Configure logging
 logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger(__name__)
 
-def add_locations(nb_session, data):
+def add_locations(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
     """
     Add locations to a NetBox server from YAML data.
 
@@ -141,7 +144,7 @@ def add_locations(nb_session, data):
 #------------------
 # Delete some data
 #------------------
-def delete_locations(nb_session, data):
+def delete_locations(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
     """
     Remove locations from a NetBox database over pynetbox API
     Args:
@@ -199,28 +202,21 @@ def delete_locations(nb_session, data):
 # Debugging
 #------------------
 
-def debug_locations(nb_session, data_yaml_file):
-    data = load_yaml(data_yaml_file)
+def debug_locations(nb_session: NetBoxApi, data: Dict) -> List:
+    import yaml
+    from sys import stdout
 
     return_list = []
     for location in data['locations']:
         if not location['is_rack']:
             return_list.append(location)
 
+    yaml.dump(return_list, stdout)
+
     return return_list
-
-def main_debug():
-    import yaml
-    from sys import stdout
-
-    data_yaml_file = 'aruba_8_ports.yaml'
-    #data_yaml_file = 'aruba_stack_2930.yaml'
-
-    data_file_path = f"{main_folder}/data/yaml/{data_yaml_file}"
-
-    yaml.dump(debug_locations(None, data_file_path), stdout)
 
 if __name__ == '__main__':
     _main("Add collected locations data to a NetBox server", add_locations)
+    #_main("Delete collected locations data", delete_locations)
 
-   # main_debug()
+    #_main("Debug locations data", debug_locations)

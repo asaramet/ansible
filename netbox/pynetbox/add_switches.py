@@ -11,13 +11,17 @@ Main function, to import:
 
 import pynetbox, re, logging
 
+from pynetbox.core.api import Api as NetBoxApi
+from typing import Dict, List
+
 from pynetbox_functions import load_yaml, _bulk_create_with_fallback, _main
+from pynetbox_functions import _resolve_tags
 
 # Configure logging
 logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger(__name__)
 
-def cache_switches(nb_session, method = "role"):
+def cache_switches(nb_session: NetBoxApi, method: str = "role") -> Dict[str, List[str]]:
     """
     Standalone function to cache existing switched with different methods.
 
@@ -78,7 +82,7 @@ def cache_switches(nb_session, method = "role"):
 
     return switches_cache
 
-def _switch_dependencies(nb_session, switch_dict):
+def _switch_dependencies(nb_session: NetBoxApi, switch_dict: Dict[str, str]) -> Dict[str, str | int]:
     """
     Generate all dependencies for a new switch, from a switch_dict, such as:
       - device_role: switch
@@ -134,43 +138,14 @@ def _switch_dependencies(nb_session, switch_dict):
         logger.error(f"Error resolving dependencies for {switch_dict.get('name')}: {e}")
         return None
 
-def _resolve_tags(nb_session, tags):
+def _switch_payload(nb_session: NetBoxApi, switch_dict: Dict[str, str], 
+    dependencies: Dict[str, str | int]) -> Dict[str, str | int]:
     """
-    Resolve tag names to tag IDs, creating tags if they don't exist.
+    Return the payload for creating a new switch on a NetBox server.
     Args:
         nb_session: pynetbox API session
-        tags: string, list of strings, None
-    Returns: 
-        List of IDs
-    """
-    if not tags: return []
-
-    # Normalize to list
-    tag_slugs = [tags] if isinstance(tags, str) else tags
-    tag_ids = []
-
-    nb_tags = nb_session.extras.tags
-    for tag_slug in tag_slugs:
-        try:
-            # Try to get existing tag
-            tag = nb_tags.get(slug = tag_slug)
-            tag_ids.append(tag.id)
-
-        except Exception as e:
-            logger.warning(f"Error resolving tag '{tag_slug}': {e}")
-            continue
-
-    return tag_ids
-
-def _switch_payload(nb_session, switch_dict, dependencies):
-    """
-    Return the payload for creating a new switch in a NetBox server.
-
-    Args:
-        nb_session: pynetbox API session
-        switch_dict: Switchd Dictionary 
+        switch_dict: Switch data dictionary 
         dependencies: Switch dependencies dictionary
-
     Return:
         The payload dictionary used to create a new switch in a NetBox session
     """
@@ -194,7 +169,7 @@ def _switch_payload(nb_session, switch_dict, dependencies):
     return payload
 
 
-def add_switches(nb_session, data):
+def add_switches(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List:
     """
     Add switches to NetBox server from YAML data.
 
