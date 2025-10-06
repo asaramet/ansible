@@ -14,7 +14,7 @@ import pynetbox, re, logging
 from pynetbox.core.api import Api as NetBoxApi
 from typing import Dict, List
 
-from pynetbox_functions import load_yaml, _bulk_create_with_fallback, _main
+from pynetbox_functions import load_yaml, _bulk_create, _main
 from pynetbox_functions import _resolve_tags
 
 # Configure logging
@@ -221,7 +221,7 @@ def add_switches(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List:
     # --- create switches in bulk ---
     new_switches = []
     if switches_to_create:
-        new_switches = _bulk_create_with_fallback(nb_devices, switches_to_create, 'switch')
+        new_switches = _bulk_create(nb_devices, switches_to_create, 'switch')
 
         if new_switches:
             logger.info(f"Successfully created {len(switches_to_create)} switches:")

@@ -15,7 +15,7 @@ from typing import Dict, List
 from pynetbox.core.api import Api as NetBoxApi
 
 from std_functions import main_folder, floor_slug, room_slug
-from pynetbox_functions import load_yaml, _bulk_create_with_fallback, _delete_netbox_obj, _main
+from pynetbox_functions import load_yaml, _bulk_create, _delete_netbox_obj, _main
 
 # Configure logging
 logging.basicConfig(level = logging.INFO)
@@ -93,7 +93,7 @@ def add_locations(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
                 })
 
     # --- create floors in bulk ---
-    new_floors = _bulk_create_with_fallback(nb_locations, floors_to_create, "floor")
+    new_floors = _bulk_create(nb_locations, floors_to_create, "floor")
     if new_floors:
         # refresh cache after changes
         locations_cache = {(loc.site.slug, loc.name): loc for loc in nb_locations.all()}
@@ -110,7 +110,7 @@ def add_locations(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
         r['parent'] = parent_floor.id
         resolved_rooms_payloads.append(r)
 
-    new_rooms = _bulk_create_with_fallback(nb_locations, resolved_rooms_payloads, 'room')
+    new_rooms = _bulk_create(nb_locations, resolved_rooms_payloads, 'room')
     if new_rooms:
         locations_cache = {(loc.site.slug, loc.name): loc for loc in nb_locations.all()}
 
@@ -125,7 +125,7 @@ def add_locations(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
         rk['location'] = parent_room.id
         resolved_racks_payloads.append(rk)
 
-    new_racks = _bulk_create_with_fallback(nb_racks, resolved_racks_payloads, 'rack')
+    new_racks = _bulk_create(nb_racks, resolved_racks_payloads, 'rack')
 
     # Output messages
     if not (new_floors or new_rooms or new_racks):

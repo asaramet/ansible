@@ -14,7 +14,7 @@ import pynetbox, logging
 from typing import Dict, List
 from pynetbox.core.api import Api as NetBoxApi
 
-from pynetbox_functions import _bulk_create_with_fallback, _bulk_update_with_fallback
+from pynetbox_functions import _bulk_create, _bulk_update
 from pynetbox_functions import _main, _resolve_tags, _get_device
 
 # Configure logging
@@ -110,7 +110,7 @@ def chassis(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List[Dict[str,
     new_chassis = []
     if chassis_to_create: 
         try:
-            new_chassis = _bulk_create_with_fallback(nb_chassis, chassis_to_create, 'chassis')
+            new_chassis = _bulk_create(nb_chassis, chassis_to_create, 'chassis')
             if new_chassis:
                 logger.info(f"Successfully created {len(new_chassis)} chassis")
 
@@ -184,7 +184,7 @@ def chassis(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List[Dict[str,
     if not devices_to_update: return None
 
     try:
-        updated_devices = _bulk_update_with_fallback(nb_devices, devices_to_update, 'switch')
+        updated_devices = _bulk_update(nb_devices, devices_to_update, 'switch')
         if updated_devices:
             logger.info(f"Successfully updated {len(updated_devices)} devices with chassis assignments")
 

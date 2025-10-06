@@ -34,6 +34,8 @@ def _get_device(nb_session: NetBoxApi, name: str) -> Devices:
     Args:
         nb_session: pynetbox API session
         name: device hostname (str)
+    Return:
+        Device object
     """
     d_obj = None
     try:
@@ -41,21 +43,61 @@ def _get_device(nb_session: NetBoxApi, name: str) -> Devices:
         if not d_obj: 
             logger.warning(f"Device {name} not found in NetBox")
     except Exception as e:
-        logger.error(f"Error retrieving device {d_name}: {e}")
+        logger.error(f"Error retrieving device {d_name}: {e}", exc_info = True)
 
     return d_obj
 
-def _bulk_create_with_fallback(endpoint: Endpoint, payloads: List[Dict], kind: str) -> List:
+def _extract_stack_number(device_name: str, data: Dict[str, str]) -> str:
+    """
+    Extract stack number from device name or data dictionary.
+    Args:
+        device_name: Device hostname (e.g rsgw0001-1)
+        data: Data dictionary (e.g data['modules'])
+    Return:
+        Stack number as string or None if it's not a stack
+    """
+    # If 'new_position' in data dict
+    if 'new_position' in data and '/' in data['new_position']:
+        return data['new_position'].split('/')[0]
+    
+    # Stack number provided in the data dict
+    if 'stack_number' in data:
+        return str(data['stack_number'])
+
+    # Check the device name
+    if '-' in device_name:
+        parts = device_name.split('-')
+        last_part = parts[-1]
+        if last_part.isdigit():
+            return last_part
+
+    return None
+
+def _cache_devices(nb_session: NetBoxApi, device_names: List[str]) -> Dict[str, object]:
+    """
+    Get devices in a bulk and return them as cached dictionary
+    Args:
+        nb_session: pynetbox API session
+        device_names: A list of device hostnames
+    Return:
+        Dictionary of device objects in the form of:
+            hostname: device object
+    """
+    devices = nb_session.dcim.devices.filter(name__in = device_names)
+    return {device.name: device for device in devices}
+
+def _bulk_create(endpoint: Endpoint, payloads: List[Dict], kind: str) -> List:
     """
     Bulk create objects on a NetBox platform
     Args:
         endpoint: pynetbox endpoint space
         payloads: A list of objects characteristics dictionaries to add to NetBox
         kind: A string describing the objects to create
+    Returns:
+        List of successfully created objects.
     """
-    if not payloads: return []
-
-    created = []
+    if not payloads: 
+        return []
 
     try:
         # pynetbox accepts a list as the first argument to create()
@@ -63,17 +105,23 @@ def _bulk_create_with_fallback(endpoint: Endpoint, payloads: List[Dict], kind: s
         logger.info(f"Bulk-created {len(created)} {kind}(s).")
         return created
     except Exception as exc:
-        logger.warning(f"Bulk create for {kind} failed ({exc}), falling back to per-item create.")
+        logger.warning(
+            f"Bulk create for {kind} failed ({exc}), falling back to per-item create.",
+            exc_info = True
+        )
         created = []
         for payload in payloads:
             try: 
                 obj = endpoint.create(payload)
                 created.append(obj)
             except Exception as exc2:
-                logger.error(f"Failed to create {kind} {payload.get('name')}: {exc2}")
+                logger.error(
+                    f"Failed to create {kind} {payload.get('name')}: {exc2}", 
+                    exc_info = True
+                )
         return created
 
-def _bulk_update_with_fallback(endpoint: Endpoint, payloads: List[Dict], kind: str) -> List:
+def _bulk_update(endpoint: Endpoint, payloads: List[Dict], kind: str) -> List:
     """
     Bulk update objects on a NetBox platform, with individual fallback on failure. 
     Args:
@@ -92,7 +140,7 @@ def _bulk_update_with_fallback(endpoint: Endpoint, payloads: List[Dict], kind: s
         # Cache all objects that need to be updated to minimize API calls
         object_ids = [payload.get('id') for payload in payloads if 'id' in payload.keys()]
         if not object_ids:
-            logger.error(f"No valid IDs found in payloads for {kind}")
+            logger.error(f"No valid IDs found in payloads for {kind}", exc_info = True)
             return []
 
         try:
@@ -117,7 +165,7 @@ def _bulk_update_with_fallback(endpoint: Endpoint, payloads: List[Dict], kind: s
                 if not updated_item:
                     updated_item = endpoint.get(item_id)
                     if not updated_item:
-                        logger.error(f"Could not find {kind} with ID {item_id}")
+                        logger.error(f"Could not find {kind} with ID {item_id}", exc_info = True)
                         continue
 
                 # Track changes
@@ -144,7 +192,7 @@ def _bulk_update_with_fallback(endpoint: Endpoint, payloads: List[Dict], kind: s
                     logger.debug(f"No changes for {kind} ID {item_id}")
 
             except Exception as e:
-                logger.error(f"Failed to update individual {kind} with ID {item_id}: {e}")
+                logger.error(f"Failed to update individual {kind} with ID {item_id}: {e}", exc_info = True)
 
         if successful_update > 0:
             logger.info(f"Individual fallback completed: {successful_update}/{len(payloads)} {kind} updated successfully")       
@@ -172,10 +220,10 @@ def _delete_netbox_obj(obj: Record) -> bool:
         if status == 409:
             logger.info(f"Skipped {obj.name} (has dependencies). Detail: {detail}")
         else:
-            logger.error(f"Failed to delete {obj.name}: {detail or e}")
+            logger.error(f"Failed to delete {obj.name}: {detail or e}", exc_info = True)
         return False
     except Exception as exc:
-        logger.error(f"Unexpected error deleting {getattr(obj, 'name', obj)}: {exc}")
+        logger.error(f"Unexpected error deleting {getattr(obj, 'name', obj)}: {exc}", exc_info = True)
         return False
 
 def _resolve_tags(nb_session: NetBoxApi, tags: List[str] | str | None) -> List[int]:
@@ -205,6 +253,32 @@ def _resolve_tags(nb_session: NetBoxApi, tags: List[str] | str | None) -> List[i
             continue
 
     return tag_ids
+
+def _manufacturer(nb_session: NetBoxApi, manufacturer_name: str) -> int:
+    """
+    Get or create a manufacturer and return its ID.
+    Args:
+        nb_session: pynetbox API session
+        manufacturer_name: manufacturer's name
+    Returns: 
+        Manufacturer ID
+    """
+    nb_manufacturers = nb_session.dcim.manufacturers
+    manufacturer = nb_manufacturers.get(name = manufacturer_name)
+
+    if manufacturer:
+        return manufacturer.id
+
+    try:
+        new_manufacturer = nb_manufacturers.create({
+            'name': manufacturer_name,
+            'slug': manufacturer_name.lower().replace(' ', '-')
+        })
+        return new_manufacturer.id
+    except Exception as e:
+        logging.error(f"Failed to create manufacturer {manufacturer_name}: {e}", exc_info = True)
+        raise
+
 
 def _main(description: str, function: Callable, **kwargs) -> None:
     """
@@ -252,3 +326,38 @@ def _main(description: str, function: Callable, **kwargs) -> None:
 
         # Call the passed function, with additional arguments
         function(nb, data, **kwargs)
+
+def _debug(function: Callable, **kwargs) -> None:
+    """
+    Debug NetBox API with custom session
+    Args:
+        function: debug function to execute, that must have:
+            nb_seession: pynetbox API session
+        as argument.
+    """
+    import argparse
+    from std_functions import main_folder
+    from nb import development, production
+
+
+    # Disable warnings about self-signed certificates
+    from urllib3 import disable_warnings, exceptions
+    disable_warnings(exceptions.InsecureRequestWarning)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-s', "--server",
+        choices = ["development", "production"],
+        default= "development",
+        help = "Select which NetBox server to connect to (default: development)"
+    )
+
+    args = parser.parse_args()
+
+    if args.server == "development":
+        nb = development
+    elif args.server == "production":
+        nb = production
+
+    nb.http_session.verify = False # Disable SSL verification
+    function(nb, **kwargs)
