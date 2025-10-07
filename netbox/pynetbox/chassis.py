@@ -181,7 +181,9 @@ def chassis(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List[Dict[str,
             logger.info(f"Device {d_name} will be updated: {', '.join(updates_logged)}")
 
     # Bulk update devices 
-    if not devices_to_update: return None
+    if not devices_to_update: 
+        logger.info("No chassis needs update")
+        return None
 
     try:
         updated_devices = _bulk_update(nb_devices, devices_to_update, 'switch')
