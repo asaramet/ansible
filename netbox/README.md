@@ -64,7 +64,7 @@ sudo pacman -Syu python-pynetbox python-packaging
 - `add_switches.py` - add switches to a NetBox platform using `pynetbox` library.
 - `chassis.py` - process chassis on a NetBox platform using `pynetbox` library.
 - `extra_functions.py` - more functions used in multiple python scripts.
-- `interfaces.py` - 
+- `interfaces.py` - synchronize interfaces on a NetBox platform using `pynetbox` library
 - `json_functions_os_cx.py` - functions to return JSON objects for Aruba OS-CX switches.
 - `json_functions.py` - functions to return JSON objects for Aruba OS switches.
 - `modules.py` - process modules for switches on a NetBox platform using `pynetbox` library
