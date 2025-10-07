@@ -32,8 +32,8 @@ def update(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
         nb_session: pynetbox API session
         data: Data dictionary containing lists
     """
-    logger.info("-- Add missing locations --")
-    add_locations(nb_session, data)
+    #logger.info("-- Add missing locations --")
+    #add_locations(nb_session, data)
 
     logger.info("-- Update/Add switches data --")
     add_switches(nb_session, data)

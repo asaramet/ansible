@@ -116,91 +116,91 @@
       include_vars:
         file: ../data/yaml/aruba_6300.yaml
 
-    - name: Create a floor (location)
-      tags: 
-        - location
-        - add_switches
-        - switches
-        - update
-      netbox.netbox.netbox_location:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          name: "{{ item.floor }}"
-          site: "{{ item.site }}"
-          parent_location: "{{ item.parent_location }}"
-        state: present
-      loop: "{{ locations }}"
+#    - name: Create a floor (location)
+#      tags: 
+#        - location
+#        - add_switches
+#        - switches
+#        - update
+#      netbox.netbox.netbox_location:
+#        netbox_url: "{{ netbox_url }}"
+#        netbox_token: "{{ netbox_token }}"
+#        validate_certs: false
+#        data:
+#          name: "{{ item.floor }}"
+#          site: "{{ item.site }}"
+#          parent_location: "{{ item.parent_location }}"
+#        state: present
+#      loop: "{{ locations }}"
 
-    - name: Get existing racks from NetBox
-      tags: 
-        - add_switches
-        - switches
-        - update
-      set_fact:
-        assigned_racks: >-
-          {{ assigned_racks | default({}) | combine
-            (
-              { item.name : 
-                (
-                  query(
-                    'netbox.netbox.nb_lookup', 'devices',
-                    api_endpoint = netbox_url,
-                    api_filter='name={}'.format(item.name),
-                    token = netbox_token, validate_certs=false
-                ) | default([]) | first | 
-                default({})).get('value', {}).get('rack', None)
-              }
-            )
-          }}
-      loop: "{{ devices }}"
+#    - name: Get existing racks from NetBox
+#      tags: 
+#        - add_switches
+#        - switches
+#        - update
+#      set_fact:
+#        assigned_racks: >-
+#          {{ assigned_racks | default({}) | combine
+#            (
+#              { item.name : 
+#                (
+#                  query(
+#                    'netbox.netbox.nb_lookup', 'devices',
+#                    api_endpoint = netbox_url,
+#                    api_filter='name={}'.format(item.name),
+#                    token = netbox_token, validate_certs=false
+#                ) | default([]) | first | 
+#                default({})).get('value', {}).get('rack', None)
+#              }
+#            )
+#          }}
+#      loop: "{{ devices }}"
 
-    - name: Get existing device position in the rack from NetBox
-      tags: 
-        - add_switches
-        - switches
-        - update
-      set_fact:
-        assigned_position: >-
-          {{ assigned_position | default({}) | combine
-            (
-              { item.name : ( query(
-                'netbox.netbox.nb_lookup', 'devices',
-                api_endpoint = netbox_url,
-                api_filter='name={}'.format(item.name),
-                token = netbox_token,
-                validate_certs=false) | default([]) | first | 
-                default({})).get('value', {}).get('position', None)
-              }
-            )
-          }}
-      loop: "{{ devices }}"
+#    - name: Get existing device position in the rack from NetBox
+#      tags: 
+#        - add_switches
+#        - switches
+#        - update
+#      set_fact:
+#        assigned_position: >-
+#          {{ assigned_position | default({}) | combine
+#            (
+#              { item.name : ( query(
+#                'netbox.netbox.nb_lookup', 'devices',
+#                api_endpoint = netbox_url,
+#                api_filter='name={}'.format(item.name),
+#                token = netbox_token,
+#                validate_certs=false) | default([]) | first | 
+#                default({})).get('value', {}).get('position', None)
+#              }
+#            )
+#          }}
+#      loop: "{{ devices }}"
 
-    - name: Add rack switches (already assign to racks in NetBox)
-      tags: 
-        - add_switches
-        #- switches
-        - update
-      netbox.netbox.netbox_device:
-        netbox_url: "{{ netbox_url }}"
-        netbox_token: "{{ netbox_token }}"
-        validate_certs: false
-        data:
-          name: "{{ item.name }}"
-          site: "{{ item.site }}"
-          location: "{{ item.location }}"
-          rack: "{{ assigned_racks[item.name]['name'] if assigned_racks.get(item.name) else None }}"
-          position: "{{ assigned_position.get(item.name, None) | float}}"
-          device_type: "{{ item.device_type }}" 
-          device_role: "{{ item.device_role }}"
-          serial: "{{ item.serial }}"
-          tags: "{{ item.tags }}"
-          tenant: netzadmin
-        state: present
-      loop: "{{ devices }}"
-      #when: assigned_racks[item.name]
-      when: no
+#    - name: Add rack switches (already assign to racks in NetBox)
+#      tags: 
+#        - add_switches
+#        #- switches
+#        - update
+#      netbox.netbox.netbox_device:
+#        netbox_url: "{{ netbox_url }}"
+#        netbox_token: "{{ netbox_token }}"
+#        validate_certs: false
+#        data:
+#          name: "{{ item.name }}"
+#          site: "{{ item.site }}"
+#          location: "{{ item.location }}"
+#          rack: "{{ assigned_racks[item.name]['name'] if assigned_racks.get(item.name) else None }}"
+#          position: "{{ assigned_position.get(item.name, None) | float}}"
+#          device_type: "{{ item.device_type }}" 
+#          device_role: "{{ item.device_role }}"
+#          serial: "{{ item.serial }}"
+#          tags: "{{ item.tags }}"
+#          tenant: netzadmin
+#        state: present
+#      loop: "{{ devices }}"
+#      #when: assigned_racks[item.name]
+#      when: no
 
     - name: Add switches (not assign to any racks in NetBox)
       tags: 
@@ -214,7 +214,7 @@
         data:
           name: "{{ item.name }}"
           site: "{{ item.site }}"
-          location: "{{ item.location }}"
+          #location: "{{ item.location }}"
           device_type: "{{ item.device_type }}" 
           device_role: "{{ item.device_role }}"
           serial: "{{ item.serial }}"
@@ -222,7 +222,7 @@
           tenant: netzadmin
         state: present
       loop: "{{ devices }}"
-      when: not assigned_racks[item.name]
+      #when: not assigned_racks[item.name]
 
     - name: Unassign switches to chassis
       tags: 

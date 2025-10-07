@@ -81,7 +81,8 @@ def devices_json(config_files, device_type_slags, tags):
         hostname = get_hostname(t_file)
 
         # get room location
-        location = get_location(t_file)
+        #location = get_location(t_file)
+        location = None # it was decided to add them manually
         site = site_slug(t_file)
 
         if location: # Not None
@@ -96,7 +97,7 @@ def devices_json(config_files, device_type_slags, tags):
 
             serial = serials[hostname] if hostname in serials.keys() else None
 
-            data['devices'].append({'name': hostname, "location": location, 
+            data['devices'].append({'name': hostname, #"location": location, 
                 'device_role': get_device_role(t_file, hostname), 'device_type': d_label, 
                 'site': site, 'tags': tags, 'serial':serial})
             continue
@@ -117,7 +118,7 @@ def devices_json(config_files, device_type_slags, tags):
             serial = serials[h_name] if h_name in serials.keys() else None
 
             if vc_position == 2: vc_priority = 128
-            data['devices'].append({'name': h_name, "location": location, 
+            data['devices'].append({'name': h_name, # "location": location, 
                 'device_role': get_device_role(t_file, clean_name), 'device_type': d_label, 
                 'site': site, 'tags': tags, 'serial':serial,
                 'virtual_chassis': clean_name, 'vc_position': vc_position, 

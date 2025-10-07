@@ -9,7 +9,7 @@ from std_functions import device_type_slags, this_folder, main_folder, config_fi
 
 from json_functions import devices_json, trunks_json, device_interfaces_json
 from json_functions import vlans_json, tagged_vlans_json
-from json_functions import ip_addresses_json, locations_json, modules_json
+from json_functions import ip_addresses_json, modules_json
 
 # Collect single switches data and saved it to a YAML file
 def single(data_folder, output_file_path, devices_tags):
@@ -26,7 +26,7 @@ def single(data_folder, output_file_path, devices_tags):
 
     try:
         yaml.dump({"modular": False}, f)
-        yaml.dump(locations_json(files), f)
+        #yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(trunks_json(files), f)
         yaml.dump(device_interfaces_json(files), f)
@@ -52,7 +52,7 @@ def modular(data_folder, output_file_path, devices_tags):
 
     try:
         yaml.dump({"modular": True}, f)
-        yaml.dump(locations_json(files), f)
+        #yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(modules_json(files), f)
         yaml.dump(trunks_json(files), f)
@@ -74,7 +74,7 @@ def stack(data_folder, output_file_path, devices_tags):
     files = config_files(data_folder)
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump({"modular": False}, f)
-        yaml.dump(locations_json(files), f)
+        #yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(device_interfaces_json(files), f)
         yaml.dump(trunks_json(files), f)
@@ -92,7 +92,7 @@ def stack_module(data_folder, output_file_path, devices_tags):
 
     with open(main_folder + output_file_path, 'w') as f:
         yaml.dump({"modular": True}, f)
-        yaml.dump(locations_json(files), f)
+        #yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(device_interfaces_json(files), f)
         yaml.dump(trunks_json(files), f)

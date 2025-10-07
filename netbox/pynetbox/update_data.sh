@@ -14,8 +14,9 @@ python3 ${SCRIPT_DIR}/yaml_aruba.py
 server='development'
 server='production'
 
-python3 ${SCRIPT_DIR}/add_locations.py -s ${server}
+#python3 ${SCRIPT_DIR}/add_locations.py -s ${server}
 python3 ${SCRIPT_DIR}/add_switches.py -s ${server}
 python3 ${SCRIPT_DIR}/chassis.py -s ${server}
 python3 ${SCRIPT_DIR}/modules.py -s ${server}
 python3 ${SCRIPT_DIR}/vlans.py -s ${server}
+python3 ${SCRIPT_DIR}/interfaces.py -s ${server}

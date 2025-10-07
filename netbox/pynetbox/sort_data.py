@@ -275,7 +275,7 @@ def main():
         sort_file(f)
 
 if __name__ == "__main__":
-    #main()
+    main()
 
-    debug()
+    #debug()
 
