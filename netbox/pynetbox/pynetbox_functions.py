@@ -15,7 +15,7 @@ from pynetbox.core.endpoint import Endpoint
 from pynetbox.core.response import Record
 
 # Configure logging
-logging.basicConfig(level = logging.INFO)
+#logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger(__name__)
 
 def read_data(nb_session: NetBoxApi) -> None:

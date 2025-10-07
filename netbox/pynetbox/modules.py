@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-Process modules for switches on NetBox platform using `pynetbox` library
+Process modules for switches on a NetBox platform using `pynetbox` library
 Main function, to import:
 
 - modules(nb_session, data):

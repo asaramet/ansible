@@ -18,6 +18,7 @@ from add_locations import add_locations
 from add_switches import add_switches
 from chassis import chassis
 from modules import modules
+from vlans import vlans
 
 # Configure logging
 logging.basicConfig(level = logging.INFO)
@@ -42,6 +43,9 @@ def update(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
 
     logger.info("-- Update/Add missing switch modules --")
     modules(nb_session, data)
+
+    logger.info("-- Synchronize VLANs --")
+    vlans(nb_session, data)
 
 if __name__ == '__main__':
     from pynetbox_functions import _main

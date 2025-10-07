@@ -66,11 +66,13 @@ sudo pacman -Syu python-pynetbox python-packaging
 - `extra_functions.py` - more functions used in multiple python scripts.
 - `json_functions_os_cx.py` - functions to return JSON objects for Aruba OS-CX switches.
 - `json_functions.py` - functions to return JSON objects for Aruba OS switches.
+- `modules.py` - process modules for switches on a NetBox platform using `pynetbox` library
 - `nb.py` - in house `pynetbox` API session initialization.
 - `pynetbox_functions.py` - project specific functions for `pynetbox` based apps.
 - `sort_data.py` - Sort collected running config files according to the switch type.
 - `std_functions.py` - standard functions used in multiple python scripts.
 - `update_data.py` - run yaml data collection scripts.
+- `vlans.py` - synchronize VLANs on a NetBox platform using `pynetbox` library
 - `yaml_aruba_os_cx.py` - Collect Aruba OS-CX devices data from config files and generate a yaml data file.
 - `yaml_aruba.py` - Collect Aruba OS devices data from config files and generate a yaml data file.
 - `yaml_cisco.py` - Collect Cisco devices data from config files and generate a yaml data file.
