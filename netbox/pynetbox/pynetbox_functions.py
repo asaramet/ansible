@@ -83,7 +83,12 @@ def _cache_devices(nb_session: NetBoxApi, device_names: List[str]) -> Dict[str, 
         Dictionary of device objects in the form of:
             hostname: device object
     """
-    devices = nb_session.dcim.devices.filter(name__in = device_names)
+    devices = nb_session.dcim.devices.filter(name = device_names)
+
+    # Extend search if nothing is found
+    if not devices:
+        devices = nb_session.dcim.devices.filter(name__in = device_names)
+
     return {device.name: device for device in devices}
 
 def _bulk_create(endpoint: Endpoint, payloads: List[Dict], kind: str) -> List:
@@ -332,7 +337,7 @@ def _debug(function: Callable, **kwargs) -> None:
     Debug NetBox API with custom session
     Args:
         function: debug function to execute, that must have:
-            nb_seession: pynetbox API session
+            nb_session: pynetbox API session
         as argument.
     """
     import argparse

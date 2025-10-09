@@ -12,7 +12,7 @@ from std_functions import serial_numbers, convert_interfaces_range
 from std_functions import get_os_version, get_hostname, get_device_role
 from std_functions import get_trunks, get_interface_names, get_vlans
 from std_functions import get_untagged_vlans, get_tagged_vlans, get_vlans_names, get_trunk_stack
-from std_functions import get_ip_address, get_modules, module_types_dict
+from std_functions import get_ip_address, get_modules
 from std_functions import module_types_dict, modules_interfaces
 from std_functions import convert_range
 
@@ -406,7 +406,8 @@ def modules_json(config_files):
             if module['stack'] != '0':
                 new_position = module['stack'] + '/' + module['module']
 
-            data['modules'].append({'device': module['hostname'], 'module_bay': module['module'], 'type': m_types[module['type'].lower()], 
+            data['modules'].append({'device': module['hostname'], 'module_bay': module['module'], 
+                'type': m_types[module['type'].lower()], 
                 'name': module['name'], 'new_position': new_position})
     return data
 
@@ -486,10 +487,10 @@ if __name__ == "__main__":
         #"/data/aruba-8-ports/",
         #"/data/aruba-12-ports/",
         # "/data/aruba-48-ports/"
-         "/data/hpe-8-ports/",
+        # "/data/hpe-8-ports/",
         # "/data/aruba-stack/"
-        #"/data/aruba-stack-2920/"
-         "/data/aruba-stack-2930/",
+        "/data/aruba-stack-2920/"
+        # "/data/aruba-stack-2930/",
         # "/data/aruba-modular/"
         # "/data/aruba-modular-stack/"
         # "/data/procurve-single/"
@@ -505,7 +506,7 @@ if __name__ == "__main__":
         print("\n Folder: ", data_folder)
 
 
-        debug_locations_json(data_folder)
+        #debug_locations_json(data_folder)
         #debug_devices_json(data_folder)
         #debug_device_interfaces_json(data_folder)
         #debug_trunks_json(data_folder)
@@ -517,4 +518,4 @@ if __name__ == "__main__":
 
         #debug_ip_addresses_json(data_folder)
 
-        #debug_modules_json(data_folder)
+        debug_modules_json(data_folder)
