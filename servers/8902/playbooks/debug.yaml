@@ -1,0 +1,19 @@
+---
+#
+# RUN:
+# ansible-playbook playbooks/debug.yaml -l <hosts>
+
+- name: Debuging
+  hosts: vm
+  gather_facts: false
+  tags: update
+  #become: true
+  tasks:
+    - name: Display variables on {{ inventory_hostname }}
+      debug:
+        msg: "{{ hostvars[inventory_hostname] }}"
+
+    - name: Display postfix aliases 
+      debug:
+        msg: "{{ postfix_aliases }}"
+...

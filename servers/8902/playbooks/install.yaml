@@ -1,0 +1,47 @@
+---
+# Install/update packages
+#
+# RUN:
+# ansible-playbook playbooks/install.yaml
+
+- name: Install/update packages
+  hosts: vm
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Update APT package cache 
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Update all packages 
+      ansible.builtin.apt:
+        upgrade: dist
+
+    - name: Remove unnecessary packages
+      ansible.builtin.apt:
+        autoremove: true
+
+    - name: Clean up APT cache
+      ansible.builtin.apt:
+        autoclean: true
+
+    - name: Get running kernel version
+      ansible.builtin.command: uname -r 
+      register: running_kernel
+      changed_when: false
+
+    - name: Get latest installed kernel version
+      ansible.builtin.shell: "dpkg --list | grep -E 'linux-image-[0-9]+' | awk '{print $2}' | sort -V | tail -n 1"
+      register: installed_kernel
+      changed_when: false
+
+    - name: Show kernels
+      debug:
+        msg: 
+          - "Running Kernel: linux-image-{{ running_kernel.stdout }}" 
+          - "Installed Kernel: {{ installed_kernel.stdout_lines }}"
+
+    - name: Reboot if a new kernel is installed
+      ansible.builtin.reboot:
+      when: "'linux-image-' + running_kernel.stdout not in installed_kernel.stdout_lines"
+...
