@@ -15,10 +15,9 @@ from typing import Dict, List
 from pynetbox.core.api import Api as NetBoxApi
 
 from std_functions import main_folder, floor_slug, room_slug
-from pynetbox_functions import load_yaml, _bulk_create, _delete_netbox_obj, _main
+from pynetbox_functions import load_yaml, _bulk_create, _delete_netbox_obj
 
-# Configure logging
-logging.basicConfig(level = logging.INFO)
+# Get logger
 logger = logging.getLogger(__name__)
 
 def add_locations(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
@@ -29,6 +28,11 @@ def add_locations(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
         nb_session: pynetbox API session
         data: Dictionary containing 'locations' list
     """
+    if not data.get('locations'):
+        logger.warning("'locations' dict not found in data")
+        logger.info("No new locations created.")
+        return
+
     nb_locations = nb_session.dcim.locations
     nb_sites = nb_session.dcim.sites   
     nb_racks = nb_session.dcim.racks
@@ -206,17 +210,25 @@ def debug_locations(nb_session: NetBoxApi, data: Dict) -> List:
     import yaml
     from sys import stdout
 
+    locations = data.get('locations')
+
+    if not locations:
+        logger.debug("'locations' dict not found in data")
+        return
+
     return_list = []
-    for location in data['locations']:
+    for location in locations:
         if not location['is_rack']:
             return_list.append(location)
 
-    yaml.dump(return_list, stdout)
+    yaml.dump(return_list, logger)
 
     return return_list
 
 if __name__ == '__main__':
+    from pynetbox_functions import _main, _debug
+
     _main("Add collected locations data to a NetBox server", add_locations)
     #_main("Delete collected locations data", delete_locations)
 
-    #_main("Debug locations data", debug_locations)
+    #_debug(debug_locations)

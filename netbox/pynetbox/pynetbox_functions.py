@@ -15,7 +15,6 @@ from pynetbox.core.endpoint import Endpoint
 from pynetbox.core.response import Record
 
 # Configure logging
-#logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger(__name__)
 
 def read_data(nb_session: NetBoxApi) -> None:
@@ -298,11 +297,12 @@ def _main(description: str, function: Callable, **kwargs) -> None:
     from std_functions import main_folder
     from nb import development, production
 
-
     # Disable warnings about self-signed certificates
     from urllib3 import disable_warnings, exceptions
     disable_warnings(exceptions.InsecureRequestWarning)
 
+    # Configure logging
+    logging.basicConfig(level = logging.INFO)
 
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
@@ -344,6 +344,8 @@ def _debug(function: Callable, **kwargs) -> None:
     from std_functions import main_folder
     from nb import development, production
 
+    # Set DEBUG logging output
+    logging.basicConfig(level = logging.DEBUG)
 
     # Disable warnings about self-signed certificates
     from urllib3 import disable_warnings, exceptions
@@ -365,4 +367,13 @@ def _debug(function: Callable, **kwargs) -> None:
         nb = production
 
     nb.http_session.verify = False # Disable SSL verification
-    function(nb, **kwargs)
+
+    files_yaml = [
+        "aruba_stack_2920.yaml"
+    ]
+
+    for file_name in files_yaml:
+        data_file_path = f"{main_folder}/data/yaml/{file_name}"
+        data = load_yaml(data_file_path)
+
+    function(nb, data, **kwargs)

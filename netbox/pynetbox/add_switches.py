@@ -14,11 +14,10 @@ import pynetbox, re, logging
 from pynetbox.core.api import Api as NetBoxApi
 from typing import Dict, List
 
-from pynetbox_functions import load_yaml, _bulk_create, _main
+from pynetbox_functions import load_yaml, _bulk_create
 from pynetbox_functions import _resolve_tags
 
-# Configure logging
-logging.basicConfig(level = logging.INFO)
+# Get logger
 logger = logging.getLogger(__name__)
 
 def cache_switches(nb_session: NetBoxApi, method: str = "role") -> Dict[str, List[str]]:
@@ -233,4 +232,6 @@ def add_switches(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List:
     return new_switches
             
 if __name__ == '__main__':
+    from pynetbox_functions import _main
+
     _main("Add switches to a NetBox server", add_switches)

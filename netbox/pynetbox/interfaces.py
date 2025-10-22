@@ -17,9 +17,7 @@ from pynetbox.core.api import Api as NetBoxApi
 from pynetbox_functions import _cache_devices, _bulk_create, _bulk_update
 from pynetbox_functions import _delete_netbox_obj, _get_device
 
-# Configure logging
-logging.basicConfig(level = logging.INFO)
-#logging.basicConfig(level = logging.DEBUG)
+# Get logging
 logger = logging.getLogger(__name__)
 
 def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
@@ -462,6 +460,7 @@ def trunks(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
     logger.info(f"Finished processing {len(trunk_interfaces)} trunk entries")
 
 if __name__ == '__main__':
-    from pynetbox_functions import _main
+    from pynetbox_functions import _main, _debug
     #_main("Synchronizing device interfaces", interfaces)
-    _main("Synchronizing device interfaces", trunks)
+    #_main("Synchronizing device interfaces", trunks)
+    _debug(trunks)

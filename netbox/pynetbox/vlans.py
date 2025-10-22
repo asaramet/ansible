@@ -16,9 +16,7 @@ from pynetbox.core.api import Api as NetBoxApi
 
 from pynetbox_functions import _bulk_create
 
-# Configure logging
-logging.basicConfig(level = logging.INFO)
-#logging.basicConfig(level = logging.DEBUG)
+# Get logger
 logger = logging.getLogger(__name__)
 
 def vlans(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
@@ -77,5 +75,8 @@ def vlans(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
     logger.info(f"Successfully created {len(created)} VLANs")
 
 if __name__ == '__main__':
-    from pynetbox_functions import _main
-    _main("Synchronizing VLANs", vlans)
+    from pynetbox_functions import _main, _debug
+
+    #_main("Synchronizing VLANs", vlans)
+
+    _debug(vlans)

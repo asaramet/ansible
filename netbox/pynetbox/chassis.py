@@ -15,10 +15,9 @@ from typing import Dict, List
 from pynetbox.core.api import Api as NetBoxApi
 
 from pynetbox_functions import _bulk_create, _bulk_update
-from pynetbox_functions import _main, _resolve_tags, _get_device
+from pynetbox_functions import _resolve_tags, _get_device
 
-# Configure logging
-logging.basicConfig(level = logging.INFO)
+# Get logger
 logger = logging.getLogger(__name__)
 
 def get_chassis(nb_session: NetBoxApi, master_name: str) -> NetBoxApi:
@@ -196,4 +195,6 @@ def chassis(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List[Dict[str,
     return devices_to_update
 
 if __name__ == '__main__':
+    from pynetbox_functions import _main
+
     _main("Processing chassis data on a NetBox server", chassis)

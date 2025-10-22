@@ -14,11 +14,10 @@ import pynetbox, logging
 from typing import Dict, List, Tuple, Optional
 from pynetbox.core.api import Api as NetBoxApi
 
-from pynetbox_functions import _bulk_create, _bulk_update, _main
+from pynetbox_functions import _bulk_create, _bulk_update
 from pynetbox_functions import _manufacturer, _cache_devices, _extract_stack_number
 
-# Configure logging
-logging.basicConfig(level = logging.INFO)
+# Get logger
 logger = logging.getLogger(__name__)
 
 def switch_modules(nb_session: NetBoxApi, type_names: List[str]) -> Dict[str, object]:
@@ -480,12 +479,14 @@ def modules(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List[Dict[str,
     return results
 
 #---- Debugging ----#
-def show_module_on_device(nb_session: NetBoxApi):
-    device_id = 587
+def show_module_on_device(nb_session: NetBoxApi, data = None):
+
+    device_id = 588
     ic_name = "1/A"
     logger.info(f"Debugging '{ic_name}'s interfaces on the device with ID {device_id}")
 
     debug_device = nb_session.dcim.devices.get(device_id)
+    logger.debug(debug_device)
     if debug_device:
         logger.info(f"Device: {debug_device.name}")
         interfaces = nb_session.dcim.interfaces.filter(device_id = device_id, name__ic = ic_name)
@@ -494,8 +495,8 @@ def show_module_on_device(nb_session: NetBoxApi):
 
 
 if __name__ == '__main__':
-    _main("Processing modules data on a NetBox server", modules)
+    from pynetbox_functions import _main, _debug
+    #_main("Processing modules data on a NetBox server", modules)
 
     # Debug
-    #from pynetbox_functions import _debug
-    #_debug(show_module_on_device)
+    _debug(show_module_on_device)

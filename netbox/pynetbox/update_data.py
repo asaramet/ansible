@@ -19,6 +19,7 @@ from add_switches import add_switches
 from chassis import chassis
 from modules import modules
 from vlans import vlans
+from interfaces import interfaces, trunks
 
 # Configure logging
 logging.basicConfig(level = logging.INFO)
@@ -46,6 +47,12 @@ def update(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
 
     logger.info("-- Synchronize VLANs --")
     vlans(nb_session, data)
+
+    logger.info("-- Update interfaces --")
+    interfaces(nb_session, data)
+
+    logger.info("-- Synchronize LAG interfaces--")
+    trunks(nb_session, data)
 
 if __name__ == '__main__':
     from pynetbox_functions import _main
