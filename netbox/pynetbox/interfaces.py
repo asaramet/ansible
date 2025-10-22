@@ -14,11 +14,12 @@ import pynetbox, logging
 from typing import Dict, List
 from pynetbox.core.api import Api as NetBoxApi
 
-from pynetbox_functions import _cache_devices, _bulk_create, _bulk_update, _delete_netbox_obj
+from pynetbox_functions import _cache_devices, _bulk_create, _bulk_update
+from pynetbox_functions import _delete_netbox_obj, _get_device
 
 # Configure logging
-#logging.basicConfig(level = logging.INFO)
-logging.basicConfig(level = logging.DEBUG)
+logging.basicConfig(level = logging.INFO)
+#logging.basicConfig(level = logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
@@ -204,7 +205,7 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
         _bulk_create(
             nb_session.dcim.interfaces,
             interfaces_to_create,
-            f"interfaces(s)"
+            "interfaces(s)"
         )
 
     # Bulk update existing interfaces
@@ -213,7 +214,7 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
         _bulk_update(
             nb_session.dcim.interfaces,
             interfaces_to_update,
-            f"interfaces(s)"
+            "interfaces(s)"
         )
 
     # Delete obsolete non-stacked interfaces
@@ -248,16 +249,67 @@ def trunks(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
     cached_devices = _cache_devices(nb_session, device_names)
     logger.info(f"Processing {len(trunk_interfaces)} LAG interfaces for {len(cached_devices)} devices")
 
+    # Build a mapping of stack members to master devices
+    # For virtual chassis, stack members like rsww1000sp-2 should map to master rsww1000sp
+    device_mapping = {} # maps hostname -> actual device to use
+    master_devices = {} # maps master hostname -> device object
+
+    for hostname in device_names:
+        device = cached_devices.get(hostname)
+
+        if device:
+            # Device exists as-is
+            device_mapping[hostname] = device
+            master_devices[hostname] = device
+        else:
+            # Device not found - might to be a stack member, try to find master
+            # Extract potential master name (e.g., rgww1000sp-1 -> rgww1000sp)
+            if '-' in hostname:
+                potential_master = hostname.rsplit('-', 1)[0]
+                master_device = cached_devices.get(potential_master)
+
+                if not master_device:
+                    # Try fetching the master device
+                    master_device = _get_device(nb_session, potential_master)
+
+                if master_device:
+                    logger.info(
+                        f"Device {hostname} not found, using master device {potential_master} "
+                        f"(virtual chassis/stack configuration)"
+                    )
+                    device_mapping[hostname] = master_device
+                    master_devices[potential_master] = master_device
+                    # Cache for future lookups
+                    cached_devices[potential_master] = master_device
+                else:
+                    logger.warning(f"Neither {hostname} nor master {potential_master} found in NetBox")
+            else:
+                logger.warning(f"Device {hostname} not found in NetBox")
+
     # Cache all existing interfaces at once
     cached_interfaces, cached_lags = {}, {}
     nr_interfaces, nr_lags = 0, 0
 
-    for hostname, device in cached_devices.items():
+    nb_interfaces = nb_session.dcim.interfaces
+
+    for hostname, device in master_devices.items():
         try:
-            d_interfaces = {
-                intf.name: intf 
-                for intf in nb_session.dcim.interfaces.filter(device_id = device.id)
-            }
+            # Fetch all interfaces - convert to list to ensure full iteration
+            all_intf = list(nb_interfaces.filter(device_id = device.id))
+                        # Also check for virtual chassis members and fetch their interfaces
+            # In a stack, interfaces from all members should be accessible from master
+            if hasattr(device, 'virtual_chassis') and device.virtual_chassis:
+                # Get all devices in the virtual chassis
+                vc_id = device.virtual_chassis.id
+                vc_members = nb_session.dcim.devices.filter(virtual_chassis_id = vc_id)
+
+                for member in vc_members:
+                    if member.id != device.id: # Don't fetch the master again
+                        member_intfs = list(nb_interfaces.filter(device_id = member.id))
+                        all_intf.extend(member_intfs)
+                        logger.info(f"Added {len(member_intfs)} interfaces from VC member {member.name}")
+
+            d_interfaces = {intf.name: intf for intf in all_intf}
             cached_interfaces[hostname] = d_interfaces
             nr_interfaces += len(d_interfaces)
 
@@ -269,14 +321,145 @@ def trunks(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
                    (hasattr(intf.type, 'label') and 'LAG' in intf.type.label)
             }
             nr_lags += len(cached_lags[hostname])
+
+            # Debug: show interface count per stack
+            stack_counts = {}
+            for intf_name in d_interfaces.keys():
+                if '/' in intf_name:
+                    stack_num = intf_name.split('/')[0]
+                    stack_counts[stack_num] = stack_counts.get(stack_num, 0) + 1
+            if stack_counts:
+                logger.info(f"Interface distribution for {hostname}: {stack_counts}")
         except Exception as e:
             logger.error(f"Error fetching interfaces for {hostname}: {e}")
             cached_interfaces[hostname] = {}
             cached_lags[hostname] = {}
 
-    logger.info(f"Found {nr_lags} LAG interfaces in {nr_interfaces} total")
+    logger.info(f"Cached {nr_interfaces} total interfaces including {nr_lags} LAGs")
 
-    # Group by device and trunk
+    # Group by actual device (master) and trunk
+    trunks_by_device = {}
+    for item in trunk_interfaces:
+        hostname = item.get('hostname')
+        trunk_name = item.get('trunk_name')
+
+        # Get the actual device (master in virtual chassis)
+        actual_device = device_mapping.get(hostname)
+        if not actual_device:
+            continue
+
+        # Use master device name as key
+        master_hostname = actual_device.name
+
+        if master_hostname not in trunks_by_device:
+            trunks_by_device[master_hostname] = {}
+        if trunk_name not in trunks_by_device.get(master_hostname):
+            trunks_by_device[master_hostname][trunk_name] = []
+
+        trunks_by_device[master_hostname][trunk_name].append(item.get('interface'))
+
+    # Collect interfaces to bulk process   
+    lags_to_create = []
+    interfaces_to_update = []
+
+    # Process each device
+    for hostname, trunks_dict in trunks_by_device.items():
+        device = master_devices.get(hostname)
+        if not device:
+            logger.warning(f"Device {hostname} not found in NetBox, skipping trunks")
+            continue
+
+        all_interfaces = cached_interfaces.get(hostname, {})
+        existing_lags = cached_lags.get(hostname, {})
+
+        for trunk_name, member_interfaces in trunks_dict.items():
+            lag = existing_lags.get(trunk_name)
+
+            # Create LAG if it doesn't exist
+            if not lag:
+                lag_payload = {
+                    'device': device.id,
+                    'name': trunk_name,
+                    'type': 'lag',
+                    'description': f"Link Aggregation Group {trunk_name}"
+                }
+                lags_to_create.append(lag_payload)
+                logger.info(f"Will create LAG {trunk_name} on {hostname}")
+
+            # Process member interfaces
+            for member_name in member_interfaces:
+                member_name_clean = member_name.strip()
+                member_intf = all_interfaces.get(member_name_clean)
+
+                if not member_intf:
+                    # Debug: show what interfaces we do have
+                    available_interfaces = sorted([name for name in all_interfaces.keys() if '/' in name])
+                    logger.warning(
+                        f"Member interfaces {member_name} not found on {hostname}, "
+                        f"create if first before adding in {trunk_name}. "
+                        f"Available stacked interfaces: {available_interfaces}"
+                    )
+                    continue
+                
+                # Check if already in the correct LAG
+                current_lag = getattr(member_intf, 'lag', None)
+                if current_lag and hasattr(current_lag, 'name') and current_lag.name == trunk_name:
+                    logger.debug(f"Interface {member_name} already in {trunk_name}")
+                    continue
+                
+                # Will update after LAG creation
+                interfaces_to_update.append({
+                    'interface_id': member_intf.id,
+                    'trunk_name': trunk_name,
+                    'member_name': member_name,
+                    'hostname': hostname
+                })
+    # Bulk create LAGs across all devices
+    if lags_to_create:
+        created_lags = _bulk_create(
+            nb_interfaces,
+            lags_to_create,
+            "LAG interface(s)"
+        )
+
+        # Refresh LAG cache for this device after creation
+        for hostname, device in master_devices.items():
+            try:
+                all_intf = list(nb_interfaces.filter(device_id = device.id))
+                d_interfaces = {intf.name: intf for intf in all_intf}
+                cached_lags[hostname] = {
+                    name: intf 
+                    for name, intf in all_interfaces.items()
+                    if (hasattr(intf.type, 'value') and intf.type.value == 'lag') or 
+                    (hasattr(intf.type, 'label') and 'LAG' in intf.type.label)
+                }
+            except Exception as e:
+                logger.error(f"Error refreshing LAGs for {hostname}: {e}")
+        
+    # Update member interfaces to join LAGs
+    member_updates = []
+    for update_info in interfaces_to_update:
+        hostname = update_info['hostname']
+        trunk_name = update_info.get('trunk_name')
+
+        lag = cached_lags.get(hostname, {}).get(trunk_name)
+        if not lag:
+            logger.error(f"LAG {trunk_name} not found on {hostname} after creation attempt")
+            continue
+        
+        member_updates.append({
+            'id': update_info.get('interface_id'),
+            'lag': lag.id
+        })
+
+    if member_updates:
+        _bulk_update(
+            nb_interfaces,
+            member_updates,
+            "trunk member interface(s)"
+        )
+    
+    logger.info(f"Finished processing {len(trunk_interfaces)} trunk entries")
 
 if __name__ == '__main__':
     from pynetbox_functions import _main
