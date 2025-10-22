@@ -21,8 +21,7 @@ from modules import modules
 from vlans import vlans
 from interfaces import interfaces, trunks
 
-# Configure logging
-logging.basicConfig(level = logging.INFO)
+# Get logger
 logger = logging.getLogger(__name__)
 
 def update(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
