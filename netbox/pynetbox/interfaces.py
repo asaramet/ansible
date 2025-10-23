@@ -11,7 +11,7 @@ Main function, to import:
 
 import pynetbox, logging
 
-from typing import Dict, List
+from typing import Dict, List, Set
 from pynetbox.core.api import Api as NetBoxApi
 
 from pynetbox_functions import _cache_devices, _bulk_create, _bulk_update
@@ -19,6 +19,29 @@ from pynetbox_functions import _delete_netbox_obj, _get_device
 
 # Get logging
 logger = logging.getLogger(__name__)
+
+def collect_stack_interfaces(intf_name: str, intf_obj: object,
+    stack_numbers: Set[str], interface_list: List[Dict[str, str]]) -> List:
+    """
+    Return a list of interface objects if given interface name 
+    exist as a stacked interface in a switch stack
+    Args:
+        intf_name: Default interface name
+        intf_obj: NetBox interface object
+        stack_numbers: Lost of stacks members numbers
+        interface_list: List of interfaces dictionaries
+    Return:
+        A list of interface objects if they exist in the given switch stack
+    """
+
+    collected_interfaces = []
+
+    for stack_num in stack_numbers:
+        stacked_equivalent = f"{stack_num}/{intf_name}"
+        if stacked_equivalent in [item.get('interface') for item in interface_list]:
+            # Mark for deletion
+            collected_interfaces.append(intf_obj)
+    return collected_interfaces
 
 def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
     """
@@ -70,18 +93,40 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
 
     logger.info(f"Fetched total of {len(cached_vlans)} VLANs")
 
+    nb_interfaces = nb_session.dcim.interfaces
+
     # Cache all existing interfaces for requested devices 
     cached_interfaces = {}
+    cached_modules = {} # Cache modules for each device
+
     for hostname, device in cached_devices.items():
         try:
             existing_interfaces = {
                 intf.name: intf
-                for intf in nb_session.dcim.interfaces.filter(device_id = device.id)
+                for intf in nb_interfaces.filter(device_id = device.id)
             }
             cached_interfaces[hostname] = existing_interfaces
+
+            # Fetch device modules and their interfaces
+            modules = list(nb_session.dcim.modules.filter(device_id = device.id))
+            cached_modules[hostname] = {}
+
+            for module in modules:
+                module_interfaces = {
+                    intf.name: intf 
+                    for intf in nb_interfaces.filter(module_id = module.id)
+                }
+                cached_modules[hostname][module.id] = {
+                    'module': module,
+                    'interfaces': module_interfaces
+                }
+                # Also add module interfaces to the main interface cache for lookup
+                existing_interfaces.update(module_interfaces)
+
         except Exception as e:
-            logger.error(f"Error fetching interfaces for {hostname}: {e}")
+            logger.error(f"Error fetching interfaces/modules for {hostname}: {e}")
             cached_interfaces[hostname] = {}
+            cached_modules[hostname] = {}
 
     # Group interface by device for efficient processing
     interfaces_by_device = {}
@@ -119,19 +164,25 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
 
             # Find interfaces without stack numbers that should be deleted
             for intf_name, intf_obj in existing_interfaces.items():
+                # Skip it it's a module interface (will be handled separately)
+                if hasattr(intf_obj, 'module') and intf_obj.module:
+                    continue
+
                 # Check if it's a numeric-only interface (e.g., '1', '48')
                 if intf_name.isdigit():
-                    # Check if there is a corresponding stacked interface for any stack
-                    for stack_num in stack_numbers:
-                        stacked_equivalent = f"{stack_num}/{intf_name}"
-                        if stacked_equivalent in [item.get('interface') for item in interface_list]:
-                            # Mark for deletion
-                            interfaces_to_delete.append(intf_obj)
-                            logger.info(
-                                f"Will delete non-stacked interface '{intf_name}' on {hostname} "
-                                f"(stacked interface '{stacked_equivalent}' exists)"
-                            )
-                            break
+                    # Check if there is a corresponding stacked interface for any stack and add it 
+                    interfaces_to_delete += collect_stack_interfaces(intf_name, intf_obj, stack_numbers, interface_list)
+
+            # Handle module interfaces - delete non-stacked module interfaces
+            for module_id, module_data in cached_modules.get(hostname, {}).items():
+                module_interfaces = module_data['interfaces']
+
+                for intf_name, intf_obj in module_interfaces.items():
+                    # Check if it's a non-stacked module interface (e.g., "A1", "A2")
+                    if '/' not in intf_name:
+                        # Append them to the delete list
+                        interfaces_to_delete += collect_stack_interfaces(
+                            intf_name, intf_obj, stack_numbers, interface_list)
 
         for item in interface_list:
             interface_name = item.get('interface')
@@ -145,6 +196,30 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
                     f"on device {hostname}. Skipping this interface."
                 )
                 continue 
+
+            # Determine if this is a module interface (e.g. 1/A1, 2/A2)
+            # Module interfaces have non-numeric port numbers
+            is_module_interface = False
+            module_id = None
+
+            if '/' in interface_name:
+                stack_num, port_num = interface_name.split('/', 1)
+                # If port number is not numeric, it's likely a module interface
+                if not port_num.isdigit():
+                    is_module_interface = True
+                    # Try to find the module for this stack member
+                    # Look for modules on this device
+                    modules_list = list(cached_modules.get(hostname, {}).items())
+                    if modules_list:
+                        # Use the first available module
+                        # TODO: Match by module position or other attributes
+                        module_id = modules_list[0][0]
+                        logger.debug(f"Assigning module interface {interface_name} to module ID {module_id}")
+                    else:
+                        logger.warning(
+                            f"No module found for module interface {interface_name} on {hostname}. "
+                            "It will be created as a device interface instead."
+                        )
 
             # Resolve VLAN if provided
             vlan_id = None
@@ -168,6 +243,11 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
                 'type': i_type,
                 'description': item.get('name', '')
             }
+
+            # Set device or module
+            if is_module_interface and module_id:
+                payload['module'] = module_id
+
             # Add optional fields
             if 'poe_mode' in item:
                 payload['poe_mode'] = item.get('poe_mode')
@@ -189,31 +269,34 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
                 # Ensure no tagged VLANs on access ports
                 payload['tagged_vlans'] = []
 
+            # Update existing interface
             if existing_intf:
-                # Update existing interface
-                payload['id'] = existing_intf.id
-                interfaces_to_update.append(payload)
+                # Check if it's needed to move from device to module or vice versa
+                existing_is_module = hasattr(existing_intf, 'module') and existing_intf.module
+
+                if is_module_interface and module_id and not existing_is_module:
+                    # Need to delete old device/module interface and create new module/device interface
+                    interfaces_to_delete.append(existing_intf)
+                    interfaces_to_create.append(payload)
+                    logger.info(
+                        f"Will recreate interface {interface_name} on {hostname} "
+                        "as module interface (was device interface)"
+                    )
+                elif not is_module_interface and existing_is_module:
+                    # Need to delete old module interface and create new device interface
+                    interfaces_to_delete.append(existing_intf)
+                    interfaces_to_create.append(payload)
+                    logger.info(
+                        f"Will recreate interface {interface_name} on {hostname} "
+                        "as device interface (was module interface)"
+                    )
+                else:
+                    # Same type, just update
+                    payload['id'] = existing_intf.id
+                    interfaces_to_update.append(payload)
             else:
                 # Create new interface
                 interfaces_to_create.append(payload)
-
-    # Bulk create new interfaces
-    if interfaces_to_create:
-        logger.info(f"Bulk create {len(interfaces_to_create)} interfaces")
-        _bulk_create(
-            nb_session.dcim.interfaces,
-            interfaces_to_create,
-            "interfaces(s)"
-        )
-
-    # Bulk update existing interfaces
-    if interfaces_to_update:
-        logger.info(f"Bulk update {len(interfaces_to_update)} interfaces")
-        _bulk_update(
-            nb_session.dcim.interfaces,
-            interfaces_to_update,
-            "interfaces(s)"
-        )
 
     # Delete obsolete non-stacked interfaces
     if interfaces_to_delete:
@@ -223,7 +306,30 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
                 nr_deleted += 1
         logger.info(f"Deleted {nr_deleted} obsolete non-stacked interface(s)")
 
+    # Bulk create new interfaces
+    if interfaces_to_create:
+        logger.info(f"Bulk create {len(interfaces_to_create)} interfaces")
+        _bulk_create(
+            nb_interfaces,
+            interfaces_to_create,
+            "interfaces(s)"
+        )
+
+    # Bulk update existing interfaces
+    if interfaces_to_update:
+        logger.info(f"Bulk update {len(interfaces_to_update)} interfaces")
+        _bulk_update(
+            nb_interfaces,
+            interfaces_to_update,
+            "interfaces(s)"
+        )
+
     logger.info(f"Finished processing {len(device_interfaces)} interface entries")
+
+    # Debug section
+    #logger.debug(f"\n==++ Interfaces to delete: {interfaces_to_delete}\n")
+    #logger.debug(f"\n==++ Interfaces to update: {interfaces_to_update}\n")
+
 
 def trunks(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
     """
@@ -463,4 +569,5 @@ if __name__ == '__main__':
     from pynetbox_functions import _main, _debug
     #_main("Synchronizing device interfaces", interfaces)
     #_main("Synchronizing device interfaces", trunks)
-    _debug(trunks)
+    _debug(interfaces)
+    #_debug(trunks)

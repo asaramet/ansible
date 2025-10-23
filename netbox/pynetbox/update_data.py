@@ -51,7 +51,7 @@ def update(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
     interfaces(nb_session, data)
 
     logger.info("-- Synchronize LAG interfaces--")
-    trunks(nb_session, data)
+    #trunks(nb_session, data)
 
 if __name__ == '__main__':
     from pynetbox_functions import _main
