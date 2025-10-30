@@ -36,7 +36,7 @@ def update(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
     #add_locations(nb_session, data)
 
     logger.info("-- Update/Add switches data --")
-    add_switches(nb_session, data)
+    switches(nb_session, data)
 
     logger.info("-- Update/Add chassis --")
     chassis(nb_session, data)

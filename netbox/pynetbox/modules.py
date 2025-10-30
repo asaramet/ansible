@@ -23,9 +23,11 @@ logger = logging.getLogger(__name__)
 def switch_modules(nb_session: NetBoxApi, type_names: List[str]) -> Dict[str, object]:
     """
     Get existing module types and create the missing ones.
+
     Args:
         nb_session: pynetbox API session
         type_names: List of module type names 
+
     Returns:
         Dictionary of module type name to object
     """
@@ -62,14 +64,140 @@ def switch_modules(nb_session: NetBoxApi, type_names: List[str]) -> Dict[str, ob
 
     return types_dict
 
+def cleanup_module_interfaces(nb_session: NetBoxApi, device: object, module_bay: object, module_type: object) -> Tuple[List[str], List[str]]:
+    """
+    Find and delete interfaces that should belong to a module but are currently on the device.
+
+    Args:
+        nb_session: pynetbox API session
+        device: Device object
+        module_bay: Module bay object where module will be installed
+        module_type: Module type that will be installed
+
+    Returns: 
+        Tuple of (deleted_interfaces, errors)
+    """
+    deleted, errors = [], []
+
+    try:
+        # Get interface templates fot this module type
+        interface_templates = list(nb_session.dcim.interface_templates.filter(module_type_id = module_type.id))
+
+        if not interface_templates:
+            logger.debug(f"No interface templates for module type {module_type.model}")
+            return deleted, errors
+        
+        # Get bay position to construct expected interface names
+        bay_position = getattr(module_bay, 'position', None) or getattr(module_bay, 'name', '')
+
+        # Build list of interface names that should be on the module
+        expected_interface_names = []
+        for template in interface_templates:
+            # Interface name format: {bay_position}-{template_name}
+            # e.g., "1/A" + "1" = "1/A1"
+            interface_name = f"{bay_position}{template.name}"
+            expected_interface_names.append(interface_name)
+
+        if not expected_interface_names:
+            return deleted, errors
+
+        logger.info(f"Checking for orphaned interfaces on device {device.name}: {expected_interface_names}")
+
+        # Find these interfaces on the device (not on any module)
+        for iface_name in expected_interface_names:
+            try:
+                # Get interface by name on this device
+                existing_interface = nb_session.dcim.interfaces.get(device_id = device.id, name = iface_name)
+
+                if existing_iface:
+                    # Check if it's on a module already
+                    if hasattr(existing_interface, 'module') and existing_interface.module:
+                        logger.debug(f"Interface {iface_name} already belongs to module {existing_interface.module.id}, skipping")
+                        continue
+
+                    # This interface exists on the device but not on a module | Delete it
+                    logger.warning(f"Deleting orphaned interface {iface_name} from device {device.name} (will be recreated on module)")
+                    existing_interface.delete()
+                    deleted.append(iface_name)
+
+            except Exception as e:
+                error_msg = f"Failed to delete {iface_name}: {str(e)}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+
+        if deleted:
+            logger.info(f"Deleted {len(deleted)} orphaned interface(s) from device {device.name}: {deleted}")
+
+        return deleted, errors
+
+    except Exception as e:
+        logger.error(f"Error during interface cleanup: {e}", exc_info = True)
+        return deleted, [str(e)]
+
+def check_module_interface_conflicts(nb_session: NetBoxApi, device: object, module_type: object, module_bay: object) -> bool:
+    """
+    Check if creating a module would cause interface name conflicts.
+
+    Args:
+        nb_session: pynetbox API session
+        device: Device object
+        module_type: Module type object
+        module_bay: Module bay object
+
+    Returns:
+        True if conflict exist, False otherwise
+    """
+    try:
+        # Get interface templates for this module type
+        interface_templates = list(nb_session.dcim.interface_templates.filter(module_type_id = module_type.id))
+
+        if not interface_templates:
+            # No interface templates, no conflicts
+            return False
+
+        # Get existing interfaces on the device
+        existing_interfaces = {iface.name for iface in nb_session.dcim.interfaces.filter(device_id = device.id)}
+
+        # Check if any template interface names would conflict
+        bay_position = getattr(module_bay, 'position', None) or getattr(module_bay, 'name', '')
+
+        conflicts = []
+        for template in interface_templates:
+            # NetBox will generate interface names based on bay postion + template name
+            # For example: bay position "1/A" + template name "1" = interface name "1/A1"
+            potential_name = f"{bay_position}{template.name}"
+
+            if potential_name in existing_interfaces:
+                conflicts.append(potential_name)
+                logger.warning(f"Interface conflict detected: {potential_name} already exists on {device.name}")
+
+                # Check if this interface belongs to a module already
+                existing_iface = existing_interfaces[potential_name]
+                if hasattr(existing_iface, 'module') and existing_iface.module:
+                    logger.warning(f"\tInterface {potential_name} belongs to module ID {existing_iface.module.id}")
+        
+        if conflicts:
+            logger.warning(f"Found {len(conflicts)} interface conflicts for module type {module_type.model} in bay {bay_position}: {conflicts}")
+            return True
+
+        return False
+
+    except Exception as e:
+        logger.error(f"Error checking interface conflicts: {e}", exc_info = True)
+        # On error assume conflicts exist
+        return True
+
 def get_module_bay(nb_session: NetBoxApi, device: object, bay_name: str, stack_number: str = None) -> Optional[object]:
     """
-    Get module bay 
+    Get module bay for both stacked and single switches.
+    Prioritizes properly named bays ({hostname}-{bay}) over default template bays.
+
     Args:
         nb_session: pynetbox API session
         device: Device object
         bay_name: Original bay name (e.g., "A")
-        stack_number: Stack number (e.g, "1")
+        stack_number: Stack number (e.g, "1"), optional for single switches
+
     Returns:
         Module bay object or None
     """
@@ -77,50 +205,60 @@ def get_module_bay(nb_session: NetBoxApi, device: object, bay_name: str, stack_n
     device_name = device.name
     nb_module_bays = nb_session.dcim.module_bays
 
+    # Try multiple naming patterns
     try:
-        # Try multiple naming patterns
-        possible_names = [
-            bay_name,
-            f"{device_name}-{bay_name}", # rsgw0001-1-A
-            f"{stack_number}/{bay_name}" if stack_number else f"Module {bay_name}",
-            "Uplink"
+        # Priority 1: Properly named bay with hostname prefix (e.g., "swgr1001u-1-A")
+        specific_bay_name = f"{device_name}-{bay_name}"
+        module_bay = nb_module_bays.get(device_id = device_id, name = specific_bay_name)
+        if module_bay:
+            logger.debug(f"Found module bay by specific name: {specific_bay_name}")
+            return module_bay
+
+
+        # Priority 2: Try by position (e.g., "1/A" or "2/A")
+        if stack_number:
+            position_name = f"{stack_number}/{bay_name}"
+            module_bay = nb_module_bays.get(device_id = device_id, position = position_name)
+            if module_bay:
+                logger.debug(f"Found module bay by position: {position_name} for {device_name}")
+                return module_bay
+
+            # Also try by label
+            module_bay = nb_module_bays.get(device_id = device_id, label = position_name)
+            if module_bay:
+                logger.debug(f"Found module bay by label: {position_name} for {device_name}")
+                return module_bay
+
+
+        # Priority 3: Generic name patterns (fallback only)
+        fallback_names = [
+            bay_name,               # Simple "A"
+            f"Module {bay_name}",   # "Module A"
+            "Uplink"                # Special case
         ]
 
-        possible_positions = [bay_name]
-        if stack_number:
-            possible_positions.append(f"{stack_number}/{bay_name}")
-
-        # Try to find by name
-        for name in possible_names:
+        for name in fallback_names:
             module_bay = nb_module_bays.get(device_id = device_id, name = name)
-            if module_bay: return module_bay
+            if module_bay: 
+                logger.warning(f"Found module bay by fallback name '{name}' for {device_name}" +
+                    f" This is a default template bay, consider renaming to {specific_bay_name}")
+                return module_bay
 
-        # If not found by name, try searching by position (e.g., '1/A')
-        for position in possible_positions:
-            module_bay = nb_module_bays.get(device_id = device_id, position = position)
-            if module_bay: return module_bay
-
-        # If still not found, try searching by label
-        for label in possible_positions:
-            module_bay = nb_module_bays.get(device_id = device_id, label = label)
-            if module_bay: return module_bay
-
-        # Last resort: search all module bays for this device and match by description or name pattern
+        # Priority 4: Search all module bays and match by patterns
         all_bays = nb_module_bays.filter(device_id = device_id)
         for bay in all_bays:
             # Check various name patterns
-            if (bay.name and (
-                bay.name == bay_name or 
-                bay.name == f"{device_name}-{bay_name}" or 
-                bay.name.endswith(f"-{bay_name}")
-            )):
+            if (bay.name and bay.name.endswith(f"-{bay_name}")):
+                logger.debug(f"Found module bay by pattern match: {bay.name}")
                 return bay
             
             # Check by description pattern
             if (hasattr(bay, 'description') and bay.description and 
                 f"Module {bay_name}" in bay.description):
+                logger.debug(f"Found module bay by description: {bay.name}")
                 return bay
 
+        logger.debug(f"No module bay found for device {device_name}, bay {bay_name}")
         return None
 
     except Exception as e:
@@ -130,12 +268,14 @@ def get_module_bay(nb_session: NetBoxApi, device: object, bay_name: str, stack_n
 def create_module_bay(nb_session: NetBoxApi, device: object, bay_name: str, stack_number: str = None, new_position: str = None) -> Optional[object]:
     """
     Create or update module bay
+
     Args:
         nb_session: pynetbox API session
         device: Device object
         bay_name: Original bay name (e.g., "A")
         stack_number: Stack number (e.g., "1")
         new_position: Target position (e.g., "1/A")
+
     Returns:
         Module bay object or None
     """
@@ -168,63 +308,14 @@ def create_module_bay(nb_session: NetBoxApi, device: object, bay_name: str, stac
 
         return get_module_bay(nb_session, device, bay_name, stack_number)
 
-def check_module_interface_conflicts(nb_session: NetBoxApi, device: object, module_type: object, module_bay: object) -> bool:
-    """
-    Check if creating a module would cause interface name conflicts.
-    Args:
-        nb_session: pynetbox API session
-        device: Device object
-        module_type: Module type object
-        module_bay: Module bay object
-    Returns:
-        True if conflict exist, False otherwise
-    """
-    try:
-        # Get interface templates for this module type
-        interface_templates = nb_session.dcim.interface_templates.filter(module_type_id = module_type.id)
-
-        if not interface_templates:
-            # No interface templates, no conflicts
-            return False
-
-        # Get existing interfaces on the device
-        existing_interfaces = {iface.name for iface in nb_session.dcim.interfaces.filter(device_id = device.id)}
-
-        # Check if any template interface names would conflict
-        bay_position = getattr(module_bay, 'position', None) or getattr(module_bay, 'name', '')
-
-        conflicts = []
-        for template in interface_templates:
-            # NetBox will generate interface names based on bay postion + template name
-            # For example: bay position "1/A" + template name "1" = interface name "1/A1"
-            potential_name = f"{bay_position}-{template.name}"
-
-            if potential_name in existing_interfaces:
-                conflicts.append(potential_name)
-                logger.debug(f"Interface conflict detected: {potential_name} already exists")
-
-                # Check if this interface belongs to a module already
-                existing_iface = existing_interfaces[potential_name]
-                if hasattr(existing_iface, 'module') and existing_iface.module:
-                    logger.warning(f"\tInterface {potential_name} belongs to module ID {existing_iface.module.id}")
-        
-        if conflicts:
-            logger.warning(f"Found {len(conflicts)} interface conflicts for module type {module_type.model} in bay {bay_position}: {conflicts}")
-            return True
-
-        return False
-
-    except Exception as e:
-        logger.error(f"Error checking interface conflicts: {e}", exc_info = True)
-        # On error assume conflicts exist
-        return True
-
 def prepare_module_payloads(nb_session: NetBoxApi, modules_data: List[Dict[str, str]]) -> Tuple[List[Dict], List[Dict], List[Dict]]:
     """
     Prepare payloads for bulk create and update operations.
+
     Args:
         nb_session: pynetbox API session
         modules_data: List of module data dictionaries
+
     Returns:
         Tuple of payloads to (create, update, errors)
     """
@@ -239,7 +330,7 @@ def prepare_module_payloads(nb_session: NetBoxApi, modules_data: List[Dict[str, 
 
     logger.info(f"Processing {len(modules_data)} modules for {len(device_names)} devices")
 
-    # Fetch devices in bulk.
+    # Fetch devices in bulk
     devices_dict = _cache_devices(nb_session, device_names)
     logger.info(f"Found {len(devices_dict)} devices out of {len(set(device_names))} requested")
 
@@ -303,7 +394,6 @@ def prepare_module_payloads(nb_session: NetBoxApi, modules_data: List[Dict[str, 
                 logger.info(f"Module bay {module_bay_name} not found, attempting to create for switch {device_name}")
                 module_bay = create_module_bay(nb_session, device, module_bay_name, stack_number, new_position)
 
-
             if not module_bay:
                 errors.append({
                     'device': device_name,
@@ -322,6 +412,12 @@ def prepare_module_payloads(nb_session: NetBoxApi, modules_data: List[Dict[str, 
                 same_type_modules = list(nb_modules.filter(device_id = device.id, module_type_id = module_type.id))
                 if same_type_modules:
                     logger.info(f"Found {len(same_type_modules)} module(s) of type {module_type_name} on device {device_name} in other bays")
+                    # Check if any of these modules are in the bay we're trying to use
+                    for mod in same_type_modules:
+                        if hasattr(mod, 'module_bay') and mod.module_bay and mod.module_bay.id == module_bay.id:
+                            logger.warning(f"Module already exists in bay {module_bay_name}, using existing module ID {mod.id}")
+                            existing_modules_list = [mod]
+                            break
 
             if len(existing_modules_list) > 1:
                 logger.warning(f"Found {len(existing_modules_list)} modules in bay {module_bay_name} (ID: {module_bay.id}) for device {device_name}")
@@ -381,10 +477,12 @@ def prepare_module_payloads(nb_session: NetBoxApi, modules_data: List[Dict[str, 
                         'message': f"Module in bay {module_bay_name} already up to date"
                     })
             else:
-                # New module. First check for conflicts
+                # New module. First check for conflicts first and
                 if not check_module_interface_conflicts(nb_session, device, module_type, module_bay):
+                    # New module - safe to create
                     create_payloads.append(payload)
                 else:
+                    # Interface conflict detected
                     logger.warning(f"Skipping module creation for {device_name} bay {module_bay_name} - interface conflicts detected")
                     errors.append({
                         'device': device_name,
@@ -408,6 +506,7 @@ def prepare_module_payloads(nb_session: NetBoxApi, modules_data: List[Dict[str, 
 def modules(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List[Dict[str, str | int]]:
     """
     Update switch modules on a NetBox server from YAML data.
+
     Args:
         nb_session: pynetbox API session
         data: Dictionary containing 'chassis' list
@@ -481,8 +580,8 @@ def modules(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List[Dict[str,
 #---- Debugging ----#
 def show_module_on_device(nb_session: NetBoxApi, data = None):
 
-    device_id = 588
-    ic_name = "1/A"
+    device_id = 599
+    ic_name = "2/A"
     logger.info(f"Debugging '{ic_name}'s interfaces on the device with ID {device_id}")
 
     debug_device = nb_session.dcim.devices.get(device_id)
@@ -500,3 +599,4 @@ if __name__ == '__main__':
 
     # Debug
     _debug(show_module_on_device)
+    _debug(modules)
