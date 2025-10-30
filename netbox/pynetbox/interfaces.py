@@ -567,7 +567,7 @@ def trunks(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
 
 if __name__ == '__main__':
     from pynetbox_functions import _main, _debug
-    #_main("Synchronizing device interfaces", interfaces)
-    #_main("Synchronizing device interfaces", trunks)
-    _debug(interfaces)
+    _main("Synchronizing device interfaces", interfaces)
+    _main("Synchronizing device interfaces", trunks)
+    #_debug(interfaces)
     #_debug(trunks)

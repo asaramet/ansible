@@ -168,7 +168,7 @@ def _switch_payload(nb_session: NetBoxApi, switch_dict: Dict[str, str],
     return payload
 
 
-def add_switches(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List:
+def switches(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List:
     """
     Add switches to NetBox server from YAML data.
 
@@ -234,4 +234,4 @@ def add_switches(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> List:
 if __name__ == '__main__':
     from pynetbox_functions import _main
 
-    _main("Add switches to a NetBox server", add_switches)
+    _main("Add switches to a NetBox server", switches)

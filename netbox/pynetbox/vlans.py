@@ -77,6 +77,6 @@ def vlans(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
 if __name__ == '__main__':
     from pynetbox_functions import _main, _debug
 
-    #_main("Synchronizing VLANs", vlans)
+    _main("Synchronizing VLANs", vlans)
 
-    _debug(vlans)
+    #_debug(vlans)

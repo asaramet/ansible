@@ -595,8 +595,8 @@ def show_module_on_device(nb_session: NetBoxApi, data = None):
 
 if __name__ == '__main__':
     from pynetbox_functions import _main, _debug
-    #_main("Processing modules data on a NetBox server", modules)
+    _main("Processing modules data on a NetBox server", modules)
 
     # Debug
-    _debug(show_module_on_device)
-    _debug(modules)
+    #_debug(show_module_on_device)
+    #_debug(modules)

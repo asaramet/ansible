@@ -15,11 +15,12 @@ from typing import Dict, List
 from pynetbox.core.api import Api as NetBoxApi
 
 from add_locations import add_locations
-from add_switches import add_switches
+from switches import switches
 from chassis import chassis
 from modules import modules
 from vlans import vlans
 from interfaces import interfaces, trunks
+from ips import ips
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -50,8 +51,11 @@ def update(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
     logger.info("-- Update interfaces --")
     interfaces(nb_session, data)
 
-    logger.info("-- Synchronize LAG interfaces--")
-    #trunks(nb_session, data)
+    logger.info("-- Synchronize LAG interfaces --")
+    trunks(nb_session, data)
+
+    logger.info("-- Assign IPs to devices --")
+    ips(nb_session, data)
 
 if __name__ == '__main__':
     from pynetbox_functions import _main

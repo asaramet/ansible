@@ -322,7 +322,7 @@ def _main(description: str, function: Callable, **kwargs) -> None:
     nb.http_session.verify = False # Disable SSL verification
 
     files_yaml = [
-        "aruba_stack_2920.yaml"
+        "aruba_stack_2930.yaml"
     ]
     
     for file_name in files_yaml:
