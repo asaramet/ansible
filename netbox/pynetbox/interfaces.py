@@ -25,11 +25,13 @@ def collect_stack_interfaces(intf_name: str, intf_obj: object,
     """
     Return a list of interface objects if given interface name 
     exist as a stacked interface in a switch stack
+
     Args:
         intf_name: Default interface name
         intf_obj: NetBox interface object
         stack_numbers: Lost of stacks members numbers
         interface_list: List of interfaces dictionaries
+
     Return:
         A list of interface objects if they exist in the given switch stack
     """
@@ -46,9 +48,11 @@ def collect_stack_interfaces(intf_name: str, intf_obj: object,
 def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
     """
     Create or update interfaces in NetBox based on YAML data.
+
     Args:
         nb_session: pynetbox API session
-        data: Dictionary containing 'device_interfaces' list
+        data: Dictionary containing 'device_interfaces' and 'tagged_vlans' lists
+
     """
     if 'device_interfaces' not in data:
         logger.warning("No 'device_interfaces' key found in data")
@@ -76,6 +80,13 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
 
     logger.info(f"Processing {len(unique_vlans)} VLANs requested")
 
+    # Collect VLANs from `tagged_vlans` section
+    tagged_vlans_data = data.get('tagged_vlans', [])
+    for item in tagged_vlans_data:
+        for vlan in item.get('tagged_vlans', []):
+            vlan_key = (vlan.get('vlan_id', ''), vlan.get('name', ''))
+            unique_vlans.add(vlan_key)
+
     # Fetch all VLANs in one or minimal requests
     cached_vlans = {}
     if unique_vlans:
@@ -92,6 +103,15 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
             logger.warning(f"Error caching VLANs: {e}")
 
     logger.info(f"Fetched total of {len(cached_vlans)} VLANs")
+
+    #Build a lookup for tagged VLANs by hostname and interface
+    tagged_vlans_lookup = {}
+    for item in tagged_vlans_data:
+        hostname = item.get('hostname', None)
+        interface = item.get('interface', None)
+        if hostname and interface:
+            key = (hostname, interface)
+            tagged_vlans_lookup[key] = item.get('tagged_vlans', [])
 
     nb_interfaces = nb_session.dcim.interfaces
 
@@ -256,11 +276,36 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
 
             # Handle VLAN assignment based on trunk mode
             is_trunk = item.get('is_trunk', False)
+
+            # Check if there are additional tagged VLANs from the tagged_vlans section
+            lookup_key = (hostname, interface_name)
+            additional_tagged_vlans = tagged_vlans_lookup.get(lookup_key, [])
+
             if is_trunk:
                 payload['mode'] = 'tagged' 
+                tagged_vlans_ids = []
+
+                # Add the primary VLAN if provided
                 if vlan_id:
-                    # For trunk ports, VLAN goes to tagged_vlans (as a list)
-                    payload['tagged_vlans'] = [vlan_id]
+                    tagged_vlans_ids.append(vlan_id)
+
+                # Add additional tagged VLANs from the tagged_vlans section
+                for vlan_info in additional_tagged_vlans:
+                    vlan_id = vlan_info.get('vlan_id', '')
+                    vlan_name = vlan_info.get('name', '')
+                    vlan_key = (vlan_id, vlan_name)
+                    additional_vlan_id = cached_vlans.get(vlan_key)
+                    if not additional_vlan_id:
+                        additional_vlan_id = cached_vlans.get(vlan_id, '')
+
+                    if additional_vlan_id and additional_vlan_id not in tagged_vlans_ids:
+                        tagged_vlans_ids.append(additional_vlan_id)
+                    elif not additional_vlan_id:
+                        logger.warning(
+                            f"Tagged VLAN {vlan_id} ({vlan_name}) "
+                            f"not found for interface {interface_name} on {hostname}"
+                        )
+                payload['tagged_vlans'] = tagged_vlans_ids
             else:
                 payload['mode'] = 'access' 
                 if vlan_id:
@@ -268,6 +313,14 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
                     payload['untagged_vlan'] = vlan_id
                 # Ensure no tagged VLANs on access ports
                 payload['tagged_vlans'] = []
+
+                # Warn if tagged VLANs were specified for an access port
+                if additional_tagged_vlans:
+                    logger.warning(
+                        f"Interface {interface_name} on {hostname} is in access mode "
+                        f"but has {len(additional_tagged_vlans)} tagged VLANs specified. "
+                        "Tagged VLANs are only supported in trunk mode."
+                    )
 
             # Update existing interface
             if existing_intf:
