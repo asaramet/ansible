@@ -233,8 +233,8 @@ def get_module_bay(nb_session: NetBoxApi, device: object, bay_name: str, stack_n
         # Priority 3: Generic name patterns (fallback only)
         fallback_names = [
             bay_name,               # Simple "A"
-            f"Module {bay_name}",   # "Module A"
-            "Uplink"                # Special case
+            #f"Module {bay_name}",   # "Module A"
+            #"Uplink"                # Special case
         ]
 
         for name in fallback_names:

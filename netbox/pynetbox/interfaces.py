@@ -1,626 +1,596 @@
 #!/usr/bin/env python3
 
-'''
-Synchronize device interfaces on a NetBox platform using `pynetbox` library
-Main function, to import:
+"""
+Interface management functions for NetBox
+Handles creation, update, and deletion of device interfaces with VLAN assignments
+"""
 
-- interfaces(nb_session, data):
-    - nb_session - pynetbox API session
-    - data - data (yaml format)
-'''
-
-import pynetbox, logging
-
-from typing import Dict, List, Set
+import logging
+from typing import Dict, List, Optional
 from pynetbox.core.api import Api as NetBoxApi
 
-from pynetbox_functions import _cache_devices, _bulk_create, _bulk_update
-from pynetbox_functions import _delete_netbox_obj, _get_device
-
-# Get logging
+# Import the standard delete function from pynetbox_functions
+from pynetbox_functions import _bulk_delete_interfaces, _bulk_create, _bulk_update
+from pynetbox_functions import _cache_devices
+    
 logger = logging.getLogger(__name__)
 
-def collect_stack_interfaces(intf_name: str, intf_obj: object,
-    stack_numbers: Set[str], interface_list: List[Dict[str, str]]) -> List:
-    """
-    Return a list of interface objects if given interface name 
-    exist as a stacked interface in a switch stack
-
-    Args:
-        intf_name: Default interface name
-        intf_obj: NetBox interface object
-        stack_numbers: Lost of stacks members numbers
-        interface_list: List of interfaces dictionaries
-
-    Return:
-        A list of interface objects if they exist in the given switch stack
-    """
-
-    collected_interfaces = []
-
-    for stack_num in stack_numbers:
-        stacked_equivalent = f"{stack_num}/{intf_name}"
-        if stacked_equivalent in [item.get('interface') for item in interface_list]:
-            # Mark for deletion
-            collected_interfaces.append(intf_obj)
-    return collected_interfaces
-
-def interfaces(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
+def interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
     """
     Create or update interfaces in NetBox based on YAML data.
-
+    
+    Process flow:
+    1. Delete interfaces specified in 'delete_interfaces'
+    2. Create/update interfaces from 'device_interfaces'
+    3. Add tagged VLANs from 'tagged_vlans' to trunk interfaces
+    
     Args:
         nb_session: pynetbox API session
-        data: Dictionary containing 'device_interfaces' and 'tagged_vlans' lists
-
+        data: Dictionary containing:
+            - 'delete_interfaces': List of interfaces to delete
+            - 'device_interfaces': List of interfaces to create/update
+            - 'tagged_vlans': List of trunk interfaces with tagged VLANs
     """
-    if 'device_interfaces' not in data:
-        logger.warning("No 'device_interfaces' key found in data")
-        return
+    
+    # Step 1: Delete interfaces if specified
+    if 'delete_interfaces' in data and data['delete_interfaces']:
+        logger.info("=== Starting interface deletion ===")
+        _delete_interfaces(nb_session, data['delete_interfaces'])
+    
+    # Step 2: Create or update interfaces
+    if 'device_interfaces' in data and data['device_interfaces']:
+        logger.info("=== Starting interface creation/update ===")
+        _process_device_interfaces(nb_session, data)
+    
+    logger.info("=== Interface management completed ===")
 
+def _delete_interfaces(nb_session: NetBoxApi, delete_list: List[Dict[str, str]]) -> None:
+    """
+    Delete specified interfaces from NetBox using bulk operations.
+    
+    Args:
+        nb_session: pynetbox API session
+        delete_list: List of dicts with 'hostname' and 'interface' keys
+    """
+    if not delete_list:
+        return
+    
+    # Step 1: Extract unique hostnames
+    hostnames = list(set([entry.get('hostname') for entry in delete_list if entry.get('hostname')]))
+    
+    if not hostnames:
+        logger.warning("No valid hostnames found in delete_list")
+        return
+    
+    # Step 2: Bulk fetch devices using existing function
+    logger.info(f"Fetching {len(hostnames)} devices for interface deletion...")
+    cached_devices = _cache_devices(nb_session, hostnames)
+    
+    if not cached_devices:
+        logger.warning("No devices found for deletion")
+        return
+    
+    # Step 3: Bulk fetch all interfaces for these devices
+    device_ids = [device.id for device in cached_devices.values()]
+    logger.info(f"Fetching interfaces for {len(device_ids)} devices...")
+    cached_interfaces = _cache_interfaces_by_device(nb_session, device_ids)
+    
+    # Step 4: Identify interfaces to delete
+    interfaces_to_delete = []
+    not_found_count = 0
+    
+    for entry in delete_list:
+        hostname = entry.get('hostname')
+        interface_name = entry.get('interface')
+        
+        if not hostname or not interface_name:
+            logger.warning(f"Skipping invalid delete entry: {entry}")
+            continue
+        
+        device = cached_devices.get(hostname)
+        if not device:
+            logger.warning(f"Device {hostname} not found in cache")
+            not_found_count += 1
+            continue
+        
+        # Look up interface in cache
+        interface_key = f"{device.id}:{interface_name}"
+        interface = cached_interfaces.get(interface_key)
+        
+        if not interface:
+            logger.info(f"Interface {interface_name} not found on {hostname} (already deleted or never existed)")
+            not_found_count += 1
+            continue
+        
+        interfaces_to_delete.append(interface)
+        logger.debug(f"Marked interface {interface_name} on {hostname} for deletion")
+    
+    # Step 5: Bulk delete interfaces
+    deleted_count = _bulk_delete_interfaces(interfaces_to_delete)
+    
+    logger.info(f"Deletion summary: {deleted_count} deleted, {not_found_count} not found")
+
+def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
+    """
+    Process and create/update device interfaces with VLAN assignments using bulk operations.
+    
+    Args:
+        nb_session: pynetbox API session
+        data: Dictionary containing 'device_interfaces' and optionally 'tagged_vlans'
+    """
+    from pynetbox_functions import _cache_devices, _bulk_create, _bulk_update
+    
     device_interfaces = data.get('device_interfaces', [])
-    if not device_interfaces:
+    tagged_vlans_data = data.get('tagged_vlans', [])
+    
+    # Build a lookup for tagged VLANs by hostname and interface
+    tagged_vlans_lookup = _build_tagged_vlans_lookup(tagged_vlans_data)
+    
+    # IMPORTANT: Collect ALL interfaces to process
+    # Some interfaces may only be in tagged_vlans (trunks), not in device_interfaces
+    all_interfaces_to_process = {}  # Key: "hostname:interface", Value: entry dict
+    
+    # First, add all from device_interfaces
+    for entry in device_interfaces:
+        hostname = entry.get('hostname')
+        interface_name = entry.get('interface')
+        if hostname and interface_name:
+            key = f"{hostname}:{interface_name}"
+            all_interfaces_to_process[key] = entry.copy()
+    
+    # Then, add trunk interfaces from tagged_vlans that aren't in device_interfaces
+    for trunk_entry in tagged_vlans_data:
+        hostname = trunk_entry.get('hostname')
+        interface_name = trunk_entry.get('interface')
+        if hostname and interface_name:
+            key = f"{hostname}:{interface_name}"
+            if key not in all_interfaces_to_process:
+                # This trunk interface is not in device_interfaces, add it
+                all_interfaces_to_process[key] = {
+                    'hostname': hostname,
+                    'interface': interface_name,
+                    'is_trunk': True,
+                    'type': 'lag',  # Assume LAG/trunk type
+                    'name': f"Trunk {interface_name}",  # Default description
+                }
+                logger.debug(f"Added trunk interface {interface_name} on {hostname} (only in tagged_vlans)")
+    
+    if not all_interfaces_to_process:
         logger.info("No interfaces to process")
         return
-
-    # Cache all devices mentioned in the data
-    device_names = list(set(item.get('hostname') for item in device_interfaces))
-    logger.info(f"Processing {len(device_interfaces)} interfaces for {len(device_names)} devices")
-
+    
+    # Cache devices to minimize API calls
+    device_names = list(set([entry['hostname'] for entry in all_interfaces_to_process.values()]))
     cached_devices = _cache_devices(nb_session, device_names)
-    logger.info(f"Found {len(cached_devices)} devices out of {len(set(device_names))} requested")
-
-
-    # Cache all VLANs that are mentioned in the data
-    unique_vlans = set()
-    for item in device_interfaces:
-        if 'vlan_id' in item and item.get('vlan_id'):
-            vlan_key = (item.get('vlan_id'), item.get('vlan_name', ''))
-            unique_vlans.add(vlan_key)
-
-    logger.info(f"Processing {len(unique_vlans)} VLANs requested")
-
-    # Collect VLANs from `tagged_vlans` section
-    tagged_vlans_data = data.get('tagged_vlans', [])
-    for item in tagged_vlans_data:
-        for vlan in item.get('tagged_vlans', []):
-            vlan_key = (vlan.get('vlan_id', ''), vlan.get('name', ''))
-            unique_vlans.add(vlan_key)
-
-    # Fetch all VLANs in one or minimal requests
-    cached_vlans = {}
-    if unique_vlans:
-        try:
-            vlan_ids = [vid for vid, _ in unique_vlans]
-            all_vlans = nb_session.ipam.vlans.filter(vid = vlan_ids)
-            for vlan in all_vlans:
-                vid = str(vlan.vid)
-                key = (vid, vlan.name)
-                cached_vlans[key] = vlan.id
-                # Also cache by VIS only for fallback
-                cached_vlans[vid, ''] = vlan.id
-        except Exception as e:
-            logger.warning(f"Error caching VLANs: {e}")
-
-    logger.info(f"Fetched total of {len(cached_vlans)} VLANs")
-
-    #Build a lookup for tagged VLANs by hostname and interface
-    tagged_vlans_lookup = {}
-    for item in tagged_vlans_data:
-        hostname = item.get('hostname', None)
-        interface = item.get('interface', None)
-        if hostname and interface:
-            key = (hostname, interface)
-            tagged_vlans_lookup[key] = item.get('tagged_vlans', [])
-
-    nb_interfaces = nb_session.dcim.interfaces
-
-    # Cache all existing interfaces for requested devices 
-    cached_interfaces = {}
-    cached_modules = {} # Cache modules for each device
-
-    for hostname, device in cached_devices.items():
-        try:
-            existing_interfaces = {
-                intf.name: intf
-                for intf in nb_interfaces.filter(device_id = device.id)
-            }
-            cached_interfaces[hostname] = existing_interfaces
-
-            # Fetch device modules and their interfaces
-            modules = list(nb_session.dcim.modules.filter(device_id = device.id))
-            cached_modules[hostname] = {}
-
-            for module in modules:
-                module_interfaces = {
-                    intf.name: intf 
-                    for intf in nb_interfaces.filter(module_id = module.id)
-                }
-                cached_modules[hostname][module.id] = {
-                    'module': module,
-                    'interfaces': module_interfaces
-                }
-                # Also add module interfaces to the main interface cache for lookup
-                existing_interfaces.update(module_interfaces)
-
-        except Exception as e:
-            logger.error(f"Error fetching interfaces/modules for {hostname}: {e}")
-            cached_interfaces[hostname] = {}
-            cached_modules[hostname] = {}
-
-    # Group interface by device for efficient processing
-    interfaces_by_device = {}
-    for item in device_interfaces:
-        hostname = item.get('hostname')
-        if hostname not in interfaces_by_device:
-            interfaces_by_device[hostname] = []
-        interfaces_by_device[hostname].append(item)
-
-    # Collect interfaces to create and update
-    interfaces_to_create = []
-    interfaces_to_update = []
-    interfaces_to_delete = []
-
-    # Process each device's interface
-    logger.info(f"Processing {len(cached_interfaces)} interfaces for {len(cached_devices)} devices")
-    for hostname, interface_list in interfaces_by_device.items():
+    
+    # Cache VLANs for the devices
+    cached_vlans = _cache_vlans_for_devices(nb_session, cached_devices)
+    
+    # Cache existing interfaces for these devices
+    device_ids = [device.id for device in cached_devices.values()]
+    cached_interfaces = _cache_interfaces_by_device(nb_session, device_ids)
+    
+    # Prepare payloads for bulk operations
+    create_payloads = []
+    update_payloads = []
+    interfaces_for_vlan_assignment = []  # Track interfaces that need VLAN updates
+    
+    for key, entry in all_interfaces_to_process.items():
+        hostname = entry.get('hostname')
+        interface_name = entry.get('interface')
+        
+        if not hostname or not interface_name:
+            logger.warning(f"Skipping invalid interface entry: {entry}")
+            continue
+        
         device = cached_devices.get(hostname)
         if not device:
-            logger.warning(f"Device {hostname} no found in NetBox, skipping interfaces")
+            logger.warning(f"Device {hostname} not found in cache, skipping interface {interface_name}")
             continue
-
-        existing_interfaces = cached_interfaces.get(hostname, {})
-
-        # Check if this device has stack-numbered interfaces (e.g., "1/1", "2/1")
-        has_stacked_interfaces = any('/' in item.get('interface') for item in interface_list)
-
-        if has_stacked_interfaces:
-            # Extract unique stack numbers from the data
-            stack_numbers = set()
-            for item in interface_list:
-                if '/' in item.get('interface'):
-                    stack_num = item.get('interface').split('/')[0]
-                    stack_numbers.add(stack_num)
-
-            # Find interfaces without stack numbers that should be deleted
-            for intf_name, intf_obj in existing_interfaces.items():
-                # Skip it it's a module interface (will be handled separately)
-                if hasattr(intf_obj, 'module') and intf_obj.module:
-                    continue
-
-                # Check if it's a numeric-only interface (e.g., '1', '48')
-                if intf_name.isdigit():
-                    # Check if there is a corresponding stacked interface for any stack and add it 
-                    interfaces_to_delete += collect_stack_interfaces(intf_name, intf_obj, stack_numbers, interface_list)
-
-            # Handle module interfaces - delete non-stacked module interfaces
-            for module_id, module_data in cached_modules.get(hostname, {}).items():
-                module_interfaces = module_data['interfaces']
-
-                for intf_name, intf_obj in module_interfaces.items():
-                    # Check if it's a non-stacked module interface (e.g., "A1", "A2")
-                    if '/' not in intf_name:
-                        # Append them to the delete list
-                        interfaces_to_delete += collect_stack_interfaces(
-                            intf_name, intf_obj, stack_numbers, interface_list)
-
-        for item in interface_list:
-            interface_name = item.get('interface')
-            existing_intf = existing_interfaces.get(interface_name)
-
-            # Validate required fields
-            i_type = item.get('type')
-            if not i_type:
-                logger.error(
-                    f"Missing or empty 'type' field for interface {interface_name} "
-                    f"on device {hostname}. Skipping this interface."
-                )
-                continue 
-
-            # Determine if this is a module interface (e.g. 1/A1, 2/A2)
-            # Module interfaces have non-numeric port numbers
-            is_module_interface = False
-            module_id = None
-
-            if '/' in interface_name:
-                stack_num, port_num = interface_name.split('/', 1)
-                # If port number is not numeric, it's likely a module interface
-                if not port_num.isdigit():
-                    is_module_interface = True
-                    # Try to find the module for this stack member
-                    # Look for modules on this device
-                    modules_list = list(cached_modules.get(hostname, {}).items())
-                    if modules_list:
-                        # Use the first available module
-                        # TODO: Match by module position or other attributes
-                        module_id = modules_list[0][0]
-                        logger.debug(f"Assigning module interface {interface_name} to module ID {module_id}")
-                    else:
-                        logger.warning(
-                            f"No module found for module interface {interface_name} on {hostname}. "
-                            "It will be created as a device interface instead."
-                        )
-
-            # Resolve VLAN if provided
-            vlan_id = None
-            if 'vlan_id' in item and item.get('vlan_id'):
-                vid = item.get('vlan_id')
-                vname = item.get('vlan_name')
-
-                vlan_key = (vid, vname)
-                vlan_id = cached_vlans.get(vlan_key)
-
-                if not vlan_id:
-                    # Try without name as fallback
-                    vlan_id = cached_vlans.get((vid, ''))
-                if not vlan_id:
-                    logger.warning(f"VLAN {vid} ({vname}) not found in cache")
-
-            # Build interface payload
-            payload = {
-                'device': device.id,
-                'name': interface_name,
-                'type': i_type,
-                'description': item.get('name', '')
-            }
-
-            # Set device or module
-            if is_module_interface and module_id:
-                payload['module'] = module_id
-
-            # Add optional fields
-            if 'poe_mode' in item:
-                payload['poe_mode'] = item.get('poe_mode')
-            if 'poe_type' in item:
-                payload['poe_type'] = item.get('poe_type')
-
-            # Handle VLAN assignment based on trunk mode
-            is_trunk = item.get('is_trunk', False)
-
-            # Check if there are additional tagged VLANs from the tagged_vlans section
-            lookup_key = (hostname, interface_name)
-            additional_tagged_vlans = tagged_vlans_lookup.get(lookup_key, [])
-
-            if is_trunk:
-                payload['mode'] = 'tagged' 
-                tagged_vlans_ids = []
-
-                # Add the primary VLAN if provided
-                if vlan_id:
-                    tagged_vlans_ids.append(vlan_id)
-
-                # Add additional tagged VLANs from the tagged_vlans section
-                for vlan_info in additional_tagged_vlans:
-                    vlan_id = vlan_info.get('vlan_id', '')
-                    vlan_name = vlan_info.get('name', '')
-                    vlan_key = (vlan_id, vlan_name)
-                    additional_vlan_id = cached_vlans.get(vlan_key)
-                    if not additional_vlan_id:
-                        additional_vlan_id = cached_vlans.get(vlan_id, '')
-
-                    if additional_vlan_id and additional_vlan_id not in tagged_vlans_ids:
-                        tagged_vlans_ids.append(additional_vlan_id)
-                    elif not additional_vlan_id:
-                        logger.warning(
-                            f"Tagged VLAN {vlan_id} ({vlan_name}) "
-                            f"not found for interface {interface_name} on {hostname}"
-                        )
-                payload['tagged_vlans'] = tagged_vlans_ids
-            else:
-                payload['mode'] = 'access' 
-                if vlan_id:
-                    # For access ports, VLAN goes to untagged_vlan 
-                    payload['untagged_vlan'] = vlan_id
-                # Ensure no tagged VLANs on access ports
-                payload['tagged_vlans'] = []
-
-                # Warn if tagged VLANs were specified for an access port
-                if additional_tagged_vlans:
-                    logger.warning(
-                        f"Interface {interface_name} on {hostname} is in access mode "
-                        f"but has {len(additional_tagged_vlans)} tagged VLANs specified. "
-                        "Tagged VLANs are only supported in trunk mode."
-                    )
-
-            # Update existing interface
-            if existing_intf:
-                # Check if it's needed to move from device to module or vice versa
-                existing_is_module = hasattr(existing_intf, 'module') and existing_intf.module
-
-                if is_module_interface and module_id and not existing_is_module:
-                    # Need to delete old device/module interface and create new module/device interface
-                    interfaces_to_delete.append(existing_intf)
-                    interfaces_to_create.append(payload)
-                    logger.info(
-                        f"Will recreate interface {interface_name} on {hostname} "
-                        "as module interface (was device interface)"
-                    )
-                elif not is_module_interface and existing_is_module:
-                    # Need to delete old module interface and create new device interface
-                    interfaces_to_delete.append(existing_intf)
-                    interfaces_to_create.append(payload)
-                    logger.info(
-                        f"Will recreate interface {interface_name} on {hostname} "
-                        "as device interface (was module interface)"
-                    )
-                else:
-                    # Same type, just update
-                    payload['id'] = existing_intf.id
-                    interfaces_to_update.append(payload)
-            else:
-                # Create new interface
-                interfaces_to_create.append(payload)
-
-    # Delete obsolete non-stacked interfaces
-    if interfaces_to_delete:
-        nr_deleted = 0
-        for intf_obj in interfaces_to_delete:
-            if _delete_netbox_obj(intf_obj):
-                nr_deleted += 1
-        logger.info(f"Deleted {nr_deleted} obsolete non-stacked interface(s)")
-
-    # Bulk create new interfaces
-    if interfaces_to_create:
-        logger.info(f"Bulk create {len(interfaces_to_create)} interfaces")
-        _bulk_create(
-            nb_interfaces,
-            interfaces_to_create,
-            "interfaces(s)"
+        
+        # Check if this interface has tagged VLANs (making it a trunk)
+        lookup_key = f"{hostname}:{interface_name}"
+        tagged_vlans_list = tagged_vlans_lookup.get(lookup_key, [])
+        is_trunk = len(tagged_vlans_list) > 0 or entry.get('is_trunk', False)
+        
+        logger.debug(f"Processing interface {interface_name} on {hostname}: is_trunk={is_trunk}, tagged_vlans={len(tagged_vlans_list)}")
+        
+        # Prepare interface payload
+        interface_payload = _prepare_interface_payload(
+            device=device,
+            entry=entry,
+            is_trunk=is_trunk,
+            cached_vlans=cached_vlans,
+            nb_session=nb_session
         )
-
-    # Bulk update existing interfaces
-    if interfaces_to_update:
-        logger.info(f"Bulk update {len(interfaces_to_update)} interfaces")
-        _bulk_update(
-            nb_interfaces,
-            interfaces_to_update,
-            "interfaces(s)"
-        )
-
-    logger.info(f"Finished processing {len(device_interfaces)} interface entries")
-
-    # Debug section
-    #logger.debug(f"\n==++ Interfaces to delete: {interfaces_to_delete}\n")
-    #logger.debug(f"\n==++ Interfaces to update: {interfaces_to_update}\n")
-
-
-def trunks(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
-    """
-    Create or update LAG interfaces in NetBox based on YAML data.
-    Args:
-        nb_session: pynetbox API session
-        data: Dictionary containing 'trunk_interfaces' list
-    """
-
-    if 'trunk_interfaces' not in data:
-        logger.warning("No 'trunk_interfaces' key found in data")
-        return
-
-    trunk_interfaces = data.get('trunk_interfaces')
-    if not trunk_interfaces:
-        logger.info("No trunks to process")
-        return
-
-    # Cache all devices mentioned in the data
-    device_names = list(set(item.get('hostname') for item in trunk_interfaces))
-    cached_devices = _cache_devices(nb_session, device_names)
-    logger.info(f"Processing {len(trunk_interfaces)} LAG interfaces for {len(cached_devices)} devices")
-
-    # Build a mapping of stack members to master devices
-    # For virtual chassis, stack members like rsww1000sp-2 should map to master rsww1000sp
-    device_mapping = {} # maps hostname -> actual device to use
-    master_devices = {} # maps master hostname -> device object
-
-    for hostname in device_names:
-        device = cached_devices.get(hostname)
-
-        if device:
-            # Device exists as-is
-            device_mapping[hostname] = device
-            master_devices[hostname] = device
+        
+        # Check if interface exists
+        interface_key = f"{device.id}:{interface_name}"
+        existing_interface = cached_interfaces.get(interface_key)
+        
+        if existing_interface:
+            # Prepare for update
+            interface_payload['id'] = existing_interface.id
+            update_payloads.append(interface_payload)
+            interfaces_for_vlan_assignment.append({
+                'interface': existing_interface,
+                'device': device,
+                'tagged_vlans': tagged_vlans_list,
+                'is_trunk': is_trunk
+            })
         else:
-            # Device not found - might to be a stack member, try to find master
-            # Extract potential master name (e.g., rgww1000sp-1 -> rgww1000sp)
-            if '-' in hostname:
-                potential_master = hostname.rsplit('-', 1)[0]
-                master_device = cached_devices.get(potential_master)
-
-                if not master_device:
-                    # Try fetching the master device
-                    master_device = _get_device(nb_session, potential_master)
-
-                if master_device:
-                    logger.info(
-                        f"Device {hostname} not found, using master device {potential_master} "
-                        f"(virtual chassis/stack configuration)"
-                    )
-                    device_mapping[hostname] = master_device
-                    master_devices[potential_master] = master_device
-                    # Cache for future lookups
-                    cached_devices[potential_master] = master_device
-                else:
-                    logger.warning(f"Neither {hostname} nor master {potential_master} found in NetBox")
-            else:
-                logger.warning(f"Device {hostname} not found in NetBox")
-
-    # Cache all existing interfaces at once
-    cached_interfaces, cached_lags = {}, {}
-    nr_interfaces, nr_lags = 0, 0
-
-    nb_interfaces = nb_session.dcim.interfaces
-
-    for hostname, device in master_devices.items():
-        try:
-            # Fetch all interfaces - convert to list to ensure full iteration
-            all_intf = list(nb_interfaces.filter(device_id = device.id))
-                        # Also check for virtual chassis members and fetch their interfaces
-            # In a stack, interfaces from all members should be accessible from master
-            if hasattr(device, 'virtual_chassis') and device.virtual_chassis:
-                # Get all devices in the virtual chassis
-                vc_id = device.virtual_chassis.id
-                vc_members = nb_session.dcim.devices.filter(virtual_chassis_id = vc_id)
-
-                for member in vc_members:
-                    if member.id != device.id: # Don't fetch the master again
-                        member_intfs = list(nb_interfaces.filter(device_id = member.id))
-                        all_intf.extend(member_intfs)
-                        logger.info(f"Added {len(member_intfs)} interfaces from VC member {member.name}")
-
-            d_interfaces = {intf.name: intf for intf in all_intf}
-            cached_interfaces[hostname] = d_interfaces
-            nr_interfaces += len(d_interfaces)
-
-            # Separate LAG interfaces
-            cached_lags[hostname] = {
-                name: intf 
-                for name, intf in d_interfaces.items()
-                if (hasattr(intf.type, 'value') and intf.type.value == 'lag') or
-                   (hasattr(intf.type, 'label') and 'LAG' in intf.type.label)
-            }
-            nr_lags += len(cached_lags[hostname])
-
-            # Debug: show interface count per stack
-            stack_counts = {}
-            for intf_name in d_interfaces.keys():
-                if '/' in intf_name:
-                    stack_num = intf_name.split('/')[0]
-                    stack_counts[stack_num] = stack_counts.get(stack_num, 0) + 1
-            if stack_counts:
-                logger.info(f"Interface distribution for {hostname}: {stack_counts}")
-        except Exception as e:
-            logger.error(f"Error fetching interfaces for {hostname}: {e}")
-            cached_interfaces[hostname] = {}
-            cached_lags[hostname] = {}
-
-    logger.info(f"Cached {nr_interfaces} total interfaces including {nr_lags} LAGs")
-
-    # Group by actual device (master) and trunk
-    trunks_by_device = {}
-    for item in trunk_interfaces:
-        hostname = item.get('hostname')
-        trunk_name = item.get('trunk_name')
-
-        # Get the actual device (master in virtual chassis)
-        actual_device = device_mapping.get(hostname)
-        if not actual_device:
-            continue
-
-        # Use master device name as key
-        master_hostname = actual_device.name
-
-        if master_hostname not in trunks_by_device:
-            trunks_by_device[master_hostname] = {}
-        if trunk_name not in trunks_by_device.get(master_hostname):
-            trunks_by_device[master_hostname][trunk_name] = []
-
-        trunks_by_device[master_hostname][trunk_name].append(item.get('interface'))
-
-    # Collect interfaces to bulk process   
-    lags_to_create = []
-    interfaces_to_update = []
-
-    # Process each device
-    for hostname, trunks_dict in trunks_by_device.items():
-        device = master_devices.get(hostname)
-        if not device:
-            logger.warning(f"Device {hostname} not found in NetBox, skipping trunks")
-            continue
-
-        all_interfaces = cached_interfaces.get(hostname, {})
-        existing_lags = cached_lags.get(hostname, {})
-
-        for trunk_name, member_interfaces in trunks_dict.items():
-            lag = existing_lags.get(trunk_name)
-
-            # Create LAG if it doesn't exist
-            if not lag:
-                lag_payload = {
-                    'device': device.id,
-                    'name': trunk_name,
-                    'type': 'lag',
-                    'description': f"Link Aggregation Group {trunk_name}"
-                }
-                lags_to_create.append(lag_payload)
-                logger.info(f"Will create LAG {trunk_name} on {hostname}")
-
-            # Process member interfaces
-            for member_name in member_interfaces:
-                member_name_clean = member_name.strip()
-                member_intf = all_interfaces.get(member_name_clean)
-
-                if not member_intf:
-                    # Debug: show what interfaces we do have
-                    available_interfaces = sorted([name for name in all_interfaces.keys() if '/' in name])
-                    logger.warning(
-                        f"Member interfaces {member_name} not found on {hostname}, "
-                        f"create if first before adding in {trunk_name}. "
-                        f"Available stacked interfaces: {available_interfaces}"
-                    )
-                    continue
-                
-                # Check if already in the correct LAG
-                current_lag = getattr(member_intf, 'lag', None)
-                if current_lag and hasattr(current_lag, 'name') and current_lag.name == trunk_name:
-                    logger.debug(f"Interface {member_name} already in {trunk_name}")
-                    continue
-                
-                # Will update after LAG creation
-                interfaces_to_update.append({
-                    'interface_id': member_intf.id,
-                    'trunk_name': trunk_name,
-                    'member_name': member_name,
-                    'hostname': hostname
-                })
-    # Bulk create LAGs across all devices
-    if lags_to_create:
-        created_lags = _bulk_create(
-            nb_interfaces,
-            lags_to_create,
-            "LAG interface(s)"
-        )
-
-        # Refresh LAG cache for this device after creation
-        for hostname, device in master_devices.items():
-            try:
-                all_intf = list(nb_interfaces.filter(device_id = device.id))
-                d_interfaces = {intf.name: intf for intf in all_intf}
-                cached_lags[hostname] = {
-                    name: intf 
-                    for name, intf in all_interfaces.items()
-                    if (hasattr(intf.type, 'value') and intf.type.value == 'lag') or 
-                    (hasattr(intf.type, 'label') and 'LAG' in intf.type.label)
-                }
-            except Exception as e:
-                logger.error(f"Error refreshing LAGs for {hostname}: {e}")
-        
-    # Update member interfaces to join LAGs
-    member_updates = []
-    for update_info in interfaces_to_update:
-        hostname = update_info['hostname']
-        trunk_name = update_info.get('trunk_name')
-
-        lag = cached_lags.get(hostname, {}).get(trunk_name)
-        if not lag:
-            logger.error(f"LAG {trunk_name} not found on {hostname} after creation attempt")
-            continue
-        
-        member_updates.append({
-            'id': update_info.get('interface_id'),
-            'lag': lag.id
-        })
-
-    if member_updates:
-        _bulk_update(
-            nb_interfaces,
-            member_updates,
-            "trunk member interface(s)"
+            # Prepare for creation
+            create_payloads.append(interface_payload)
+            interfaces_for_vlan_assignment.append({
+                'interface_name': interface_name,
+                'device': device,
+                'tagged_vlans': tagged_vlans_list,
+                'is_trunk': is_trunk,
+                'payload': interface_payload
+            })
+    
+    # Perform bulk operations
+    created_interfaces = []
+    if create_payloads:
+        logger.info(f"Creating {len(create_payloads)} interfaces...")
+        created_interfaces = _bulk_create(
+            endpoint=nb_session.dcim.interfaces,
+            payloads=create_payloads,
+            kind='interface'
         )
     
-    logger.info(f"Finished processing {len(trunk_interfaces)} trunk entries")
+    updated_interfaces = []
+    if update_payloads:
+        logger.info(f"Updating {len(update_payloads)} interfaces...")
+        updated_interfaces = _bulk_update(
+            endpoint=nb_session.dcim.interfaces,
+            payloads=update_payloads,
+            kind='interface'
+        )
+    
+    # Assign tagged VLANs to trunk interfaces (must be done after interface creation/update)
+    _assign_tagged_vlans_bulk(
+        nb_session=nb_session,
+        interfaces_data=interfaces_for_vlan_assignment,
+        created_interfaces=created_interfaces,
+        updated_interfaces=updated_interfaces,
+        cached_vlans=cached_vlans
+    )
+    
+    logger.info(f"Interface processing summary: {len(created_interfaces)} created, {len(updated_interfaces)} updated")
 
-if __name__ == '__main__':
+
+def _build_tagged_vlans_lookup(tagged_vlans_data: List[Dict]) -> Dict[str, List[Dict]]:
+    """
+    Build a lookup dictionary for tagged VLANs by hostname and interface.
+    
+    Args:
+        tagged_vlans_data: List of dicts with 'hostname', 'interface', and 'tagged_vlans'
+    
+    Returns:
+        Dictionary with keys like "hostname:interface" mapping to list of tagged VLANs
+    """
+    lookup = {}
+    
+    for entry in tagged_vlans_data:
+        hostname = entry.get('hostname')
+        interface_name = entry.get('interface')
+        tagged_vlans = entry.get('tagged_vlans', [])
+        
+        if hostname and interface_name:
+            key = f"{hostname}:{interface_name}"
+            lookup[key] = tagged_vlans
+    
+    return lookup
+
+
+def _cache_interfaces_by_device(nb_session: NetBoxApi, device_ids: List[int]) -> Dict[str, object]:
+    """
+    Cache all interfaces for given device IDs in bulk.
+    
+    Args:
+        nb_session: pynetbox API session
+        device_ids: List of device IDs
+    
+    Returns:
+        Dictionary with keys "device_id:interface_name" mapping to interface objects
+    """
+    if not device_ids:
+        return {}
+    
+    cached_interfaces = {}
+    
+    try:
+        # Bulk fetch all interfaces for the devices
+        # Note: NetBox API may have limits on filter size, so we might need to chunk
+        chunk_size = 100  # Adjust based on your NetBox configuration
+        
+        for i in range(0, len(device_ids), chunk_size):
+            chunk = device_ids[i:i + chunk_size]
+            interfaces = nb_session.dcim.interfaces.filter(device_id=chunk)
+            
+            for interface in interfaces:
+                key = f"{interface.device.id}:{interface.name}"
+                cached_interfaces[key] = interface
+        
+        logger.info(f"Cached {len(cached_interfaces)} interfaces for {len(device_ids)} devices")
+        return cached_interfaces
+        
+    except Exception as e:
+        logger.error(f"Error caching interfaces: {e}", exc_info=True)
+        return {}
+
+
+def _cache_vlans_for_devices(nb_session: NetBoxApi, cached_devices: Dict[str, object]) -> Dict[str, object]:
+    """
+    Cache ALL VLANs from NetBox platform for assignment to interfaces.
+    
+    Args:
+        nb_session: pynetbox API session
+        cached_devices: Dictionary of cached device objects (not used, kept for compatibility)
+    
+    Returns:
+        Dictionary with structure: {vid_or_name: vlan_object}
+        Where vid_or_name can be either the VLAN ID (as string) or the VLAN name
+    """
+    cached_vlans = {}
+    
+    try:
+        # Fetch ALL VLANs from NetBox platform
+        logger.info("Caching all VLANs from NetBox platform...")
+        all_vlans = nb_session.ipam.vlans.all()
+        
+        for vlan in all_vlans:
+            # Index by vid (VLAN ID on switch) as string
+            vid_key = str(vlan.vid)
+            
+            # Store by vid - if duplicate vid exists, last one wins
+            # (VLANs with same vid can exist at different sites)
+            cached_vlans[vid_key] = vlan
+            
+            # Also store by name for flexible lookup
+            cached_vlans[vlan.name] = vlan
+            
+            logger.debug(f"Cached VLAN: vid={vlan.vid}, name={vlan.name}, site={vlan.site.name if vlan.site else 'Global'}, netbox_id={vlan.id}")
+        
+        logger.info(f"Cached {len(all_vlans)} VLANs from NetBox platform")
+        
+    except Exception as e:
+        logger.error(f"Error caching VLANs from NetBox: {e}", exc_info=True)
+    
+    return cached_vlans
+
+
+def _get_vlan_object(nb_session: NetBoxApi, device: object, vlan_id: Optional[str], 
+                     vlan_name: Optional[str], cached_vlans: Dict) -> Optional[object]:
+    """
+    Get VLAN object from global cache or NetBox.
+    
+    IMPORTANT: vlan_id here is the VLAN ID on the switch (vid), NOT the NetBox database ID
+    
+    Args:
+        nb_session: pynetbox API session
+        device: Device object (used only for logging)
+        vlan_id: VLAN ID on the switch (vid) as string (e.g., "5", "50", "350")
+        vlan_name: VLAN name
+        cached_vlans: Cached VLANs dictionary (global, not site-specific)
+    
+    Returns:
+        VLAN object or None
+    """
+    if not vlan_id and not vlan_name:
+        return None
+    
+    # Try to get from cache by VLAN ID (vid) first
+    if vlan_id:
+        vlan_id_str = str(vlan_id)  # Ensure it's a string
+        vlan = cached_vlans.get(vlan_id_str)
+        if vlan:
+            logger.debug(f"Found VLAN in cache: vid={vlan_id}, name={vlan.name}, site={vlan.site.name if vlan.site else 'Global'}, netbox_id={vlan.id}")
+            return vlan
+    
+    # Try by name
+    if vlan_name:
+        vlan = cached_vlans.get(vlan_name)
+        if vlan:
+            logger.debug(f"Found VLAN by name in cache: name={vlan_name}, vid={vlan.vid}, site={vlan.site.name if vlan.site else 'Global'}, netbox_id={vlan.id}")
+            return vlan
+    
+    # Fallback to direct API call (search globally, not by site)
+    try:
+        # Search by vid (VLAN ID on switch) - no site restriction
+        if vlan_id:
+            # Try to find VLAN with this vid (might return multiple, we take first)
+            vlans = nb_session.ipam.vlans.filter(vid=int(vlan_id))
+            if vlans:
+                vlan = vlans[0]  # Take first match
+                logger.debug(f"Found VLAN via API: vid={vlan_id}, name={vlan.name}, site={vlan.site.name if vlan.site else 'Global'}, netbox_id={vlan.id}")
+                return vlan
+        
+        if vlan_name:
+            # Search by name globally
+            vlans = nb_session.ipam.vlans.filter(name=vlan_name)
+            if vlans:
+                vlan = vlans[0]  # Take first match
+                logger.debug(f"Found VLAN by name via API: name={vlan_name}, vid={vlan.vid}, site={vlan.site.name if vlan.site else 'Global'}, netbox_id={vlan.id}")
+                return vlan
+    except Exception as e:
+        logger.warning(f"Error looking up VLAN (vid: {vlan_id}, Name: {vlan_name}): {e}")
+    
+    # VLAN not found - provide helpful diagnostic info
+    logger.warning(
+        f"VLAN not found for device {device.name}: "
+        f"vid={vlan_id}, name={vlan_name}. "
+        f"Total VLANs in cache: {len(cached_vlans)}"
+    )
+    if cached_vlans and logger.isEnabledFor(logging.DEBUG):
+        # Log first few available VLANs to help debugging
+        sample_vlans = list(cached_vlans.items())[:10]
+        logger.debug(f"Sample of available VLANs: {[(k, getattr(v, 'vid', 'N/A')) for k, v in sample_vlans if hasattr(v, 'vid')]}")
+    
+    return None
+
+
+def _prepare_interface_payload(device: object, entry: Dict, is_trunk: bool,
+                              cached_vlans: Dict, nb_session: NetBoxApi) -> Dict:
+    """
+    Prepare interface payload for bulk create/update.
+    
+    Args:
+        device: Device object
+        entry: Interface data dictionary
+        is_trunk: Whether this is a trunk interface
+        cached_vlans: Cached VLANs dictionary
+        nb_session: pynetbox API session
+    
+    Returns:
+        Interface payload dictionary
+    """
+    interface_name = entry['interface']
+    
+    # Prepare interface payload
+    interface_payload = {
+        'device': device.id,
+        'name': interface_name,
+        'type': entry.get('type', '1000base-t'),
+        'description': entry.get('name', ''),
+    }
+    
+    # Add PoE settings if present
+    if entry.get('poe_mode'):
+        interface_payload['poe_mode'] = entry['poe_mode']
+    if entry.get('poe_type'):
+        interface_payload['poe_type'] = entry['poe_type']
+    
+    # CRITICAL: Determine mode and handle VLAN assignments properly
+    if is_trunk:
+        # This is a trunk interface - tagged mode
+        interface_payload['mode'] = 'tagged'
+        # IMPORTANT: When switching to tagged mode, must clear untagged_vlan
+        # NetBox doesn't allow both tagged VLANs and untagged_vlan in tagged mode
+        interface_payload['untagged_vlan'] = None  # Clear any existing untagged VLAN
+    else:
+        # This is an access interface
+        interface_payload['mode'] = 'access'
+        
+        # Handle untagged VLAN for access interfaces
+        if entry.get('vlan_id') or entry.get('vlan_name'):
+            untagged_vlan = _get_vlan_object(
+                nb_session, device, entry.get('vlan_id'), 
+                entry.get('vlan_name'), cached_vlans
+            )
+            if untagged_vlan:
+                interface_payload['untagged_vlan'] = untagged_vlan.id
+    
+    return interface_payload
+
+
+def _assign_tagged_vlans_bulk(nb_session: NetBoxApi, interfaces_data: List[Dict],
+                              created_interfaces: List, updated_interfaces: List,
+                              cached_vlans: Dict) -> None:
+    """
+    Assign tagged VLANs to trunk interfaces after they've been created/updated.
+    
+    Args:
+        nb_session: pynetbox API session
+        interfaces_data: List of dicts with interface and VLAN info
+        created_interfaces: List of newly created interface objects
+        updated_interfaces: List of updated interface objects
+        cached_vlans: Cached VLANs dictionary
+    """
+    # Build a lookup for newly created interfaces by device_id and name
+    created_lookup = {}
+    for iface in created_interfaces:
+        key = f"{iface.device.id}:{iface.name}"
+        created_lookup[key] = iface
+    
+    # Build a lookup for updated interfaces by device_id and name
+    updated_lookup = {}
+    for iface in updated_interfaces:
+        key = f"{iface.device.id}:{iface.name}"
+        updated_lookup[key] = iface
+    
+    vlan_assignment_count = 0
+    
+    for data in interfaces_data:
+        if not data.get('is_trunk') or not data.get('tagged_vlans'):
+            continue
+        
+        # Get the interface object
+        interface = data.get('interface')
+        device = data['device']
+        
+        if not interface:
+            # This was a newly created interface, look it up
+            interface_name = data.get('interface_name')
+            if device and interface_name:
+                key = f"{device.id}:{interface_name}"
+                interface = created_lookup.get(key)
+        else:
+            # This was an updated interface - get the refreshed version
+            key = f"{device.id}:{interface.name}"
+            # Try to get updated version, fallback to the one we have
+            interface = updated_lookup.get(key, interface)
+            
+            # CRITICAL: If we're converting from access to trunk, need to refresh the object
+            # to ensure mode change has been applied
+            if interface.mode != 'tagged':
+                try:
+                    # Refresh the interface object from NetBox
+                    interface = nb_session.dcim.interfaces.get(interface.id)
+                    logger.debug(f"Refreshed interface {interface.name} on {device.name}, mode is now: {interface.mode}")
+                except Exception as e:
+                    logger.warning(f"Could not refresh interface {interface.name}: {e}")
+        
+        if not interface:
+            logger.warning(f"Could not find interface object for VLAN assignment")
+            continue
+        
+        tagged_vlans_list = data['tagged_vlans']
+        
+        # Get VLAN objects
+        vlan_objects = []
+        for vlan_entry in tagged_vlans_list:
+            vlan_id = vlan_entry.get('vlan_id')
+            vlan_name = vlan_entry.get('name')
+            
+            vlan_obj = _get_vlan_object(nb_session, device, vlan_id, vlan_name, cached_vlans)
+            if vlan_obj:
+                vlan_objects.append(vlan_obj.id)
+            else:
+                logger.warning(f"Could not find VLAN {vlan_name} (vid: {vlan_id}) for interface {interface.name} on {device.name}")
+        
+        if vlan_objects:
+            try:
+                # IMPORTANT: Clear any existing tagged VLANs first, then set new ones
+                # This ensures we don't have leftover VLANs from previous configuration
+                interface.tagged_vlans = vlan_objects
+                interface.save()
+                vlan_assignment_count += 1
+                logger.info(f"Assigned {len(vlan_objects)} tagged VLANs to {interface.name} on {device.name}")
+            except Exception as e:
+                logger.error(f"Error assigning tagged VLANs to {interface.name} on {device.name}: {e}", exc_info=True)
+    
+    if vlan_assignment_count > 0:
+        logger.info(f"Total trunk interfaces configured: {vlan_assignment_count}")
+        logger.warning(f"Could not find VLAN {vlan_name} (ID: {vlan_id}) for interface {interface.name} on {device.name}")
+        
+        if vlan_objects:
+            try:
+                # Set tagged VLANs
+                interface.tagged_vlans = vlan_objects
+                interface.save()
+                logger.info(f"Assigned {len(vlan_objects)} tagged VLANs to {interface.name} on {device.name}")
+            except Exception as e:
+                logger.error(f"Error assigning tagged VLANs to {interface.name} on {device.name}: {e}", exc_info=True)
+
+
+# Main execution function for standalone testing
+if __name__ == "__main__":
     from pynetbox_functions import _main, _debug
-    _main("Synchronizing device interfaces", interfaces)
-    _main("Synchronizing device interfaces", trunks)
-    #_debug(interfaces)
-    #_debug(trunks)
+    
+    #_debug(
+    _main(
+        description="Manage device interfaces in NetBox (create, update, delete with VLAN assignments)",
+        function=interfaces
+    )
