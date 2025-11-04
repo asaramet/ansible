@@ -681,6 +681,74 @@ def _manufacturer(nb_session: NetBoxApi, manufacturer_name: str) -> int:
         logging.error(f"Failed to create manufacturer {manufacturer_name}: {e}", exc_info = True)
         raise
 
+def _resolve_or_create(
+    endpoint: Endpoint, 
+    identifier: str, 
+    lookup_field: str = 'name',
+    create_payload: Dict | None = None
+) -> int | None:
+    """
+    Generic get-or-create function for NetBox objects.
+    
+    This is a more flexible version that could replace specific resolvers
+    like _resolve_virtual_chassis, _manufacturer, etc.
+    
+    Args:
+        endpoint: pynetbox endpoint (e.g., nb_session.dcim.virtual_chassis)
+        identifier: Value to search for
+        lookup_field: Field name to search on (default: 'name')
+        create_payload: Optional custom payload for creation. If None, uses
+                       {lookup_field: identifier}
+                       
+    Returns:
+        Object ID, or None on failure
+        
+    Examples:
+        >>> # Virtual chassis
+        >>> vc_id = _resolve_or_create(
+        ...     nb.dcim.virtual_chassis, 
+        ...     "rsgw1u140sp"
+        ... )
+        
+        >>> # Manufacturer with custom payload
+        >>> mfr_id = _resolve_or_create(
+        ...     nb.dcim.manufacturers,
+        ...     "Cisco",
+        ...     create_payload={'name': 'Cisco', 'slug': 'cisco'}
+        ... )
+        
+        >>> # Tag lookup (different field)
+        >>> tag_id = _resolve_or_create(
+        ...     nb.extras.tags,
+        ...     "switch",
+        ...     lookup_field='slug'
+        ... )
+    """
+    if not identifier:
+        return None
+    
+    try:
+        # Try to get existing object
+        obj = endpoint.get(**{lookup_field: identifier})
+        if obj:
+            logger.debug(f"Found existing {endpoint.name}: {identifier} (ID: {obj.id})")
+            return obj.id
+        
+        # Create new object if it doesn't exist
+        if create_payload is None:
+            create_payload = {lookup_field: identifier}
+        
+        logger.info(f"Creating new {endpoint.name}: {identifier}")
+        new_obj = endpoint.create(create_payload)
+        logger.info(f"Created {endpoint.name}: {identifier} (ID: {new_obj.id})")
+        return new_obj.id
+        
+    except Exception as e:
+        logger.error(
+            f"Error resolving {endpoint.name} '{identifier}': {e}",
+            exc_info=True
+        )
+        return None
 
 def _main(description: str, function: Callable, **kwargs) -> None:
     """
@@ -720,8 +788,8 @@ def _main(description: str, function: Callable, **kwargs) -> None:
     nb.http_session.verify = False # Disable SSL verification
 
     files_yaml = [
-        #"aruba_stack_2930.yaml"
-        "procurve_modular"
+        "aruba_stack_2920.yaml"
+        #"procurve_modular.yaml"
     ]
     
     for file_name in files_yaml:
