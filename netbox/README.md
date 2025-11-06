@@ -61,7 +61,6 @@ sudo pacman -Syu python-pynetbox python-packaging
 ### Python scripts
 
 - `add_locations.py` - add collected locations data to a NetBox platform using `pynetbox` library.
-- `chassis.py` - process chassis on a NetBox platform using `pynetbox` library.
 - `extra_functions.py` - more functions used in multiple python scripts.
 - `interfaces.py` - synchronize interfaces on a NetBox platform using `pynetbox` library
 - `json_functions_os_cx.py` - functions to return JSON objects for Aruba OS-CX switches.

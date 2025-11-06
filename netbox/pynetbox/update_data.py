@@ -16,7 +16,6 @@ from pynetbox.core.api import Api as NetBoxApi
 
 from add_locations import add_locations
 from switches import switches
-from chassis import chassis
 from modules import modules
 from vlans import vlans
 from interfaces import interfaces
@@ -39,9 +38,6 @@ def update(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
 
     logger.info("-- Update/Add switches data --")
     switches(nb_session, data)
-
-    logger.info("-- Update/Add chassis --")
-    chassis(nb_session, data)
 
     logger.info("-- Update/Add missing switch modules --")
     modules(nb_session, data)
