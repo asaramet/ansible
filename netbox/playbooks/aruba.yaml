@@ -8,7 +8,7 @@
 #
 # ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,create_vlans
 # ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,interfaces
-# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,trunks
+# ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,lags
 
 # ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,tagged_vlans
 # ansible-playbook playbooks/aruba.yaml --tags hpe_8,development,ip
@@ -383,14 +383,14 @@
           poe_type: "{{ item.poe_type }}"
           tagged_vlans: []
           untagged_vlan: "{{ { 'vlan_id': item.vlan_id, 'name': item.vlan_name } if item.vlan_id else omit }}" # omit the value if null id found
-          mode: "{{ 'Tagged' if item.is_trunk | default(false) else 'Access' }}" # Dynamically assign mode
+          mode: "{{ 'Tagged' if item.is_lag | default(false) else 'Access' }}" # Dynamically assign mode
         state: present
         update_vc_child: true
       loop: "{{ device_interfaces }}"
 
-    - name: Create Trunk interfaces as LAG
+    - name: Create lag interfaces as LAG
       tags:
-        - trunks
+        - lags
         - update
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
@@ -402,13 +402,13 @@
           type: Link Aggregation Group (LAG)
         update_vc_child: true
         state: present
-      loop: "{{ trunks }}"
-      when: trunks is defined and trunks | length > 0
+      loop: "{{ lags }}"
+      when: lags is defined and lags | length > 0
 
-    - name: Assign interfaces to Trunks
+    - name: Assign interfaces to lags
       tags:
-        - trunk_interfaces
-        - trunks
+        - lag_interfaces
+        - lags
         - update
       netbox.netbox.netbox_device_interface:
         netbox_url: "{{ netbox_url }}"
@@ -418,11 +418,11 @@
           device: "{{ item.hostname }}"
           name: "{{ item.interface }}"
           lag:
-            name: "{{ item.trunk_name }}"
+            name: "{{ item.lag_name }}"
         update_vc_child: true
         state: present
-      loop: "{{ trunk_interfaces }}"
-      when: trunks is defined and trunks | length > 0
+      loop: "{{ lag_interfaces }}"
+      when: lags is defined and lags | length > 0
 
     - name: Create LAG interfaces
       tags:
