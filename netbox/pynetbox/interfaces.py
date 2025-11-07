@@ -152,7 +152,7 @@ def delete_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]])
     
     # Report findings
     if not misplaced_interfaces:
-        logger.info("✅ No misplaced module interfaces found - all correctly assigned!")
+        logger.info("No misplaced module interfaces found - all correctly assigned!")
         return
     
     logger.warning(
@@ -244,7 +244,7 @@ def preview_delete_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List
     
     # Report
     if not misplaced:
-        logger.info("✅ No misplaced module interfaces found")
+        logger.info("No misplaced module interfaces found")
     else:
         logger.info(f"Found {len(misplaced)} misplaced module interface(s):")
         for item in misplaced:
@@ -539,7 +539,7 @@ def _cache_modules_for_devices(nb_session: NetBoxApi, cached_devices: Dict[str, 
     
     Module interfaces (like 2/A2) need to be assigned to the module, not the device.
     Module naming convention: {device_name}-{module_letter}
-    Example: rsgw2112sp-2-A for device rsgw2112sp-2, module A
+    Example: swgw1001ap-2-A for device swgw1001ap-2, module A
     
     Args:
         nb_session: pynetbox API session
@@ -547,7 +547,7 @@ def _cache_modules_for_devices(nb_session: NetBoxApi, cached_devices: Dict[str, 
     
     Returns:
         Dictionary with keys "device_name:module_letter" mapping to module objects
-        Example: {"rsgw2112sp-2:A": <module object>}
+        Example: {"swgw1001ap-2:A": <module object>}
     """
     if not cached_devices:
         return {}

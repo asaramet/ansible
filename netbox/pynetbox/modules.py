@@ -43,7 +43,7 @@ def module_bays(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> List[Dict
         
     Example YAML structure:
         modules:
-          - device: rsgw1u140sp-1
+          - device: swgw1001ap-1
             module_bay: A
             name: Module A
             new_position: 1/A
@@ -71,7 +71,7 @@ def module_bays(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> List[Dict
     
     # Step 2: Delete all old-format module bays in one efficient pass
     # This includes:
-    # - Old device-bay format (e.g., "rsgw1u140sp-1-A")
+    # - Old device-bay format (e.g., "swgw1001ap-1-A")
     # - Old-style names (e.g., "Module A", "Module B")
     old_bays_to_delete = _collect_all_old_format_bays(
         nb_session, modules_data, devices_cache
@@ -146,7 +146,7 @@ def modules(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> List[Dict[str
         
     Example YAML structure:
         modules:
-          - device: rsgw1u140sp-1
+          - device: swgw1001ap-1
             module_bay: A
             name: Module A
             new_position: 1/A
@@ -281,7 +281,7 @@ def _collect_all_old_format_bays(
     Collect all old-format module bays that need to be deleted.
     
     This combines two types of old bays:
-    1. Device-bay format (e.g., "rsgw1u140sp-1-A")
+    1. Device-bay format (e.g., "swgw1001ap-1-A")
     2. Old-style names (e.g., "Module A", "Module B")
     
     By combining them, we only query each device once instead of twice.
@@ -310,7 +310,7 @@ def _collect_all_old_format_bays(
         if device_name not in device_old_names_map:
             device_old_names_map[device_name] = set()
         
-        # Add device-bay format name (e.g., "rsgw1u140sp-1-A")
+        # Add device-bay format name (e.g., "swgw1001ap-1-A")
         if module_bay_letter:
             device_bay_name = f"{device_name}-{module_bay_letter}"
             device_old_names_map[device_name].add(device_bay_name)
@@ -523,7 +523,7 @@ def _process_module_operations(
             continue
         
         module_bay_position = new_position  # e.g., "1/A", "2/A"
-        device_bay_label = f"{device_name}-{module_bay}"  # e.g., "rsgw1u140sp-1-A"
+        device_bay_label = f"{device_name}-{module_bay}"  # e.g., "swgw1001ap-1-A"
         
         # Check for existing module bays with this name (position) on this device
         try:
@@ -697,7 +697,7 @@ def _build_module_payload(
         module_name: Position for the module bay (e.g., "1/A", "2/A") - becomes 'name'
         device_id: Device ID
         description: Description text (e.g., "Module A") - human readable
-        label: Label text (e.g., "rsgw1u140sp-1-A") - device-bay identifier
+        label: Label text (e.g., "swgw1001ap-1-A") - device-bay identifier
         existing_id: If provided, includes 'id' for update operation
         
     Returns:
@@ -710,7 +710,7 @@ def _build_module_payload(
         'position': module_name       # Position is same as name for module bays
     }
     
-    # Add label (device-bay format like "rsgw1u140sp-1-A")
+    # Add label (device-bay format like "swgw1001ap-1-A")
     if label:
         payload['label'] = label
     
@@ -867,18 +867,48 @@ def _process_module_installations(
                 current_module_type_id = getattr(getattr(existing_module, 'module_type', None), 'id', None)
                 current_label = getattr(existing_module, 'label', None)
                 
-                if current_module_type_id == module_type_id and current_label == new_position:
-                    # Module already correct - skip
-                    logger.debug(
-                        f"Module in bay {module_bay_position} on {device_name} is already correct, skipping"
-                    )
+                # Debug logging to see what we're comparing
+                logger.debug(
+                    f"Comparing module in bay {module_bay_position} on {device_name}: "
+                    f"current_module_type_id={current_module_type_id} vs target={module_type_id}, "
+                    f"current_label='{current_label}' vs target='{new_position}'"
+                )
+                
+                # Check if module type matches (this is the critical field)
+                module_type_matches = (current_module_type_id == module_type_id)
+                
+                # Check if label matches - be flexible about empty/None labels
+                # If label is empty/None, we consider it a match (can update it later if needed)
+                label_matches = (
+                    current_label == new_position or  # Exact match
+                    not current_label  # Empty/None label is OK - we can update it
+                )
+                
+                if module_type_matches and label_matches:
+                    # Module already correct (or label just needs updating, which is minor)
+                    if not current_label and new_position:
+                        logger.debug(
+                            f"Module in bay {module_bay_position} on {device_name} has empty label, "
+                            f"but module type matches. Considering it correct."
+                        )
+                    else:
+                        logger.debug(
+                            f"Module in bay {module_bay_position} on {device_name} is already correct, skipping"
+                        )
                     skipped_count += 1
                     continue
                 else:
-                    # Module exists but doesn't match - this shouldn't happen if module_bays() ran
-                    logger.debug(
+                    # Module exists but doesn't match
+                    mismatch_reasons = []
+                    if not module_type_matches:
+                        mismatch_reasons.append(f"module_type: {current_module_type_id} != {module_type_id}")
+                    if current_label and current_label != new_position:
+                        # Only report label mismatch if current label exists and is different
+                        mismatch_reasons.append(f"label: '{current_label}' != '{new_position}'")
+                    
+                    logger.warning(
                         f"Module in bay {module_bay_position} on {device_name} exists but doesn't match config. "
-                        f"Run module_bays() first to clean up. Skipping to avoid error."
+                        f"Mismatches: {', '.join(mismatch_reasons)}. Skipping to avoid error."
                     )
                     skipped_count += 1
                     continue
