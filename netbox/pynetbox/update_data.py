@@ -16,11 +16,11 @@ from pynetbox.core.api import Api as NetBoxApi
 
 from add_locations import add_locations
 from switches import switches
-from modules import modules
+from modules import module_bays, modules
 from vlans import vlans
-from interfaces import interfaces
+from interfaces import interfaces, delete_device_interfaces
 #from trunks, trunks
-from ips import ips
+#from ips import ips
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -39,11 +39,13 @@ def update(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
     logger.info("-- Update/Add switches data --")
     switches(nb_session, data)
 
-    logger.info("-- Update/Add missing switch modules --")
-    modules(nb_session, data)
-
     logger.info("-- Synchronize VLANs --")
     vlans(nb_session, data)
+
+    logger.info("-- Update/Add missing switch modules --")
+    delete_device_interfaces(nb_session, data)
+    module_bays(nb_session, data)
+    modules(nb_session, data)
 
     logger.info("-- Update interfaces --")
     interfaces(nb_session, data)

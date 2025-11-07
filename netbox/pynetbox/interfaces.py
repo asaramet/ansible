@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 from pynetbox.core.api import Api as NetBoxApi
 
 # Import the standard delete function from pynetbox_functions
-from pynetbox_functions import _bulk_delete_interfaces, _bulk_create, _bulk_update
+from pynetbox_functions import _bulk_create, _bulk_update
 from pynetbox_functions import _cache_devices
     
 logger = logging.getLogger(__name__)
@@ -44,6 +44,248 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
     
     logger.info("=== Interface management completed ===")
 
+
+def _bulk_delete_interfaces(interfaces: List[object]) -> int:
+    """
+    Delete interfaces using the standard _delete_netbox_obj function.
+    
+    Args:
+        interfaces: List of interface objects to delete
+    
+    Returns:
+        Number of successfully deleted interfaces
+    """
+    if not interfaces:
+        return 0
+    
+    deleted_count = 0
+    
+    logger.info(f"Attempting to delete {len(interfaces)} interfaces...")
+    
+    # Use the existing _delete_netbox_obj function for consistency
+    for interface in interfaces:
+        if _delete_netbox_obj(interface):
+            deleted_count += 1
+    
+    logger.info(f"Successfully deleted {deleted_count}/{len(interfaces)} interfaces")
+    return deleted_count
+
+
+def delete_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
+    """
+    Delete module interfaces that are incorrectly assigned to devices.
+    
+    Module interfaces (e.g., 1/A1, 2/B1, 3/C2) should be on modules, not devices.
+    This function:
+    1. Identifies interfaces that look like module interfaces
+    2. Checks if they're assigned to devices (wrong!)
+    3. Collects them in a list
+    4. Deletes them
+    
+    Use this to clean up interfaces created in the wrong location before
+    recreating them correctly on modules.
+    
+    Args:
+        nb_session: pynetbox API session
+        data: Dictionary containing 'device_interfaces' with interface data
+    
+    Example:
+        >>> # Preview first
+        >>> preview_delete_device_interfaces(nb_session, data)
+        >>> 
+        >>> # Then delete
+        >>> delete_device_interfaces(nb_session, data)
+    """
+    from pynetbox_functions import _cache_devices, _delete_netbox_obj
+    
+    if 'device_interfaces' not in data or not data['device_interfaces']:
+        logger.info("No device_interfaces in data, nothing to delete")
+        return
+    
+    logger.info("=== Scanning for misplaced module interfaces ===")
+    
+    # Collect device names
+    device_names = list(set([entry.get('hostname') for entry in data['device_interfaces'] if entry.get('hostname')]))
+    
+    if not device_names:
+        logger.warning("No valid device names found in data")
+        return
+    
+    # Cache devices
+    cached_devices = _cache_devices(nb_session, device_names)
+    logger.info(f"Cached {len(cached_devices)} devices")
+    
+    # Get all interfaces for these devices
+    device_ids = [device.id for device in cached_devices.values()]
+    cached_interfaces = _cache_interfaces_by_device(nb_session, device_ids)
+    logger.info(f"Cached {len(cached_interfaces)} total interfaces")
+    
+    # Identify module interfaces on devices (wrong placement)
+    misplaced_interfaces = []
+    
+    for interface_key, interface in cached_interfaces.items():
+        interface_name = interface.name
+        
+        # Check if this looks like a module interface
+        module_letter = _extract_module_letter(interface_name)
+        
+        if module_letter:
+            # This is a module interface name (e.g., 1/A1, 2/B2)
+            # Check if it's assigned to a device (wrong!) instead of a module
+            
+            has_device = hasattr(interface, 'device') and interface.device
+            has_module = hasattr(interface, 'module') and interface.module
+            
+            if has_device and not has_module:
+                # Module interface wrongly on device!
+                device_name = interface.device.name if hasattr(interface.device, 'name') else 'unknown'
+                misplaced_interfaces.append({
+                    'interface': interface,
+                    'name': interface_name,
+                    'device': device_name,
+                    'module_letter': module_letter
+                })
+                logger.debug(
+                    f"Found misplaced: {interface_name} on device {device_name} "
+                    f"(should be on module {device_name}-{module_letter})"
+                )
+    
+    # Report findings
+    if not misplaced_interfaces:
+        logger.info("✅ No misplaced module interfaces found - all correctly assigned!")
+        return
+    
+    logger.warning(
+        f"Found {len(misplaced_interfaces)} module interface(s) incorrectly on devices"
+    )
+    
+    # Show what will be deleted
+    logger.info("Module interfaces to delete:")
+    for item in misplaced_interfaces:
+        logger.info(
+            f"  - {item['name']} on device {item['device']} "
+            f"(should be on module {item['device']}-{item['module_letter']})"
+        )
+    
+    # Delete them
+    logger.info(f"Deleting {len(misplaced_interfaces)} misplaced module interfaces...")
+    
+    deleted_count = 0
+    failed_count = 0
+    
+    for item in misplaced_interfaces:
+        if _delete_netbox_obj(item['interface']):
+            deleted_count += 1
+        else:
+            failed_count += 1
+    
+    # Summary
+    logger.info(
+        f"Deletion complete: {deleted_count}/{len(misplaced_interfaces)} deleted"
+    )
+    if failed_count > 0:
+        logger.warning(f"{failed_count} failed to delete (may have dependencies)")
+    
+    logger.info("=== Module interface cleanup completed ===")
+
+
+def preview_delete_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> List[Dict]:
+    """
+    Preview which module interfaces would be deleted (dry-run).
+    
+    Same as delete_device_interfaces but doesn't actually delete anything.
+    
+    Args:
+        nb_session: pynetbox API session
+        data: Dictionary containing 'device_interfaces'
+    
+    Returns:
+        List of dicts with interface details that would be deleted
+    """
+    from pynetbox_functions import _cache_devices
+    
+    if 'device_interfaces' not in data or not data['device_interfaces']:
+        logger.info("No device_interfaces in data")
+        return []
+    
+    logger.info("=== Preview: Scanning for misplaced module interfaces ===")
+    
+    # Collect device names
+    device_names = list(set([entry.get('hostname') for entry in data['device_interfaces'] if entry.get('hostname')]))
+    
+    if not device_names:
+        return []
+    
+    # Cache devices and interfaces
+    cached_devices = _cache_devices(nb_session, device_names)
+    device_ids = [device.id for device in cached_devices.values()]
+    cached_interfaces = _cache_interfaces_by_device(nb_session, device_ids)
+    
+    # Identify misplaced
+    misplaced = []
+    
+    for interface_key, interface in cached_interfaces.items():
+        interface_name = interface.name
+        module_letter = _extract_module_letter(interface_name)
+        
+        if module_letter:
+            has_device = hasattr(interface, 'device') and interface.device
+            has_module = hasattr(interface, 'module') and interface.module
+            
+            if has_device and not has_module:
+                device_name = interface.device.name if hasattr(interface.device, 'name') else 'unknown'
+                misplaced.append({
+                    'interface_id': interface.id,
+                    'name': interface_name,
+                    'device': device_name,
+                    'module_letter': module_letter,
+                    'should_be_on': f"{device_name}-{module_letter}"
+                })
+    
+    # Report
+    if not misplaced:
+        logger.info("✅ No misplaced module interfaces found")
+    else:
+        logger.info(f"Found {len(misplaced)} misplaced module interface(s):")
+        for item in misplaced:
+            logger.info(
+                f"  - {item['name']} on device {item['device']} "
+                f"(should be on {item['should_be_on']})"
+            )
+    
+    logger.info("=== Preview complete (no deletion) ===")
+    return misplaced
+
+
+def _bulk_delete_interfaces(interfaces: List[object]) -> int:
+    """
+    Delete interfaces using the standard _delete_netbox_obj function.
+    
+    Args:
+        interfaces: List of interface objects to delete
+    
+    Returns:
+        Number of successfully deleted interfaces
+    """
+    if not interfaces:
+        return 0
+    
+    # Import the standard delete function from pynetbox_functions
+    from pynetbox_functions import _delete_netbox_obj
+    
+    deleted_count = 0
+    
+    logger.info(f"Attempting to delete {len(interfaces)} interfaces...")
+    
+    # Use the existing _delete_netbox_obj function for consistency
+    for interface in interfaces:
+        if _delete_netbox_obj(interface):
+            deleted_count += 1
+    
+    logger.info(f"Successfully deleted {deleted_count}/{len(interfaces)} interfaces")
+    return deleted_count
+
+
 def _delete_interfaces(nb_session: NetBoxApi, delete_list: List[Dict[str, str]]) -> None:
     """
     Delete specified interfaces from NetBox using bulk operations.
@@ -64,6 +306,7 @@ def _delete_interfaces(nb_session: NetBoxApi, delete_list: List[Dict[str, str]])
     
     # Step 2: Bulk fetch devices using existing function
     logger.info(f"Fetching {len(hostnames)} devices for interface deletion...")
+    from pynetbox_functions import _cache_devices
     cached_devices = _cache_devices(nb_session, hostnames)
     
     if not cached_devices:
@@ -109,6 +352,7 @@ def _delete_interfaces(nb_session: NetBoxApi, delete_list: List[Dict[str, str]])
     deleted_count = _bulk_delete_interfaces(interfaces_to_delete)
     
     logger.info(f"Deletion summary: {deleted_count} deleted, {not_found_count} not found")
+
 
 def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
     """
@@ -163,6 +407,9 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
     device_names = list(set([entry['hostname'] for entry in all_interfaces_to_process.values()]))
     cached_devices = _cache_devices(nb_session, device_names)
     
+    # Cache modules for devices (for module interfaces like 2/A2)
+    cached_modules = _cache_modules_for_devices(nb_session, cached_devices)
+    
     # Cache VLANs for the devices
     cached_vlans = _cache_vlans_for_devices(nb_session, cached_devices)
     
@@ -194,6 +441,7 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
         is_trunk = len(tagged_vlans_list) > 0 or entry.get('is_trunk', False)
         
         logger.debug(f"Processing interface {interface_name} on {hostname}: is_trunk={is_trunk}, tagged_vlans={len(tagged_vlans_list)}")
+        logger.debug(f"Raw entry data: hostname={hostname}, interface={interface_name}, type={entry.get('type')}, name={entry.get('name')}")
         
         # Prepare interface payload
         interface_payload = _prepare_interface_payload(
@@ -201,6 +449,7 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
             entry=entry,
             is_trunk=is_trunk,
             cached_vlans=cached_vlans,
+            cached_modules=cached_modules,
             nb_session=nb_session
         )
         
@@ -284,6 +533,84 @@ def _build_tagged_vlans_lookup(tagged_vlans_data: List[Dict]) -> Dict[str, List[
     return lookup
 
 
+def _cache_modules_for_devices(nb_session: NetBoxApi, cached_devices: Dict[str, object]) -> Dict[str, object]:
+    """
+    Cache all modules for given devices in bulk.
+    
+    Module interfaces (like 2/A2) need to be assigned to the module, not the device.
+    Module naming convention: {device_name}-{module_letter}
+    Example: rsgw2112sp-2-A for device rsgw2112sp-2, module A
+    
+    Args:
+        nb_session: pynetbox API session
+        cached_devices: Dictionary of cached device objects
+    
+    Returns:
+        Dictionary with keys "device_name:module_letter" mapping to module objects
+        Example: {"rsgw2112sp-2:A": <module object>}
+    """
+    if not cached_devices:
+        return {}
+    
+    cached_modules = {}
+    device_ids = [device.id for device in cached_devices.values()]
+    
+    try:
+        # Bulk fetch all modules for the devices
+        chunk_size = 500
+        
+        for i in range(0, len(device_ids), chunk_size):
+            chunk = device_ids[i:i + chunk_size]
+            modules = nb_session.dcim.modules.filter(device_id=chunk)
+            
+            # Check if we actually got any modules
+            modules_list = list(modules)
+            if not modules_list:
+                logger.debug(f"No modules found for device IDs chunk: {chunk[:3]}... ({len(chunk)} devices)")
+                continue
+            
+            logger.debug(f"Found {len(modules_list)} modules for chunk of {len(chunk)} devices")
+            
+            for module in modules_list:
+                try:
+                    # Safely get module name
+                    module_name = getattr(module, 'name', None)
+                    if not module_name:
+                        logger.debug(f"Module object missing 'name' attribute, skipping: {module}")
+                        continue
+                    
+                    # Module name format: {device_name}-{module_letter}
+                    # Extract the module letter (last part after last hyphen)
+                    module_parts = module_name.split('-')
+                    if len(module_parts) > 0:
+                        module_letter = module_parts[-1]  # e.g., "A", "B", "C"
+                        
+                        # Find the device name for this module
+                        device_name = None
+                        if hasattr(module, 'device'):
+                            device_name = getattr(module.device, 'name', None)
+                        
+                        if device_name:
+                            key = f"{device_name}:{module_letter}"
+                            cached_modules[key] = module
+                            logger.debug(f"Cached module {module_name} as {key}")
+                        else:
+                            logger.debug(f"Module {module_name} has no device.name, skipping")
+                except Exception as e:
+                    logger.debug(f"Error processing individual module: {e}")
+        
+        if cached_modules:
+            logger.info(f"Cached {len(cached_modules)} modules for {len(cached_devices)} devices")
+        else:
+            logger.info(f"No modules found for {len(cached_devices)} devices (devices may not have modules)")
+        
+        return cached_modules
+        
+    except Exception as e:
+        logger.warning(f"Error caching modules: {e}. Module interfaces may fail.", exc_info=True)
+        return {}
+
+
 def _cache_interfaces_by_device(nb_session: NetBoxApi, device_ids: List[int]) -> Dict[str, object]:
     """
     Cache all interfaces for given device IDs in bulk.
@@ -303,7 +630,7 @@ def _cache_interfaces_by_device(nb_session: NetBoxApi, device_ids: List[int]) ->
     try:
         # Bulk fetch all interfaces for the devices
         # Note: NetBox API may have limits on filter size, so we might need to chunk
-        chunk_size = 100  # Adjust based on your NetBox configuration
+        chunk_size = 500  # Adjust based on your NetBox configuration
         
         for i in range(0, len(device_ids), chunk_size):
             chunk = device_ids[i:i + chunk_size]
@@ -431,16 +758,57 @@ def _get_vlan_object(nb_session: NetBoxApi, device: object, vlan_id: Optional[st
     return None
 
 
+def _extract_module_letter(interface_name: str) -> Optional[str]:
+    """
+    Extract module letter from interface name.
+    
+    Module interfaces follow pattern: {slot}/{module_letter}{port}
+    Examples:
+    - "2/A2" → "A"
+    - "1/B1" → "B"
+    - "3/C10" → "C"
+    - "1/15" → None (not a module interface)
+    - "Trk1" → None (trunk, not a module interface)
+    
+    Args:
+        interface_name: Interface name (e.g., "2/A2")
+    
+    Returns:
+        Module letter if this is a module interface, None otherwise
+    """
+    if '/' not in interface_name:
+        # No slash, not a module interface (e.g., "Trk1")
+        return None
+    
+    # Split by slash
+    parts = interface_name.split('/')
+    if len(parts) != 2:
+        return None
+    
+    # Second part should be module letter + port number (e.g., "A2")
+    port_part = parts[1]
+    
+    # Check if first character is a letter (module letter)
+    if port_part and port_part[0].isalpha():
+        return port_part[0].upper()  # Return uppercase letter
+    
+    return None
+
+
 def _prepare_interface_payload(device: object, entry: Dict, is_trunk: bool,
-                              cached_vlans: Dict, nb_session: NetBoxApi) -> Dict:
+                              cached_vlans: Dict, cached_modules: Dict, nb_session: NetBoxApi) -> Dict:
     """
     Prepare interface payload for bulk create/update.
+    
+    Handles both device interfaces and module interfaces.
+    Module interfaces (e.g., 2/A2) are assigned to modules, not devices.
     
     Args:
         device: Device object
         entry: Interface data dictionary
         is_trunk: Whether this is a trunk interface
         cached_vlans: Cached VLANs dictionary
+        cached_modules: Cached modules dictionary
         nb_session: pynetbox API session
     
     Returns:
@@ -448,13 +816,40 @@ def _prepare_interface_payload(device: object, entry: Dict, is_trunk: bool,
     """
     interface_name = entry['interface']
     
+    # Detect if this is a module interface and get the module
+    module_letter = _extract_module_letter(interface_name)
+    module = None
+    
+    if module_letter:
+        # This is a module interface (e.g., 2/A2 → module A)
+        module_key = f"{device.name}:{module_letter}"
+        module = cached_modules.get(module_key)
+        
+        if module:
+            logger.debug(f"Interface {interface_name} will be assigned to module {module.name}")
+        else:
+            logger.warning(
+                f"Interface {interface_name} appears to be a module interface (module {module_letter}), "
+                f"but module {device.name}-{module_letter} not found. Will assign to device instead."
+            )
+    
     # Prepare interface payload
     interface_payload = {
-        'device': device.id,
         'name': interface_name,
         'type': entry.get('type', '1000base-t'),
         'description': entry.get('name', ''),
     }
+    
+    logger.debug(f"Creating interface payload: name='{interface_name}', type={entry.get('type', '1000base-t')}")
+    
+    # CRITICAL: Assign to module OR device
+    if module:
+        interface_payload['module'] = module.id
+        logger.debug(f"Assigning to module ID {module.id} (module: {getattr(module, 'name', 'unknown')})")
+        # Module interfaces don't have 'device' field
+    else:
+        interface_payload['device'] = device.id
+        logger.debug(f"Assigning to device ID {device.id} (device: {device.name})")
     
     # Add PoE settings if present
     if entry.get('poe_mode'):
@@ -587,10 +982,10 @@ def _assign_tagged_vlans_bulk(nb_session: NetBoxApi, interfaces_data: List[Dict]
 
 # Main execution function for standalone testing
 if __name__ == "__main__":
-    from pynetbox_functions import _main, _debug
+    from pynetbox_functions import _main
     
-    #_debug(
     _main(
         description="Manage device interfaces in NetBox (create, update, delete with VLAN assignments)",
-        function=interfaces
+        #function=interfaces
+        function=delete_device_interfaces
     )

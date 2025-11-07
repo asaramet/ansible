@@ -575,7 +575,7 @@ def _format_value_for_log(value) -> str:
         return f"{value[:47]}..."
     
     return str(value)
-
+'''
 def _delete_netbox_obj(obj: Record) -> bool:
     """
     Delete a provided NetBox object (obj)
@@ -602,31 +602,77 @@ def _delete_netbox_obj(obj: Record) -> bool:
     except Exception as exc:
         logger.error(f"Unexpected error deleting {getattr(obj, 'name', obj)}: {exc}", exc_info = True)
         return False
+'''
 
-def _bulk_delete_interfaces(interfaces: List[object]) -> int:
+def _delete_netbox_obj(obj: Record) -> bool:
     """
-    Delete interfaces using the standard _delete_netbox_obj function.
+    Delete a provided NetBox object (obj)
+    Args:
+        obj: pynetbox response.Response Object to delete from the NetBox platform
+    """
+    if not obj: return False
+    
+    # Get a good identifier for logging (some objects don't have 'name')
+    obj_identifier = _get_object_identifier(obj)
+
+    try: 
+        obj.delete()
+        logger.info(f"Removed {obj_identifier}")
+        return True
+    except pynetbox.core.query.RequestError as e:
+        # safe access to underlying HTTP response status code
+        status = getattr(getattr(e, "req", None), "status_code", None)
+        # try to get the server-provided error detail if present
+        detail = getattr(e, "error", None) or getattr(e, "args", None)
+
+        if status == 409:
+            logger.info(f"Skipped {obj_identifier} (has dependencies). Detail: {detail}")
+        else:
+            logger.error(f"Failed to delete {obj_identifier}: {detail or e}", exc_info = True)
+        return False
+    except Exception as exc:
+        logger.error(f"Unexpected error deleting {obj_identifier}: {exc}", exc_info = True)
+        return False
+
+def _get_object_identifier(obj) -> str:
+    """
+    Get a meaningful identifier for a NetBox object for logging purposes.
+    
+    Tries multiple attributes to get the best available identifier:
+    - name (for most objects)
+    - display (fallback for objects without name)
+    - module_type + device (for modules)
+    - id (last resort)
     
     Args:
-        interfaces: List of interface objects to delete
-    
+        obj: NetBox object
+        
     Returns:
-        Number of successfully deleted interfaces
+        String identifier for logging
     """
-    if not interfaces:
-        return 0
+    if not obj:
+        return "None"
     
-    deleted_count = 0
+    # Try name first (most common)
+    if hasattr(obj, 'name') and obj.name:
+        return f"{obj.name} (ID: {getattr(obj, 'id', '?')})"
     
-    logger.info(f"Attempting to delete {len(interfaces)} interfaces...")
+    # Try display (common fallback)
+    if hasattr(obj, 'display') and obj.display:
+        return f"{obj.display} (ID: {getattr(obj, 'id', '?')})"
     
-    # Use the existing _delete_netbox_obj function for consistency
-    for interface in interfaces:
-        if _delete_netbox_obj(interface):
-            deleted_count += 1
+    # For modules, try to build a meaningful name
+    if hasattr(obj, 'module_type') and obj.module_type:
+        module_type_name = getattr(obj.module_type, 'display', 'Module')
+        obj_id = getattr(obj, 'id', '?')
+        return f"{module_type_name} (ID: {obj_id})"
     
-    logger.info(f"Successfully deleted {deleted_count}/{len(interfaces)} interfaces")
-    return deleted_count
+    # Last resort - just the ID
+    if hasattr(obj, 'id'):
+        return f"Object ID: {obj.id}"
+    
+    # Really last resort
+    return str(obj)
 
 def _resolve_tags(nb_session: NetBoxApi, tags: List[str] | str | None) -> List[int]:
     """
