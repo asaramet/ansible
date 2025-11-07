@@ -22,14 +22,14 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
     Process flow:
     1. Delete interfaces specified in 'delete_interfaces'
     2. Create/update interfaces from 'device_interfaces'
-    3. Add tagged VLANs from 'tagged_vlans' to trunk interfaces
+    3. Add tagged VLANs from 'tagged_vlans' to lag interfaces
     
     Args:
         nb_session: pynetbox API session
         data: Dictionary containing:
             - 'delete_interfaces': List of interfaces to delete
             - 'device_interfaces': List of interfaces to create/update
-            - 'tagged_vlans': List of trunk interfaces with tagged VLANs
+            - 'tagged_vlans': List of lag interfaces with tagged VLANs
     """
     
     # Step 1: Delete interfaces if specified
@@ -371,7 +371,7 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
     tagged_vlans_lookup = _build_tagged_vlans_lookup(tagged_vlans_data)
     
     # IMPORTANT: Collect ALL interfaces to process
-    # Some interfaces may only be in tagged_vlans (trunks), not in device_interfaces
+    # Some interfaces may only be in tagged_vlans (lags), not in device_interfaces
     all_interfaces_to_process = {}  # Key: "hostname:interface", Value: entry dict
     
     # First, add all from device_interfaces
@@ -382,22 +382,22 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
             key = f"{hostname}:{interface_name}"
             all_interfaces_to_process[key] = entry.copy()
     
-    # Then, add trunk interfaces from tagged_vlans that aren't in device_interfaces
-    for trunk_entry in tagged_vlans_data:
-        hostname = trunk_entry.get('hostname')
-        interface_name = trunk_entry.get('interface')
+    # Then, add lag interfaces from tagged_vlans that aren't in device_interfaces
+    for lag_entry in tagged_vlans_data:
+        hostname = lag_entry.get('hostname')
+        interface_name = lag_entry.get('interface')
         if hostname and interface_name:
             key = f"{hostname}:{interface_name}"
             if key not in all_interfaces_to_process:
-                # This trunk interface is not in device_interfaces, add it
+                # This lag interface is not in device_interfaces, add it
                 all_interfaces_to_process[key] = {
                     'hostname': hostname,
                     'interface': interface_name,
-                    'is_trunk': True,
-                    'type': 'lag',  # Assume LAG/trunk type
-                    'name': f"Trunk {interface_name}",  # Default description
+                    'is_lag': True,
+                    'type': 'lag',  # Assume LAG/lag type
+                    'name': f"lag {interface_name}",  # Default description
                 }
-                logger.debug(f"Added trunk interface {interface_name} on {hostname} (only in tagged_vlans)")
+                logger.debug(f"Added lag interface {interface_name} on {hostname} (only in tagged_vlans)")
     
     if not all_interfaces_to_process:
         logger.info("No interfaces to process")
@@ -435,19 +435,19 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
             logger.warning(f"Device {hostname} not found in cache, skipping interface {interface_name}")
             continue
         
-        # Check if this interface has tagged VLANs (making it a trunk)
+        # Check if this interface has tagged VLANs (making it a lag)
         lookup_key = f"{hostname}:{interface_name}"
         tagged_vlans_list = tagged_vlans_lookup.get(lookup_key, [])
-        is_trunk = len(tagged_vlans_list) > 0 or entry.get('is_trunk', False)
+        is_lag = len(tagged_vlans_list) > 0 or entry.get('is_lag', False)
         
-        logger.debug(f"Processing interface {interface_name} on {hostname}: is_trunk={is_trunk}, tagged_vlans={len(tagged_vlans_list)}")
+        logger.debug(f"Processing interface {interface_name} on {hostname}: is_lag={is_lag}, tagged_vlans={len(tagged_vlans_list)}")
         logger.debug(f"Raw entry data: hostname={hostname}, interface={interface_name}, type={entry.get('type')}, name={entry.get('name')}")
         
         # Prepare interface payload
         interface_payload = _prepare_interface_payload(
             device=device,
             entry=entry,
-            is_trunk=is_trunk,
+            is_lag=is_lag,
             cached_vlans=cached_vlans,
             cached_modules=cached_modules,
             nb_session=nb_session
@@ -465,7 +465,7 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
                 'interface': existing_interface,
                 'device': device,
                 'tagged_vlans': tagged_vlans_list,
-                'is_trunk': is_trunk
+                'is_lag': is_lag
             })
         else:
             # Prepare for creation
@@ -474,7 +474,7 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
                 'interface_name': interface_name,
                 'device': device,
                 'tagged_vlans': tagged_vlans_list,
-                'is_trunk': is_trunk,
+                'is_lag': is_lag,
                 'payload': interface_payload
             })
     
@@ -497,7 +497,7 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
             kind='interface'
         )
     
-    # Assign tagged VLANs to trunk interfaces (must be done after interface creation/update)
+    # Assign tagged VLANs to lag interfaces (must be done after interface creation/update)
     _assign_tagged_vlans_bulk(
         nb_session=nb_session,
         interfaces_data=interfaces_for_vlan_assignment,
@@ -768,7 +768,7 @@ def _extract_module_letter(interface_name: str) -> Optional[str]:
     - "1/B1" → "B"
     - "3/C10" → "C"
     - "1/15" → None (not a module interface)
-    - "Trk1" → None (trunk, not a module interface)
+    - "Trk1" → None (lag, not a module interface)
     
     Args:
         interface_name: Interface name (e.g., "2/A2")
@@ -795,7 +795,7 @@ def _extract_module_letter(interface_name: str) -> Optional[str]:
     return None
 
 
-def _prepare_interface_payload(device: object, entry: Dict, is_trunk: bool,
+def _prepare_interface_payload(device: object, entry: Dict, is_lag: bool,
                               cached_vlans: Dict, cached_modules: Dict, nb_session: NetBoxApi) -> Dict:
     """
     Prepare interface payload for bulk create/update.
@@ -806,7 +806,7 @@ def _prepare_interface_payload(device: object, entry: Dict, is_trunk: bool,
     Args:
         device: Device object
         entry: Interface data dictionary
-        is_trunk: Whether this is a trunk interface
+        is_lag: Whether this is a lag interface
         cached_vlans: Cached VLANs dictionary
         cached_modules: Cached modules dictionary
         nb_session: pynetbox API session
@@ -858,8 +858,8 @@ def _prepare_interface_payload(device: object, entry: Dict, is_trunk: bool,
         interface_payload['poe_type'] = entry['poe_type']
     
     # CRITICAL: Determine mode and handle VLAN assignments properly
-    if is_trunk:
-        # This is a trunk interface - tagged mode
+    if is_lag:
+        # This is a lag interface - tagged mode
         interface_payload['mode'] = 'tagged'
         # IMPORTANT: When switching to tagged mode, must clear untagged_vlan
         # NetBox doesn't allow both tagged VLANs and untagged_vlan in tagged mode
@@ -884,7 +884,7 @@ def _assign_tagged_vlans_bulk(nb_session: NetBoxApi, interfaces_data: List[Dict]
                               created_interfaces: List, updated_interfaces: List,
                               cached_vlans: Dict) -> None:
     """
-    Assign tagged VLANs to trunk interfaces after they've been created/updated.
+    Assign tagged VLANs to lag interfaces after they've been created/updated.
     
     Args:
         nb_session: pynetbox API session
@@ -908,7 +908,7 @@ def _assign_tagged_vlans_bulk(nb_session: NetBoxApi, interfaces_data: List[Dict]
     vlan_assignment_count = 0
     
     for data in interfaces_data:
-        if not data.get('is_trunk') or not data.get('tagged_vlans'):
+        if not data.get('is_lag') or not data.get('tagged_vlans'):
             continue
         
         # Get the interface object
@@ -927,7 +927,7 @@ def _assign_tagged_vlans_bulk(nb_session: NetBoxApi, interfaces_data: List[Dict]
             # Try to get updated version, fallback to the one we have
             interface = updated_lookup.get(key, interface)
             
-            # CRITICAL: If we're converting from access to trunk, need to refresh the object
+            # CRITICAL: If we're converting from access to lag, need to refresh the object
             # to ensure mode change has been applied
             if interface.mode != 'tagged':
                 try:
@@ -967,7 +967,7 @@ def _assign_tagged_vlans_bulk(nb_session: NetBoxApi, interfaces_data: List[Dict]
                 logger.error(f"Error assigning tagged VLANs to {interface.name} on {device.name}: {e}", exc_info=True)
     
     if vlan_assignment_count > 0:
-        logger.info(f"Total trunk interfaces configured: {vlan_assignment_count}")
+        logger.info(f"Total lag interfaces configured: {vlan_assignment_count}")
         logger.warning(f"Could not find VLAN {vlan_name} (ID: {vlan_id}) for interface {interface.name} on {device.name}")
         
         if vlan_objects:

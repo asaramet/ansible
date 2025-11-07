@@ -365,26 +365,26 @@ def get_device_role(t_file, hostname):
 
     return "access-layer-switch"
 
-def get_trunks(t_file):
+def get_lags(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    trunks = []
+    lags = []
     for line in recursive_search("trunk", text, True):
         line_data = line.split()
-        trunks.append({"name": line_data[2], 'interfaces': line_data[1]})
+        lags.append({"name": line_data[2], 'interfaces': line_data[1]})
 
-    return trunks
+    return lags
 
-def get_trunk_stack(t_file):
-    trunks = []
+def get_lag_stack(t_file):
+    lags = []
 
-    for trunk_dict in get_trunks(t_file):
-        for interface in trunk_dict['interfaces'].split(','):
+    for lag_dict in get_lags(t_file):
+        for interface in lag_dict['interfaces'].split(','):
             interface = interface.split('/')[0]
-            trunks.append((trunk_dict['name'].title(), interface))
+            lags.append((lag_dict['name'].title(), interface))
 
-    return trunks
+    return lags
 
 def get_interface_names(t_file):
     with open(t_file, "r") as f:
@@ -434,7 +434,7 @@ def get_untagged_vlans(t_file):
     for vlan_id, interfaces in access_vlan_map.items():
         untagged.append((vlan_id, ','.join(interfaces), False))
 
-    # --- Trunk Native VLANs ---
+    # --- lag Native VLANs ---
     native_vlan_map = {}
     for interface, vlan_line in recursive_section_search(text, 'interface', 'vlan trunk'):
         parts = vlan_line.split()
@@ -800,20 +800,20 @@ def debug_get_device_role(data_folder):
     print("\n== Debug: get_device_role ==")
     print(tabulate(table, headers, "github"))
 
-def debug_get_trunks(data_folder):
+def debug_get_lags(data_folder):
     table = []
-    headers = ["File Name", "Trunks"]
+    headers = ["File Name", "lags"]
     for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_trunks(f)])
-    print("\n== Debug: get_trunks ==")
+        table.append([os.path.basename(f), get_lags(f)])
+    print("\n== Debug: get_lags ==")
     print(tabulate(table, headers))
 
-def debug_get_trunk_stack(data_folder):
+def debug_get_lag_stack(data_folder):
     table = []
-    headers = ["File Name", "Trunks sets"]
+    headers = ["File Name", "lags sets"]
     for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_trunk_stack(f)])
-    print("\n== Debug: get_trunks ==")
+        table.append([os.path.basename(f), get_lag_stack(f)])
+    print("\n== Debug: get_lags ==")
     print(tabulate(table, headers))
 
 def debug_get_interface_names(data_folder):
@@ -916,14 +916,14 @@ if __name__ == "__main__":
         #debug_get_os_version(data_folder)
         #debug_get_device_role(data_folder)
         #debug_site_slug(data_folder)
-        #debug_get_trunks(data_folder)
+        debug_get_lags(data_folder)
         #debug_get_interface_names(data_folder)
         #debug_get_vlans(data_folder)
         #debug_get_vlans_names(data_folder)
-        #debug_get_untagged_vlans(data_folder)
+        debug_get_untagged_vlans(data_folder)
         #debug_get_ip_address(data_folder)
         #debug_device_type(data_folder)
-        debug_get_modules(data_folder)
+        #debug_get_modules(data_folder)
         #debug_get_location(data_folder)
         #debug_floor_slug(data_folder)
         #debug_room_slug(data_folder)

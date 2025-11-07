@@ -10,8 +10,8 @@ from sort_data import get_switch_type
 from std_functions import device_type_slags, main_folder, config_files
 from std_functions import serial_numbers, convert_interfaces_range
 from std_functions import get_os_version, get_hostname, get_device_role
-from std_functions import get_trunks, get_interface_names, get_vlans
-from std_functions import get_untagged_vlans, get_tagged_vlans, get_vlans_names, get_trunk_stack
+from std_functions import get_lags, get_interface_names, get_vlans
+from std_functions import get_untagged_vlans, get_tagged_vlans, get_vlans_names, get_lag_stack
 from std_functions import get_ip_address, get_modules
 from std_functions import module_types_dict, modules_interfaces
 from std_functions import convert_range
@@ -127,30 +127,30 @@ def devices_json(config_files, device_type_slags, tags):
 
     return data
 
-# return trunks and interfaces json objects
-def trunks_json(config_files):
-    data = {'trunks':[], 'trunk_interfaces':[]}
+# return lags and interfaces json objects
+def lags_json(config_files):
+    data = {'lags':[], 'lag_interfaces':[]}
 
     for t_file in config_files:
         hostnames = get_hostname(t_file)
-        trk_lists = get_trunks(t_file)
+        trk_lists = get_lags(t_file)
 
         if '0' in hostnames.keys(): # single switch
             hostname = hostnames['0']
         else:
             hostname = hostnames['1']
 
-        for trunk in trk_lists:
-            if trunk == []: continue
-            trk_name = trunk['name'].title()
+        for lag in trk_lists:
+            if lag == []: continue
+            trk_name = lag['name'].title()
 
-            interfaces = trunk['interfaces'].replace('-', ',').split(',')
+            interfaces = lag['interfaces'].replace('-', ',').split(',')
 
             for interface in interfaces:
-                if {'hostname': hostname, 'name': trk_name} not in data['trunks']:
-                    data['trunks'].append({'hostname': hostname, 'name': trk_name})
+                if {'hostname': hostname, 'name': trk_name} not in data['lags']:
+                    data['lags'].append({'hostname': hostname, 'name': trk_name})
 
-                data['trunk_interfaces'].append({'hostname': hostname, 'interface': interface, 'trunk_name': trk_name})
+                data['lag_interfaces'].append({'hostname': hostname, 'interface': interface, 'lag_name': trk_name})
 
     return data
 
@@ -190,21 +190,21 @@ def untagged_vlans(config_files):
 
         # Determine if device is single (flat) or stack
         is_stack = isinstance(hostname_map, dict) and '0' not in hostname_map
-        trunk_stacks = get_trunk_stack(t_file) if is_stack else None
+        lag_stacks = get_lag_stack(t_file) if is_stack else None
 
-        for vlan_id, int_range, is_trunk in untagged_sets:
+        for vlan_id, int_range, is_lag in untagged_sets:
             vlan_name = vlan_names.get(vlan_id, f"VLAN {vlan_id}")
             if vlan_name == "VLAN 1": vlan_name = "DEFAULT_VLAN"
             interfaces = convert_interfaces_range(int_range)
 
             for stack_nr, interface in interfaces:
-                if is_trunk is None:
-                    is_trunk = interface in lags
+                if is_lag is None:
+                    is_lag = interface in lags
 
-                # For trunk interfaces in stacks, correct stack_nr
+                # For lag interfaces in stacks, correct stack_nr
                 if is_stack and 'T' in interface:
                     for nr in range(1, 20):
-                        if (interface, str(nr)) in trunk_stacks:
+                        if (interface, str(nr)) in lag_stacks:
                             stack_nr = str(nr)
                             break
 
@@ -218,7 +218,7 @@ def untagged_vlans(config_files):
                     'interface': str(interface),
                     'vlan_id': vlan_id,
                     'vlan_name': vlan_name,
-                    'is_trunk': is_trunk
+                    'is_lag': is_lag
                 })
 
     return data
@@ -241,7 +241,7 @@ def device_interfaces_json(config_files):
             vlan_lookup[(host, entry['interface'])] = {
                 'vlan_id': entry.get('vlan_id'),
                 'vlan_name': entry.get('vlan_name'),
-                'is_trunk': entry.get('is_trunk', False)
+                'is_lag': entry.get('is_lag', False)
             }
 
     for t_file in config_files:
@@ -287,7 +287,7 @@ def device_interfaces_json(config_files):
                 i_types["poe_type"].get(i_nr),
                 vlan_info.get('vlan_id'),
                 vlan_info.get('vlan_name'),
-                vlan_info.get('is_trunk', False)
+                vlan_info.get('is_lag', False)
             )
 
             unique_interfaces.add(entry)
@@ -303,9 +303,9 @@ def device_interfaces_json(config_files):
         {
             'hostname': h, 'interface': i, 'name': n, 'type': t,
             'poe_mode': p_mode, 'poe_type': p_type,
-            'vlan_id': v_id, 'vlan_name': v_name, 'is_trunk': is_trunk
+            'vlan_id': v_id, 'vlan_name': v_name, 'is_lag': is_lag
         }
-        for h, i, n, t, p_mode, p_type, v_id, v_name, is_trunk in unique_interfaces
+        for h, i, n, t, p_mode, p_type, v_id, v_name, is_lag in unique_interfaces
     ]
 
     data['delete_interfaces'] = [
@@ -326,7 +326,7 @@ def tagged_vlans_json(config_files):
         # [('5', 'A23-A24,B10,B20,F1,F4'), ('9', 'A23-A24,B10,B20,F1,F4'), ('50', 'A23-A24,B10,B20,F1,F4')]
         vlan_sets = get_tagged_vlans(t_file)
 
-        trunk_stacks = get_trunk_stack(t_file)
+        lag_stacks = get_lag_stack(t_file)
         for vlan_id, interfaces_range in vlan_sets:
             vlan_name = get_vlans_names(t_file)[vlan_id]
 
@@ -341,11 +341,11 @@ def tagged_vlans_json(config_files):
                     vlan_stacks.add(hostnames['0'])
                     continue
 
-                # Find stack number for Trunks
+                # Find stack number for lags
                 if 'T' in interface: 
                     for nr in range(0,20):
                         nr = str(nr)
-                        if (interface, nr) in trunk_stacks:
+                        if (interface, nr) in lag_stacks:
                             vlan_stacks.add(hostnames[nr])
                 else: 
                     vlan_stacks.add(hostnames[str(stack_nr)])
@@ -426,12 +426,12 @@ def debug_devices_json(data_folder):
     print("\n'device_json()' Output: for ", data_folder)
     print(output)
 
-def debug_trunks_json(data_folder):
+def debug_lags_json(data_folder):
     files = config_files(data_folder)
     devices_tags = ["switch"]
-    output = yaml.dump(trunks_json(files))
+    output = yaml.dump(lags_json(files))
 
-    print("\n'trunks_json()' Output: for ", data_folder)
+    print("\n'lags_json()' Output: for ", data_folder)
     print(output)
 
 def debug_vlans_json(data_folder):
@@ -509,13 +509,13 @@ if __name__ == "__main__":
         #debug_locations_json(data_folder)
         #debug_devices_json(data_folder)
         #debug_device_interfaces_json(data_folder)
-        #debug_trunks_json(data_folder)
+        debug_lags_json(data_folder)
 
         #debug_vlans_json(data_folder)
-        #debug_untagged_vlans(data_folder)
+        debug_untagged_vlans(data_folder)
         #debug_tagged_vlans_json(data_folder)
 
 
         #debug_ip_addresses_json(data_folder)
 
-        debug_modules_json(data_folder)
+        #debug_modules_json(data_folder)

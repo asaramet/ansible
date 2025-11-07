@@ -7,7 +7,7 @@ from tabulate import tabulate
 
 from std_functions import device_type_slags, this_folder, main_folder, config_files
 
-from json_functions import devices_json, trunks_json, device_interfaces_json
+from json_functions import devices_json, lags_json, device_interfaces_json
 from json_functions import vlans_json, tagged_vlans_json
 from json_functions import ip_addresses_json, modules_json
 
@@ -28,7 +28,7 @@ def single(data_folder, output_file_path, devices_tags):
         yaml.dump({"modular": False}, f)
         #yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
-        yaml.dump(trunks_json(files), f)
+        yaml.dump(lags_json(files), f)
         yaml.dump(device_interfaces_json(files), f)
         yaml.dump(vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
@@ -55,7 +55,7 @@ def modular(data_folder, output_file_path, devices_tags):
         #yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(modules_json(files), f)
-        yaml.dump(trunks_json(files), f)
+        yaml.dump(lags_json(files), f)
         yaml.dump(device_interfaces_json(files), f)
         yaml.dump(vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
@@ -77,7 +77,7 @@ def stack(data_folder, output_file_path, devices_tags):
         #yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(device_interfaces_json(files), f)
-        yaml.dump(trunks_json(files), f)
+        yaml.dump(lags_json(files), f)
         yaml.dump(vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)
@@ -95,7 +95,7 @@ def stack_module(data_folder, output_file_path, devices_tags):
         #yaml.dump(locations_json(files), f)
         yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
         yaml.dump(device_interfaces_json(files), f)
-        yaml.dump(trunks_json(files), f)
+        yaml.dump(lags_json(files), f)
         yaml.dump(vlans_json(files), f)
         yaml.dump(tagged_vlans_json(files), f)
         yaml.dump(ip_addresses_json(files), f)
