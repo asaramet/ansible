@@ -834,17 +834,20 @@ def _main(description: str, function: Callable, **kwargs) -> None:
     nb.http_session.verify = False # Disable SSL verification
 
     files_yaml = [
-        #"procurve_single.yaml",
+        "procurve_single.yaml",
+        #"procurve_modular.yaml",
+
         #"hpe_8_ports.yaml",
         #"hpe_24_ports.yaml",
         #"aruba_48_ports.yaml",
         #"aruba_8_ports.yaml",
         #"aruba_12_ports.yaml",
-        "procurve_modular.yaml",
-        #"aruba_modular.yaml",
+
         #"aruba_stack.yaml",
         #"aruba_stack_2930.yaml",
         #"aruba_stack_2920.yaml",
+
+        #"aruba_modular.yaml",
         #"aruba_modular_stack.yaml"
     ]
     

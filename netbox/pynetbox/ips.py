@@ -24,6 +24,7 @@ from pynetbox_functions import (
 
 logger = logging.getLogger(__name__)
 
+
 def ips(nb_session: NetBoxApi, data: Dict) -> bool:
     """
     Update switch IPs on a NetBox server from YAML data.
@@ -383,6 +384,313 @@ def _create_interfaces(
     return created
 
 
+def _should_reassign_ip(
+    nb_session: NetBoxApi,
+    ip_address: str,
+    current_interface_id: int,
+    target_interface_id: int,
+    target_device_name: str
+) -> Tuple[bool, Optional[str], Optional[Dict]]:
+    """
+    Determine if an IP should be reassigned based on device statuses.
+    
+    Args:
+        nb_session: pynetbox API session
+        ip_address: IP address being checked
+        current_interface_id: Current interface ID where IP is assigned
+        target_interface_id: Target interface ID from YAML
+        target_device_name: Target device name from YAML
+    
+    Returns:
+        Tuple of (should_reassign, reason, old_device_info)
+        - should_reassign: True if reassignment should proceed
+        - reason: String explaining the decision (for logging)
+        - old_device_info: Dict with old device details for audit trail, or None
+    """
+    try:
+        # Get current (old) interface and device
+        old_interface = nb_session.dcim.interfaces.get(current_interface_id)
+        if not old_interface or not old_interface.device:
+            return True, "Current device not found", None
+        
+        old_device = nb_session.dcim.devices.get(old_interface.device.id)
+        
+        # Get target (new) device from interface
+        target_interface = nb_session.dcim.interfaces.get(target_interface_id)
+        if not target_interface or not target_interface.device:
+            return False, "Target device not found", None
+        
+        target_device = nb_session.dcim.devices.get(target_interface.device.id)
+        
+        # Extract statuses
+        old_status = old_device.status.value if hasattr(old_device.status, 'value') else str(old_device.status)
+        target_status = target_device.status.value if hasattr(target_device.status, 'value') else str(target_device.status)
+        
+        old_is_active = old_status.lower() == 'active'
+        target_is_active = target_status.lower() == 'active'
+        
+        old_device_info = {
+            'name': old_device.name,
+            'interface': old_interface.name,
+            'status': old_status,
+            'device_obj': old_device
+        }
+        
+        # Decision logic
+        if old_is_active and target_is_active:
+            return False, (
+                f"CONFLICT - Both devices ACTIVE: "
+                f"'{old_device.name}' and '{target_device.name}'. "
+                f"Decommission one device first."
+            ), old_device_info
+        
+        if old_is_active and not target_is_active:
+            return False, (
+                f"IP staying on ACTIVE device '{old_device.name}' ({old_status}). "
+                f"Target '{target_device.name}' is NOT active ({target_status})."
+            ), old_device_info
+        
+        if target_is_active and not old_is_active:
+            return True, (
+                f"Moving to ACTIVE device '{target_device.name}' ({target_status}). "
+                f"Current '{old_device.name}' is NOT active ({old_status})."
+            ), old_device_info
+        
+        # Both inactive
+        return True, (
+            f"Both devices NOT active. "
+            f"'{old_device.name}' ({old_status}), '{target_device.name}' ({target_status}). "
+            f"Following YAML."
+        ), old_device_info
+        
+    except Exception as e:
+        logger.error(f"Error checking devices for IP {ip_address}: {e}", exc_info=True)
+        return False, f"Error checking devices: {e}", None
+
+
+def _clear_primary_ip_if_needed(device_obj: object, ip_id: int) -> bool:
+    """
+    Clear primary IP from device if the IP matches.
+    
+    Args:
+        device_obj: Device object
+        ip_id: IP address ID to check
+    
+    Returns:
+        True if successfully cleared or not needed, False if failed
+    """
+    try:
+        is_primary_ipv4 = device_obj.primary_ip4 and device_obj.primary_ip4.id == ip_id
+        is_primary_ipv6 = device_obj.primary_ip6 and device_obj.primary_ip6.id == ip_id
+        
+        if not (is_primary_ipv4 or is_primary_ipv6):
+            return True  # Not primary, nothing to clear
+        
+        logger.info(f"Clearing primary IP assignment from {device_obj.name}")
+        
+        if is_primary_ipv4:
+            device_obj.primary_ip4 = None
+        if is_primary_ipv6:
+            device_obj.primary_ip6 = None
+        
+        device_obj.save()
+        logger.debug(f"Primary IP cleared from {device_obj.name}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to clear primary IP from {device_obj.name}: {e}", exc_info=True)
+        return False
+
+
+def _process_existing_ip(
+    nb_session: NetBoxApi,
+    existing_ip: object,
+    spec: Dict,
+    interface: object,
+    interface_map: Dict
+) -> Optional[Dict]:
+    """
+    Process an existing IP address and determine if it needs updating.
+    
+    Args:
+        nb_session: pynetbox API session
+        existing_ip: Existing IP object from NetBox
+        spec: IP specification from YAML
+        interface: Target interface object
+        interface_map: Map of interfaces
+    
+    Returns:
+        Update payload dict if update needed, None otherwise
+    """
+    ip_address = spec['address']
+    hostname = spec['hostname']
+    update_payload = {'id': existing_ip.id}
+    needs_update = False
+    
+    # Check interface assignment
+    current_interface_id = existing_ip.assigned_object_id if existing_ip.assigned_object else None
+    
+    if current_interface_id and current_interface_id != interface.id:
+        # IP on different interface - check reassignment
+        should_reassign, reason, old_device_info = _should_reassign_ip(
+            nb_session,
+            ip_address,
+            current_interface_id,
+            interface.id,
+            hostname
+        )
+        
+        if not should_reassign:
+            if "CONFLICT" in reason:
+                logger.error(f"IP {ip_address}: {reason}")
+            else:
+                logger.info(f"IP {ip_address}: {reason}")
+            return None  # Skip this IP
+        
+        logger.info(f"IP {ip_address}: {reason}")
+        
+        # Clear primary IP from old device
+        if old_device_info and old_device_info['device_obj']:
+            if not _clear_primary_ip_if_needed(old_device_info['device_obj'], existing_ip.id):
+                logger.error(f"Cannot reassign IP {ip_address} - failed to clear primary IP")
+                return None
+        
+        # Add audit trail
+        if old_device_info:
+            update_payload['description'] = _build_audit_trail(
+                existing_ip.description or "",
+                old_device_info
+            )
+        
+        # Set reassignment
+        update_payload['assigned_object_type'] = 'dcim.interface'
+        update_payload['assigned_object_id'] = interface.id
+        needs_update = True
+    
+    elif not current_interface_id:
+        # IP not assigned - assign it
+        update_payload['assigned_object_type'] = 'dcim.interface'
+        update_payload['assigned_object_id'] = interface.id
+        needs_update = True
+    
+    # Check other attributes
+    if _compare_ip_attributes(existing_ip, spec, update_payload):
+        needs_update = True
+    
+    if needs_update:
+        logger.debug(f"IP {ip_address} needs update")
+        return update_payload
+    else:
+        logger.debug(f"IP {ip_address} already correctly configured")
+        return None
+
+
+def _create_new_ip(spec: Dict, interface: object) -> Dict:
+    """
+    Create payload for a new IP address.
+    
+    Args:
+        spec: IP specification from YAML
+        interface: Target interface object
+    
+    Returns:
+        Create payload dict
+    """
+    payload = {
+        'address': spec['address'],
+        'status': spec['status'],
+        'assigned_object_type': 'dcim.interface',
+        'assigned_object_id': interface.id,
+    }
+    
+    if spec['tenant']:
+        payload['tenant'] = spec['tenant']
+    if spec['role']:
+        payload['role'] = spec['role']
+    
+    return payload
+
+
+def _compare_ip_attributes(
+    existing_ip: object,
+    spec: Dict,
+    update_payload: Dict
+) -> bool:
+    """
+    Compare IP attributes and add updates to payload if needed.
+    
+    Args:
+        existing_ip: Existing IP object from NetBox
+        spec: Specification dict with desired values
+        update_payload: Dict to add updates to
+    
+    Returns:
+        True if any updates were added
+    """
+    needs_update = False
+    
+    # Check tenant
+    if spec['tenant']:
+        current_tenant = existing_ip.tenant
+        if current_tenant:
+            current_value = current_tenant.id if hasattr(current_tenant, 'id') else str(current_tenant)
+        else:
+            current_value = None
+        
+        if current_value != spec['tenant']:
+            update_payload['tenant'] = spec['tenant']
+            needs_update = True
+    
+    # Check role
+    if spec['role']:
+        current_role = existing_ip.role
+        if current_role:
+            if hasattr(current_role, 'id'):
+                current_value = current_role.id
+            elif hasattr(current_role, 'value'):
+                current_value = current_role.value
+            else:
+                current_value = str(current_role)
+        else:
+            current_value = None
+        
+        if current_value != spec['role']:
+            update_payload['role'] = spec['role']
+            needs_update = True
+    
+    # Check status
+    current_status = existing_ip.status.value if hasattr(existing_ip.status, 'value') else str(existing_ip.status)
+    if current_status != spec['status']:
+        update_payload['status'] = spec['status']
+        needs_update = True
+    
+    return needs_update
+
+
+def _build_audit_trail(existing_description: str, old_device_info: Dict) -> str:
+    """
+    Build audit trail for IP reassignment.
+    
+    Args:
+        existing_description: Current IP description
+        old_device_info: Dict with old device details
+    
+    Returns:
+        Updated description with audit trail
+    """
+    from datetime import datetime
+    
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    audit_note = (
+        f"Previously: {old_device_info['name']} ({old_device_info['interface']}, "
+        f"status: {old_device_info['status']}) until {current_date}"
+    )
+    
+    if existing_description:
+        return f"{existing_description}\n{audit_note}"
+    return audit_note
+
+
 def _process_ip_addresses(
     nb_session: NetBoxApi,
     ip_specs: List[Dict],
@@ -416,85 +724,32 @@ def _process_ip_addresses(
         hostname = spec['hostname']
         interface_name = spec['interface_name']
         
-        # Get the interface object
-        interface_key = (hostname, interface_name)
-        interface = interface_map.get(interface_key)
-        
+        # Get interface
+        interface = interface_map.get((hostname, interface_name))
         if not interface:
             logger.warning(
-                f"Interface '{interface_name}' on '{hostname}' not found in map, "
+                f"Interface '{interface_name}' on '{hostname}' not found, "
                 f"skipping IP {ip_address}"
             )
             continue
         
-        # Check if IP already exists
+        # Check if IP exists
         existing_ip = existing_ips.get(ip_address)
         
         if existing_ip:
-            # IP exists, check if it needs updating
-            needs_update = False
-            update_payload = {'id': existing_ip.id}
-            
-            # Check if assigned to correct interface
-            if not existing_ip.assigned_object or existing_ip.assigned_object_id != interface.id:
-                update_payload['assigned_object_type'] = 'dcim.interface'
-                update_payload['assigned_object_id'] = interface.id
-                needs_update = True
-            
-            # Check tenant
-            if spec['tenant']:
-                current_tenant_id = existing_ip.tenant.id if existing_ip.tenant else None
-                if current_tenant_id != spec['tenant']:
-                    update_payload['tenant'] = spec['tenant']
-                    needs_update = True
-            
-            # Check role
-            if spec['role']:
-                current_role = existing_ip.role
-
-                # Normalize current role for comparison
-                if current_role:
-                    # If role is an object with id attribute, get the id
-                    if hasattr(current_role, 'id'):
-                        current_role_value = current_role.id
-                    # If role is a string or has a value attribute, use it directly
-                    elif hasattr(current_role, 'value'):
-                        current_role_value = current_role.value
-                    else:
-                        # It's a plain string
-                        current_role_value = str(current_role)
-                else:
-                    current_role_value = None
-
-                # Compare normalized values
-                if current_role_value != spec['role']:
-                    update_payload['role'] = spec['role']
-                    needs_update = True
-            
-            # Check status
-            if existing_ip.status != spec['status']:
-                update_payload['status'] = spec['status']
-                needs_update = True
-            
-            if needs_update:
+            # Process existing IP
+            update_payload = _process_existing_ip(
+                nb_session,
+                existing_ip,
+                spec,
+                interface,
+                interface_map
+            )
+            if update_payload:
                 ips_to_update.append(update_payload)
-                logger.debug(f"IP {ip_address} needs update")
-            else:
-                logger.debug(f"IP {ip_address} is already correctly configured")
         else:
-            # IP doesn't exist, create it
-            create_payload = {
-                'address': ip_address,
-                'status': spec['status'],
-                'assigned_object_type': 'dcim.interface',
-                'assigned_object_id': interface.id,
-            }
-            
-            if spec['tenant']:
-                create_payload['tenant'] = spec['tenant']
-            if spec['role']:
-                create_payload['role'] = spec['role']
-            
+            # Create new IP
+            create_payload = _create_new_ip(spec, interface)
             ips_to_create.append(create_payload)
     
     # Execute bulk operations
@@ -541,7 +796,7 @@ def _get_existing_ip_addresses(
         # Query all IP addresses at once
         # NetBox requires addresses to be queried individually or in batches
         # We'll chunk them for efficiency
-        chunk_size = 500
+        chunk_size = 100
         
         for i in range(0, len(ip_addresses), chunk_size):
             chunk = ip_addresses[i:i + chunk_size]
@@ -599,11 +854,51 @@ def _set_primary_ips_on_devices(
         primary_ip = ip_list[0]
         
         try:
-            # Get the IP address object
+            # Get the IP address object (fresh from NetBox)
             ip_obj = nb_session.ipam.ip_addresses.get(address=primary_ip)
             
             if not ip_obj:
                 logger.warning(f"IP {primary_ip} not found, skipping primary IP for {hostname}")
+                continue
+            
+            # CRITICAL: Verify IP is actually assigned to THIS device
+            if ip_obj.assigned_object_type != 'dcim.interface':
+                logger.warning(
+                    f"IP {primary_ip} is not assigned to an interface, "
+                    f"skipping primary IP for {hostname}"
+                )
+                continue
+            
+            if not ip_obj.assigned_object_id:
+                logger.warning(
+                    f"IP {primary_ip} has no assigned interface, "
+                    f"skipping primary IP for {hostname}"
+                )
+                continue
+            
+            # Get the interface to verify it belongs to this device
+            try:
+                assigned_interface = nb_session.dcim.interfaces.get(ip_obj.assigned_object_id)
+                if not assigned_interface:
+                    logger.warning(
+                        f"Could not retrieve interface {ip_obj.assigned_object_id} "
+                        f"for IP {primary_ip}, skipping primary IP for {hostname}"
+                    )
+                    continue
+                
+                if assigned_interface.device.id != device.id:
+                    logger.warning(
+                        f"IP {primary_ip} is assigned to device '{assigned_interface.device.name}' "
+                        f"(ID {assigned_interface.device.id}), not '{hostname}' (ID {device.id}). "
+                        f"This IP was likely not successfully reassigned. Skipping primary IP assignment."
+                    )
+                    continue
+                    
+            except Exception as e:
+                logger.warning(
+                    f"Error verifying interface assignment for IP {primary_ip}: {e}. "
+                    f"Skipping primary IP for {hostname}"
+                )
                 continue
             
             # Check if update is needed
@@ -631,6 +926,7 @@ def _set_primary_ips_on_devices(
         logger.info(f"Updated primary IPs for {len(updated)} devices")
     else:
         logger.info("No device primary IP updates needed")
+
 
 if __name__ == '__main__':
     from pynetbox_functions import _main
