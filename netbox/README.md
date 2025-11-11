@@ -63,8 +63,10 @@ sudo pacman -Syu python-pynetbox python-packaging
 - `add_locations.py` - add collected locations data to a NetBox platform using `pynetbox` library.
 - `extra_functions.py` - more functions used in multiple python scripts.
 - `interfaces.py` - synchronize interfaces on a NetBox platform using `pynetbox` library
+- `ips.py` - IP Address Management Functions for NetBox
 - `json_functions_os_cx.py` - functions to return JSON objects for Aruba OS-CX switches.
 - `json_functions.py` - functions to return JSON objects for Aruba OS switches.
+- `lags.py` - LAG (Link Aggregation Group) management functions for NetBox
 - `modules.py` - process modules for switches on a NetBox platform using `pynetbox` library
 - `nb.py` - in house `pynetbox` API session initialization.
 - `pynetbox_functions.py` - project specific functions for `pynetbox` based apps.

@@ -20,7 +20,7 @@ from modules import module_bays, modules
 from vlans import vlans
 from interfaces import interfaces, delete_device_interfaces
 from lags import lags
-#from ips import ips
+from ips import ips
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -53,11 +53,8 @@ def update(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
     logger.info("-- Synchronize LAG interfaces --")
     lags(nb_session, data)
 
-#    logger.info("-- Synchronize tagged VLANs --")
-#    tagged_vlans(nb_session, data)
-
-#    logger.info("-- Assign IPs to devices --")
-#    ips(nb_session, data)
+    logger.info("-- Assign IPs to devices --")
+    ips(nb_session, data)
 
 if __name__ == '__main__':
     from pynetbox_functions import _main
