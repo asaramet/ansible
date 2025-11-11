@@ -46,10 +46,12 @@ python3 pynetbox/yaml_aruba.py | tee ${logs_folder}/pynetbox.logs  &&
 
 ansible-playbook playbooks/backup_sql.yaml | tee ${logs_folder}/backup.logs &&
 
-for i in ${tags[@]}; do
-    echo "== Updating ${i} - $(date)" &&
-    ansible-playbook playbooks/aruba.yaml --tags ${i},${server},update &> ${logs_folder}/${i}.logs ;
-    echo "== Done updating ${i} - $(date)"
-done
+#for i in ${tags[@]}; do
+#    echo "== Updating ${i} - $(date)" &&
+#    ansible-playbook playbooks/aruba.yaml --tags ${i},${server},update &> ${logs_folder}/${i}.logs ;
+#    echo "== Done updating ${i} - $(date)"
+#done
+
+python3 pynetbox/update_data.py -s ${server}
 
 echo "== Updates finished - $(date)"

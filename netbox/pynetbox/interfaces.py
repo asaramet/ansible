@@ -11,9 +11,34 @@ from pynetbox.core.api import Api as NetBoxApi
 
 # Import the standard delete function from pynetbox_functions
 from pynetbox_functions import _bulk_create, _bulk_update
-from pynetbox_functions import _cache_devices
+from pynetbox_functions import _cache_devices, _delete_netbox_obj
     
 logger = logging.getLogger(__name__)
+
+# Interface type mapping for NetBox compatibility
+INTERFACE_TYPE_MAPPING = {
+    # X2 modules (10GbE) - Common for HP ProCurve modules
+    '10gbase-x2': '10gbase-x-xfp',
+    '10gbe-x2': '10gbase-x-xfp',
+    
+    # SFP variations
+    #'sfp': '1000base-x-sfp',
+    #'sfp+': '10gbase-x-sfpp',
+    #'sfp28': '25gbase-x-sfp28',
+    
+    # QSFP variations
+    #'qsfp': '40gbase-x-qsfpp',
+    #'qsfp+': '40gbase-x-qsfpp',
+    #'qsfp28': '100gbase-x-qsfp28',
+    
+    # Generic types
+    #'10gbase': '10gbase-x-sfpp',
+    #'10gbase-x': '10gbase-x-sfpp',
+    #'10g': '10gbase-x-sfpp',
+    #'1000base': '1000base-t',
+    #'1gbase': '1000base-t',
+    #'1g': '1000base-t',
+}
 
 def interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
     """
@@ -22,14 +47,14 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
     Process flow:
     1. Delete interfaces specified in 'delete_interfaces'
     2. Create/update interfaces from 'device_interfaces'
-    3. Add tagged VLANs from 'tagged_vlans' to lag interfaces
+    3. Add tagged VLANs from 'tagged_vlans' to trunk interfaces
     
     Args:
         nb_session: pynetbox API session
         data: Dictionary containing:
             - 'delete_interfaces': List of interfaces to delete
             - 'device_interfaces': List of interfaces to create/update
-            - 'tagged_vlans': List of lag interfaces with tagged VLANs
+            - 'tagged_vlans': List of trunk interfaces with tagged VLANs
     """
     
     # Step 1: Delete interfaces if specified
@@ -44,31 +69,30 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
     
     logger.info("=== Interface management completed ===")
 
-
-def _bulk_delete_interfaces(interfaces: List[object]) -> int:
+def _normalize_interface_type(interface_type: str) -> str:
     """
-    Delete interfaces using the standard _delete_netbox_obj function.
+    Normalize interface type to valid NetBox type.
     
     Args:
-        interfaces: List of interface objects to delete
+        interface_type: Interface type string (e.g., '10gbase-x2')
     
     Returns:
-        Number of successfully deleted interfaces
+        Valid NetBox interface type string
     """
-    if not interfaces:
-        return 0
+    if not interface_type:
+        return '1000base-t'  # Default fallback
     
-    deleted_count = 0
+    # Convert to lowercase for comparison
+    type_lower = interface_type.lower().strip()
     
-    logger.info(f"Attempting to delete {len(interfaces)} interfaces...")
+    # Check if it's in our mapping
+    if type_lower in INTERFACE_TYPE_MAPPING:
+        mapped_type = INTERFACE_TYPE_MAPPING[type_lower]
+        logger.debug(f"Mapped interface type: '{interface_type}' → '{mapped_type}'")
+        return mapped_type
     
-    # Use the existing _delete_netbox_obj function for consistency
-    for interface in interfaces:
-        if _delete_netbox_obj(interface):
-            deleted_count += 1
-    
-    logger.info(f"Successfully deleted {deleted_count}/{len(interfaces)} interfaces")
-    return deleted_count
+    # Return as-is if not in mapping (assume it's valid)
+    return interface_type
 
 
 def delete_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
@@ -88,15 +112,7 @@ def delete_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]])
     Args:
         nb_session: pynetbox API session
         data: Dictionary containing 'device_interfaces' with interface data
-    
-    Example:
-        >>> # Preview first
-        >>> preview_delete_device_interfaces(nb_session, data)
-        >>> 
-        >>> # Then delete
-        >>> delete_device_interfaces(nb_session, data)
     """
-    from pynetbox_functions import _cache_devices, _delete_netbox_obj
     
     if 'device_interfaces' not in data or not data['device_interfaces']:
         logger.info("No device_interfaces in data, nothing to delete")
@@ -189,74 +205,6 @@ def delete_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]])
     logger.info("=== Module interface cleanup completed ===")
 
 
-def preview_delete_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> List[Dict]:
-    """
-    Preview which module interfaces would be deleted (dry-run).
-    
-    Same as delete_device_interfaces but doesn't actually delete anything.
-    
-    Args:
-        nb_session: pynetbox API session
-        data: Dictionary containing 'device_interfaces'
-    
-    Returns:
-        List of dicts with interface details that would be deleted
-    """
-    from pynetbox_functions import _cache_devices
-    
-    if 'device_interfaces' not in data or not data['device_interfaces']:
-        logger.info("No device_interfaces in data")
-        return []
-    
-    logger.info("=== Preview: Scanning for misplaced module interfaces ===")
-    
-    # Collect device names
-    device_names = list(set([entry.get('hostname') for entry in data['device_interfaces'] if entry.get('hostname')]))
-    
-    if not device_names:
-        return []
-    
-    # Cache devices and interfaces
-    cached_devices = _cache_devices(nb_session, device_names)
-    device_ids = [device.id for device in cached_devices.values()]
-    cached_interfaces = _cache_interfaces_by_device(nb_session, device_ids)
-    
-    # Identify misplaced
-    misplaced = []
-    
-    for interface_key, interface in cached_interfaces.items():
-        interface_name = interface.name
-        module_letter = _extract_module_letter(interface_name)
-        
-        if module_letter:
-            has_device = hasattr(interface, 'device') and interface.device
-            has_module = hasattr(interface, 'module') and interface.module
-            
-            if has_device and not has_module:
-                device_name = interface.device.name if hasattr(interface.device, 'name') else 'unknown'
-                misplaced.append({
-                    'interface_id': interface.id,
-                    'name': interface_name,
-                    'device': device_name,
-                    'module_letter': module_letter,
-                    'should_be_on': f"{device_name}-{module_letter}"
-                })
-    
-    # Report
-    if not misplaced:
-        logger.info("No misplaced module interfaces found")
-    else:
-        logger.info(f"Found {len(misplaced)} misplaced module interface(s):")
-        for item in misplaced:
-            logger.info(
-                f"  - {item['name']} on device {item['device']} "
-                f"(should be on {item['should_be_on']})"
-            )
-    
-    logger.info("=== Preview complete (no deletion) ===")
-    return misplaced
-
-
 def _bulk_delete_interfaces(interfaces: List[object]) -> int:
     """
     Delete interfaces using the standard _delete_netbox_obj function.
@@ -271,8 +219,6 @@ def _bulk_delete_interfaces(interfaces: List[object]) -> int:
         return 0
     
     # Import the standard delete function from pynetbox_functions
-    from pynetbox_functions import _delete_netbox_obj
-    
     deleted_count = 0
     
     logger.info(f"Attempting to delete {len(interfaces)} interfaces...")
@@ -306,7 +252,6 @@ def _delete_interfaces(nb_session: NetBoxApi, delete_list: List[Dict[str, str]])
     
     # Step 2: Bulk fetch devices using existing function
     logger.info(f"Fetching {len(hostnames)} devices for interface deletion...")
-    from pynetbox_functions import _cache_devices
     cached_devices = _cache_devices(nb_session, hostnames)
     
     if not cached_devices:
@@ -362,8 +307,6 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
         nb_session: pynetbox API session
         data: Dictionary containing 'device_interfaces' and optionally 'tagged_vlans'
     """
-    from pynetbox_functions import _cache_devices, _bulk_create, _bulk_update
-    
     device_interfaces = data.get('device_interfaces', [])
     tagged_vlans_data = data.get('tagged_vlans', [])
     
@@ -371,7 +314,7 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
     tagged_vlans_lookup = _build_tagged_vlans_lookup(tagged_vlans_data)
     
     # IMPORTANT: Collect ALL interfaces to process
-    # Some interfaces may only be in tagged_vlans (lags), not in device_interfaces
+    # Some interfaces may only be in tagged_vlans (trunks), not in device_interfaces
     all_interfaces_to_process = {}  # Key: "hostname:interface", Value: entry dict
     
     # First, add all from device_interfaces
@@ -382,22 +325,22 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
             key = f"{hostname}:{interface_name}"
             all_interfaces_to_process[key] = entry.copy()
     
-    # Then, add lag interfaces from tagged_vlans that aren't in device_interfaces
-    for lag_entry in tagged_vlans_data:
-        hostname = lag_entry.get('hostname')
-        interface_name = lag_entry.get('interface')
+    # Then, add trunk interfaces from tagged_vlans that aren't in device_interfaces
+    for trunk_entry in tagged_vlans_data:
+        hostname = trunk_entry.get('hostname')
+        interface_name = trunk_entry.get('interface')
         if hostname and interface_name:
             key = f"{hostname}:{interface_name}"
             if key not in all_interfaces_to_process:
-                # This lag interface is not in device_interfaces, add it
+                # This trunk interface is not in device_interfaces, add it
                 all_interfaces_to_process[key] = {
                     'hostname': hostname,
                     'interface': interface_name,
-                    'is_lag': True,
-                    'type': 'lag',  # Assume LAG/lag type
-                    'name': f"lag {interface_name}",  # Default description
+                    'is_trunk': True,
+                    'type': 'lag',  # Assume LAG/trunk type
+                    'name': f"Trunk {interface_name}",  # Default description
                 }
-                logger.debug(f"Added lag interface {interface_name} on {hostname} (only in tagged_vlans)")
+                logger.debug(f"Added trunk interface {interface_name} on {hostname} (only in tagged_vlans)")
     
     if not all_interfaces_to_process:
         logger.info("No interfaces to process")
@@ -435,19 +378,19 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
             logger.warning(f"Device {hostname} not found in cache, skipping interface {interface_name}")
             continue
         
-        # Check if this interface has tagged VLANs (making it a lag)
+        # Check if this interface has tagged VLANs (making it a trunk)
         lookup_key = f"{hostname}:{interface_name}"
         tagged_vlans_list = tagged_vlans_lookup.get(lookup_key, [])
-        is_lag = len(tagged_vlans_list) > 0 or entry.get('is_lag', False)
+        is_trunk = len(tagged_vlans_list) > 0 or entry.get('is_trunk', False)
         
-        logger.debug(f"Processing interface {interface_name} on {hostname}: is_lag={is_lag}, tagged_vlans={len(tagged_vlans_list)}")
+        logger.debug(f"Processing interface {interface_name} on {hostname}: is_trunk={is_trunk}, tagged_vlans={len(tagged_vlans_list)}")
         logger.debug(f"Raw entry data: hostname={hostname}, interface={interface_name}, type={entry.get('type')}, name={entry.get('name')}")
         
         # Prepare interface payload
         interface_payload = _prepare_interface_payload(
             device=device,
             entry=entry,
-            is_lag=is_lag,
+            is_trunk=is_trunk,
             cached_vlans=cached_vlans,
             cached_modules=cached_modules,
             nb_session=nb_session
@@ -465,7 +408,7 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
                 'interface': existing_interface,
                 'device': device,
                 'tagged_vlans': tagged_vlans_list,
-                'is_lag': is_lag
+                'is_trunk': is_trunk
             })
         else:
             # Prepare for creation
@@ -474,7 +417,7 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
                 'interface_name': interface_name,
                 'device': device,
                 'tagged_vlans': tagged_vlans_list,
-                'is_lag': is_lag,
+                'is_trunk': is_trunk,
                 'payload': interface_payload
             })
     
@@ -497,7 +440,7 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
             kind='interface'
         )
     
-    # Assign tagged VLANs to lag interfaces (must be done after interface creation/update)
+    # Assign tagged VLANs to trunk interfaces (must be done after interface creation/update)
     _assign_tagged_vlans_bulk(
         nb_session=nb_session,
         interfaces_data=interfaces_for_vlan_assignment,
@@ -539,7 +482,7 @@ def _cache_modules_for_devices(nb_session: NetBoxApi, cached_devices: Dict[str, 
     
     Module interfaces (like 2/A2) need to be assigned to the module, not the device.
     Module naming convention: {device_name}-{module_letter}
-    Example: swgw1001ap-2-A for device swgw1001ap-2, module A
+    Example: swgw1001p-2-A for device swgw1001p-2, module A
     
     Args:
         nb_session: pynetbox API session
@@ -547,7 +490,7 @@ def _cache_modules_for_devices(nb_session: NetBoxApi, cached_devices: Dict[str, 
     
     Returns:
         Dictionary with keys "device_name:module_letter" mapping to module objects
-        Example: {"swgw1001ap-2:A": <module object>}
+        Example: {"swgw1001p-2:A": <module object>}
     """
     if not cached_devices:
         return {}
@@ -768,7 +711,7 @@ def _extract_module_letter(interface_name: str) -> Optional[str]:
     - "1/B1" → "B"
     - "3/C10" → "C"
     - "1/15" → None (not a module interface)
-    - "Trk1" → None (lag, not a module interface)
+    - "Trk1" → None (trunk, not a module interface)
     
     Args:
         interface_name: Interface name (e.g., "2/A2")
@@ -795,7 +738,7 @@ def _extract_module_letter(interface_name: str) -> Optional[str]:
     return None
 
 
-def _prepare_interface_payload(device: object, entry: Dict, is_lag: bool,
+def _prepare_interface_payload(device: object, entry: Dict, is_trunk: bool,
                               cached_vlans: Dict, cached_modules: Dict, nb_session: NetBoxApi) -> Dict:
     """
     Prepare interface payload for bulk create/update.
@@ -806,7 +749,7 @@ def _prepare_interface_payload(device: object, entry: Dict, is_lag: bool,
     Args:
         device: Device object
         entry: Interface data dictionary
-        is_lag: Whether this is a lag interface
+        is_trunk: Whether this is a trunk interface
         cached_vlans: Cached VLANs dictionary
         cached_modules: Cached modules dictionary
         nb_session: pynetbox API session
@@ -836,11 +779,11 @@ def _prepare_interface_payload(device: object, entry: Dict, is_lag: bool,
     # Prepare interface payload
     interface_payload = {
         'name': interface_name,
-        'type': entry.get('type', '1000base-t'),
+        'type': _normalize_interface_type(entry.get('type', '1000base-t')),
         'description': entry.get('name', ''),
     }
     
-    logger.debug(f"Creating interface payload: name='{interface_name}', type={entry.get('type', '1000base-t')}")
+    logger.debug(f"Creating interface payload: name='{interface_name}', type={interface_payload['type']}")
     
     # CRITICAL: Assign to module OR device
     if module:
@@ -858,15 +801,21 @@ def _prepare_interface_payload(device: object, entry: Dict, is_lag: bool,
         interface_payload['poe_type'] = entry['poe_type']
     
     # CRITICAL: Determine mode and handle VLAN assignments properly
-    if is_lag:
-        # This is a lag interface - tagged mode
+    if is_trunk:
+        # This is a trunk interface - tagged mode
         interface_payload['mode'] = 'tagged'
         # IMPORTANT: When switching to tagged mode, must clear untagged_vlan
         # NetBox doesn't allow both tagged VLANs and untagged_vlan in tagged mode
         interface_payload['untagged_vlan'] = None  # Clear any existing untagged VLAN
+        # CRITICAL: Do NOT include tagged_vlans in the payload
+        # Tagged VLANs are assigned AFTER the interface mode is set to 'tagged'
+        # Including them here causes validation errors
     else:
         # This is an access interface
         interface_payload['mode'] = 'access'
+        # CRITICAL: Access mode cannot have tagged VLANs
+        # Must explicitly clear any existing tagged VLANs
+        interface_payload['tagged_vlans'] = []  # Clear tagged VLANs for access mode
         
         # Handle untagged VLAN for access interfaces
         if entry.get('vlan_id') or entry.get('vlan_name'):
@@ -884,7 +833,7 @@ def _assign_tagged_vlans_bulk(nb_session: NetBoxApi, interfaces_data: List[Dict]
                               created_interfaces: List, updated_interfaces: List,
                               cached_vlans: Dict) -> None:
     """
-    Assign tagged VLANs to lag interfaces after they've been created/updated.
+    Assign tagged VLANs to trunk interfaces after they've been created/updated.
     
     Args:
         nb_session: pynetbox API session
@@ -908,7 +857,7 @@ def _assign_tagged_vlans_bulk(nb_session: NetBoxApi, interfaces_data: List[Dict]
     vlan_assignment_count = 0
     
     for data in interfaces_data:
-        if not data.get('is_lag') or not data.get('tagged_vlans'):
+        if not data.get('is_trunk') or not data.get('tagged_vlans'):
             continue
         
         # Get the interface object
@@ -927,7 +876,7 @@ def _assign_tagged_vlans_bulk(nb_session: NetBoxApi, interfaces_data: List[Dict]
             # Try to get updated version, fallback to the one we have
             interface = updated_lookup.get(key, interface)
             
-            # CRITICAL: If we're converting from access to lag, need to refresh the object
+            # CRITICAL: If we're converting from access to trunk, need to refresh the object
             # to ensure mode change has been applied
             if interface.mode != 'tagged':
                 try:
@@ -967,7 +916,7 @@ def _assign_tagged_vlans_bulk(nb_session: NetBoxApi, interfaces_data: List[Dict]
                 logger.error(f"Error assigning tagged VLANs to {interface.name} on {device.name}: {e}", exc_info=True)
     
     if vlan_assignment_count > 0:
-        logger.info(f"Total lag interfaces configured: {vlan_assignment_count}")
+        logger.info(f"Total trunk interfaces configured: {vlan_assignment_count}")
         logger.warning(f"Could not find VLAN {vlan_name} (ID: {vlan_id}) for interface {interface.name} on {device.name}")
         
         if vlan_objects:
@@ -986,6 +935,5 @@ if __name__ == "__main__":
     
     _main(
         description="Manage device interfaces in NetBox (create, update, delete with VLAN assignments)",
-        #function=interfaces
-        function=delete_device_interfaces
+        function=interfaces
     )
