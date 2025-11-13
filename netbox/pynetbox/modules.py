@@ -984,5 +984,7 @@ def _build_module_installation_payload(
 
 if __name__ == '__main__':
     from pynetbox_functions import _main, _debug
-    _main("Update switch module bays in NetBox", module_bays)
-    _main("Update switch module in NetBox", modules)
+    #_main("Update switch module bays in NetBox", module_bays)
+    #_main("Update switch module in NetBox", modules)
+    _debug("Update switch module bays in NetBox", module_bays)
+    _debug("Update switch module in NetBox", modules)

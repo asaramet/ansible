@@ -14,7 +14,7 @@ import logging
 from typing import Dict, List
 from pynetbox.core.api import Api as NetBoxApi
 
-from add_locations import add_locations
+#from add_locations import add_locations
 from switches import switches
 from modules import module_bays, modules
 from vlans import vlans

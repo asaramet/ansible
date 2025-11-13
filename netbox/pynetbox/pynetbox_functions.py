@@ -14,6 +14,11 @@ from pynetbox.models.dcim import Devices
 from pynetbox.core.endpoint import Endpoint
 from pynetbox.core.response import Record
 
+# Main folder
+from os import path 
+this_folder = path.dirname(path.realpath(__file__))
+main_folder = path.dirname(this_folder)
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -806,7 +811,6 @@ def _main(description: str, function: Callable, **kwargs) -> None:
             data: Data dictionary
     """
     import argparse
-    from std_functions import main_folder
     from nb import development, production
 
     # Disable warnings about self-signed certificates
@@ -834,21 +838,21 @@ def _main(description: str, function: Callable, **kwargs) -> None:
     nb.http_session.verify = False # Disable SSL verification
 
     files_yaml = [
-        "procurve_single.yaml",
+        #"procurve_single.yaml",
         #"procurve_modular.yaml",
 
         #"hpe_8_ports.yaml",
-        #"hpe_24_ports.yaml",
+        #!!!"hpe_24_ports.yaml",
         #"aruba_48_ports.yaml",
         #"aruba_8_ports.yaml",
         #"aruba_12_ports.yaml",
 
         #"aruba_stack.yaml",
-        #"aruba_stack_2930.yaml",
-        #"aruba_stack_2920.yaml",
+        #!!"aruba_stack_2930.yaml",
+        #!!"aruba_stack_2920.yaml",
 
         #"aruba_modular.yaml",
-        #"aruba_modular_stack.yaml"
+        "aruba_modular_stack.yaml"
     ]
     
     for file_name in files_yaml:
@@ -867,7 +871,6 @@ def _debug(description: str, function: Callable, **kwargs) -> None:
         as argument.
     """
     import argparse
-    from std_functions import main_folder
     from nb import development, production
 
     # Set DEBUG logging output
@@ -895,7 +898,7 @@ def _debug(description: str, function: Callable, **kwargs) -> None:
     nb.http_session.verify = False # Disable SSL verification
 
     files_yaml = [
-        "aruba_stack_2930.yaml"
+        "procurve_modular.yaml",
     ]
 
     for file_name in files_yaml:
