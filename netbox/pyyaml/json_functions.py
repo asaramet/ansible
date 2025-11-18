@@ -321,33 +321,74 @@ def tagged_vlans_json(config_files):
 
     for t_file in config_files:
         hostnames = get_hostname(t_file)
+        os_version = get_os_version(t_file)
 
         # get list of tagged vlan tuples like:
-        # [('5', 'A23-A24,B10,B20,F1,F4'), ('9', 'A23-A24,B10,B20,F1,F4'), ('50', 'A23-A24,B10,B20,F1,F4')]
+        # iOS: [('5', 'A23-A24,B10,B20,F1,F4'), ('9', 'A23-A24,B10,B20,F1,F4')]
+        # OS_CX: [('341', '1/13,2/15,Lag 1'), ('350', '1/13')]
         vlan_sets = get_tagged_vlans(t_file)
 
         lag_stacks = get_lag_stack(t_file)
+        vlan_names = get_vlans_names(t_file)
+
         for vlan_id, interfaces_range in vlan_sets:
-            vlan_name = get_vlans_names(t_file)[vlan_id]
+            # Get VLAN name, or use default if not defined
+            vlan_name = vlan_names.get(vlan_id, f"VLAN {vlan_id}")
+            if vlan_name == "VLAN 1":
+                vlan_name = "DEFAULT_VLAN"
+
+            # Parse interfaces based on OS version
+            if os_version == 'ArubaOS-CX':
+                # OS_CX format: "1/1/13,2/1/15,Lag 1" (full interface paths)
+                interface_list = []
+                for intf in interfaces_range.split(','):
+                    intf = intf.strip()
+                    if intf.startswith('Lag '):
+                        # LAG interface
+                        interface_list.append(('0', intf))
+                    elif '/' in intf:
+                        # Format: "1/1/13" -> member 1, keep full interface name
+                        parts = intf.split('/')
+                        member = parts[0] if len(parts) >= 2 else '0'
+                        interface_list.append((member, intf))
+                    else:
+                        # Single switch, just port number
+                        interface_list.append(('0', intf))
+            else:
+                # iOS format: use existing convert_interfaces_range
+                interface_list = convert_interfaces_range(interfaces_range)
 
             vlan_stacks = set()
 
-            # iterate through all the interfaces that belong to a vlan
-            for stack_nr, interface in convert_interfaces_range(interfaces_range):
-                
+            # Iterate through all the interfaces that belong to a vlan
+            for stack_nr, interface in interface_list:
                 interface = str(interface)
 
                 if '0' in hostnames.keys():
+                    # Single switch
                     vlan_stacks.add(hostnames['0'])
                     continue
 
                 # Find stack number for lags
-                if 'T' in interface: 
+                if interface.startswith('Lag '):
+                    if os_version == 'ArubaOS-CX':
+                        # For OS_CX stacks, LAGs are global - add all members
+                        for member in hostnames.keys():
+                            vlan_stacks.add(hostnames[member])
+                    else:
+                        # For iOS stacks, find specific member(s) for this LAG
+                        for nr in range(0,20):
+                            nr = str(nr)
+                            if (interface, nr) in lag_stacks:
+                                vlan_stacks.add(hostnames[nr])
+                elif 'T' in interface:
+                    # iOS Trk interfaces
                     for nr in range(0,20):
                         nr = str(nr)
                         if (interface, nr) in lag_stacks:
                             vlan_stacks.add(hostnames[nr])
-                else: 
+                else:
+                    # Regular physical interface
                     vlan_stacks.add(hostnames[str(stack_nr)])
 
             for hostname in vlan_stacks:
@@ -361,7 +402,7 @@ def tagged_vlans_json(config_files):
 
                 # create a new dictionary entry if the interface vlan list does not exists
                 if not interface_exists:
-                    data['tagged_vlans'].append({ 'hostname': hostname, 'interface': interface, 
+                    data['tagged_vlans'].append({ 'hostname': hostname, 'interface': interface,
                         'tagged_vlans': [{'name': vlan_name, 'vlan_id': vlan_id}] })
                     interface_exists = False
     return data
@@ -484,24 +525,24 @@ if __name__ == "__main__":
     print("\n=== Debuging ===")
 
     data_folders = [
-        #"/data/aruba-8-ports/",
-        #"/data/aruba-12-ports/",
-        # "/data/aruba-48-ports/"
-        # "/data/hpe-8-ports/",
-        # "/data/aruba-stack/"
-        "/data/aruba-stack-2920/"
-        # "/data/aruba-stack-2930/",
-        # "/data/aruba-modular/"
-        # "/data/aruba-modular-stack/"
-        # "/data/procurve-single/"
-        # "/data/procurve-modular/"
+        "aruba-8-ports",
+        #"aruba-12-ports",
+        #"aruba-48-ports",
+        #"hpe-8-ports",
+        #"aruba-stack",
+        #"aruba-stack-2920",
+        #"aruba-stack-2930",
+        #"aruba-modular",
+        #"aruba-modular-stack",
+        #"procurve-single",
+        #"procurve-modular",
 
-        #"/data/aruba_6100/",
-        #"/data/aruba_6300/"
+        "aruba_6100",
+        "aruba_6300",
     ]
 
     for folder in data_folders:
-        data_folder = main_folder + folder
+        data_folder = os.path.join(main_folder, "data", folder)
 
         print("\n Folder: ", data_folder)
 
@@ -509,13 +550,13 @@ if __name__ == "__main__":
         #debug_locations_json(data_folder)
         #debug_devices_json(data_folder)
         #debug_device_interfaces_json(data_folder)
-        debug_lags_json(data_folder)
+        #debug_lags_json(data_folder)
 
         #debug_vlans_json(data_folder)
-        debug_untagged_vlans(data_folder)
+        #debug_untagged_vlans(data_folder)
         #debug_tagged_vlans_json(data_folder)
 
 
-        #debug_ip_addresses_json(data_folder)
+        debug_ip_addresses_json(data_folder)
 
         #debug_modules_json(data_folder)

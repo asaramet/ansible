@@ -215,6 +215,30 @@ def debug_single():
     single(data_folder, sys.stdout, ["switch"])
     print('---END Debugging---')
 
+def debug_dicts(d_folder):
+    data_folder = os.path.join(main_folder, "data", d_folder)
+    files = config_files(data_folder)
+
+    print('---Debugging ', data_folder)
+
+    # Collect all dictionaries in a list
+    data_list = [
+        #{"modular": False},
+        #devices_json(files, device_type_slags, ["switch"]),
+        #modules_json(files),
+        lags_json(files),
+        #device_interfaces_json(files),
+        #vlans_json(files),
+        #tagged_vlans_json(files),
+        #ip_addresses_json(files)
+    ]
+
+    # Print the list of dictionaries
+    yaml.dump(data_list, sys.stdout)
+
+    print('---END Debugging---')
+
+
 def debug_modular():
     data_folder = main_folder + "/data/procurve-modular/"
 
@@ -223,7 +247,29 @@ def debug_modular():
     print('---END Debugging---')
 
 if __name__ == "__main__":
+    #main()
+
+    ## ------ Debug ----------##
     #debug_single()
     #debug_modular()
 
-    main()
+
+    data_folders = [
+        "aruba-8-ports",
+        #"aruba-12-ports",
+        #"aruba-48-ports",
+        #"hpe-8-ports",
+        #"aruba-stack",
+        #"aruba-stack-2920",
+        #"aruba-stack-2930",
+        #"aruba-modular",
+        #"aruba-modular-stack",
+        #"procurve-single",
+        #"procurve-modular",
+
+        "aruba_6100",
+        #"aruba_6300",
+    ]
+
+    for folder in data_folders:
+        debug_dicts(folder)

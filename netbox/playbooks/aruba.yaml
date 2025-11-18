@@ -461,8 +461,6 @@
       loop: "{{ lag_interfaces }}"
       when: lags is defined and lags | length > 0
 
-# TODO - For Aruba OS_CX switches `tagged_vlans` is not returned
-
     - name: Assign tagged VLANs to interfaces
       tags: 
         - tagged_vlans

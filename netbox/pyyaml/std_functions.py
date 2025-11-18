@@ -124,9 +124,7 @@ def recursive_section_search(text, section, value):
 
 # Return a list of file paths from a folder
 def config_files(data_folder):
-    files = os.listdir(data_folder)
-    files = [data_folder + f for f in files if os.path.isfile(data_folder + f)]
-    return files
+    return [entry.path for entry in os.scandir(data_folder) if entry.is_file()]
 
 # Convert a range string, i.e A1-A4, to a list of elements, i.e [A1,A2,A3,A4]
 def convert_range(range_str):
@@ -370,9 +368,38 @@ def get_lags(t_file):
         text = f.readlines()
 
     lags = []
-    for line in recursive_search("trunk", text, True):
-        line_data = line.split()
-        lags.append({"name": line_data[2], 'interfaces': line_data[1]})
+    os_version = get_os_version(t_file)
+
+    if os_version == 'ArubaOS-CX':
+        # Parse OS_CX format: interface lag <number> and interface blocks with lag commands
+        # Get all interfaces assigned to LAGs
+        lag_interfaces = recursive_section_search(text, 'interface', 'lag ')
+
+        # Group interfaces by LAG
+        lag_dict = {}
+        for interface, lag_number in lag_interfaces:
+            # Skip LAG interface definitions themselves
+            if interface.startswith('lag '):
+                continue
+
+            # Extract just the last part of interface number (e.g., '1' from '1/1/1')
+            interface_num = interface.split('/')[-1]
+
+            if lag_number not in lag_dict:
+                lag_dict[lag_number] = []
+            lag_dict[lag_number].append(interface_num)
+
+        # Build the lags list
+        for lag_num, interfaces in lag_dict.items():
+            lags.append({
+                "name": f"lag {lag_num}",
+                'interfaces': ','.join(interfaces)
+            })
+    else:
+        # Parse Aruba iOS format: trunk 9-10 trk1 lacp
+        for line in recursive_search("trunk", text, True):
+            line_data = line.split()
+            lags.append({"name": line_data[2], 'interfaces': line_data[1]})
 
     return lags
 
@@ -451,9 +478,79 @@ def get_tagged_vlans(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
 
-    return recursive_section_search(text, 'vlan', 'tagged')
+    os_version = get_os_version(t_file)
 
-    return "None"
+    if os_version == 'ArubaOS-CX':
+        # Parse OS_CX format: interface with "vlan trunk allowed" commands
+        # Get all defined VLANs
+        all_vlans = set()
+        for vlan_id, _ in recursive_section_search(text, 'vlan', 'name'):
+            all_vlans.add(vlan_id)
+
+        # Also add VLANs without names (just "vlan X" declarations)
+        for line in text:
+            stripped = line.strip()
+            if stripped.startswith('vlan ') and not stripped.startswith('vlan access') and not stripped.startswith('vlan trunk'):
+                parts = stripped.split()
+                if len(parts) == 2 and parts[1].isdigit():
+                    all_vlans.add(parts[1])
+
+        # Get interfaces with trunk configuration
+        trunk_interfaces = {}
+        native_vlans = {}
+
+        # Find trunk interfaces and their native VLANs
+        current_interface = None
+        for line in text:
+            stripped = line.strip()
+
+            if stripped.startswith('interface ') and not stripped.startswith('interface vlan'):
+                parts = stripped.split(maxsplit=1)
+                if len(parts) == 2:
+                    current_interface = parts[1]
+
+            if current_interface and stripped.startswith('vlan trunk allowed'):
+                if 'all' in stripped:
+                    trunk_interfaces[current_interface] = list(all_vlans)
+                else:
+                    # Parse specific VLAN list
+                    vlan_list = stripped.replace('vlan trunk allowed', '').strip()
+                    trunk_interfaces[current_interface] = vlan_list.split(',')
+
+            if current_interface and stripped.startswith('vlan trunk native'):
+                native_vlan = stripped.split()[-1]
+                native_vlans[current_interface] = native_vlan
+
+        # Build result: (vlan_id, interface_string) for each tagged VLAN
+        vlan_to_interfaces = {}
+        for interface, vlans in trunk_interfaces.items():
+            native = native_vlans.get(interface)
+            for vlan_id in vlans:
+                # Skip native VLAN (it's untagged)
+                if vlan_id == native:
+                    continue
+
+                # Extract interface identifier
+                if interface.startswith('lag '):
+                    # Capitalize LAG name to match format (e.g., "Lag 20")
+                    interface_id = interface.replace('lag ', 'Lag ')
+                else:
+                    # For physical interfaces, keep the full format (e.g., '1/1/13')
+                    interface_id = interface
+
+                if vlan_id not in vlan_to_interfaces:
+                    vlan_to_interfaces[vlan_id] = []
+                vlan_to_interfaces[vlan_id].append(interface_id)
+
+        # Convert to list of tuples
+        result = []
+        for vlan_id, interfaces in vlan_to_interfaces.items():
+            result.append((vlan_id, ','.join(interfaces)))
+
+        return result
+    else:
+        # Parse Aruba iOS format: vlan sections with "tagged" keyword
+        return recursive_section_search(text, 'vlan', 'tagged')
 
 def extract_ip_from_mgmt(text):
     result = recursive_section_search(text, 'interface mgmt', 'ip static')
