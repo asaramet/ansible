@@ -6,7 +6,7 @@ sync_objs="
 ansible.cfg
 hosts.ini
 envs.sh
-pynetbox
+py*
 playbooks
 host_vars
 group_vars
