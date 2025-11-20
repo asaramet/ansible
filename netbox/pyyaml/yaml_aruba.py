@@ -69,39 +69,6 @@ def assign_sfp_modules(t_file):
         modules = yaml.safe_load(f)
     return modules
 
-# Collect stack switches data to a YAML file
-def stack(data_folder, output_file_path, devices_tags):
-    files = config_files(data_folder)
-    with open(main_folder + output_file_path, 'w') as f:
-        yaml.dump({"modular": False}, f)
-        #yaml.dump(locations_json(files), f)
-        yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
-        yaml.dump(device_interfaces_json(files), f)
-        yaml.dump(lags_json(files), f)
-        yaml.dump(vlans_json(files), f)
-        yaml.dump(tagged_vlans_json(files), f)
-        yaml.dump(ip_addresses_json(files), f)
-
-def stack_module(data_folder, output_file_path, devices_tags):
-    files = config_files(data_folder)
-
-    add_stack_interfaces = True
-    for f in files:
-        if 'rscs0007' in f.split('/'):
-            add_stack_interfaces = False
-
-    with open(main_folder + output_file_path, 'w') as f:
-        yaml.dump({"modular": True}, f)
-        #yaml.dump(locations_json(files), f)
-        yaml.dump(devices_json(files, device_type_slags, devices_tags), f)
-        yaml.dump(device_interfaces_json(files), f)
-        yaml.dump(lags_json(files), f)
-        yaml.dump(vlans_json(files), f)
-        yaml.dump(tagged_vlans_json(files), f)
-        yaml.dump(ip_addresses_json(files), f)
-
-        yaml.dump(modules_json(files), f)
-
 def main():
     # ProCurve Single Switches
     data_folder = main_folder + "/data/procurve-single/"
@@ -174,7 +141,7 @@ def main():
     devices_tags = ["switch", "stack"]
 
     print("Update data for Aruba stacks into the file: ", output_file_path) 
-    stack(data_folder, output_file_path, devices_tags)
+    single(data_folder, output_file_path, devices_tags)
 
     # Aruba 2930 stacks with LWL modules
     data_folder = main_folder + "/data/aruba-stack-2930/"
@@ -184,7 +151,7 @@ def main():
     devices_tags = ["switch", "stack"]
 
     print("Update data for Aruba 2930 stacks into the file: ", output_file_path) 
-    stack_module(data_folder, output_file_path, devices_tags)
+    modular(data_folder, output_file_path, devices_tags)
 
     # Aruba 2920 stacks with LWL modules
     data_folder = main_folder + "/data/aruba-stack-2920/"
@@ -195,7 +162,7 @@ def main():
     #assign_sfp_modules(data_folder)
 
     print("Update data for Aruba 2920 stacks into the file: ", output_file_path)
-    stack_module(data_folder, output_file_path, devices_tags)
+    modular(data_folder, output_file_path, devices_tags)
 
     # Aruba modular stacks
     data_folder = main_folder + "/data/aruba-modular-stack/"
@@ -204,7 +171,25 @@ def main():
     devices_tags = ["switch", "stack"]
 
     print("Update data for Aruba modular stacks into the file: ", output_file_path)
-    stack_module(data_folder, output_file_path, devices_tags)
+    modular(data_folder, output_file_path, devices_tags)
+
+    # Aruba 6100
+    data_folder = main_folder + "/data/aruba_6100/"
+    output_file_path = "/data/yaml/aruba_6100.yaml"
+
+    devices_tags = ["switch"]
+
+    print("Update data for Aruba 6100s: ", output_file_path)
+    single(data_folder, output_file_path, devices_tags)
+
+    # Aruba 6300 
+    data_folder = main_folder + "/data/aruba_6300/"
+    output_file_path = "/data/yaml/aruba_6300.yaml"
+
+    devices_tags = ["switch", "stack"]
+
+    print("Update data for Aruba 6300s: ", output_file_path) 
+    single(data_folder, output_file_path, devices_tags)
 
 #----- Debugging -------
 def debug_single():
@@ -213,6 +198,13 @@ def debug_single():
 
     print('---Debugging ', data_folder)
     single(data_folder, sys.stdout, ["switch"])
+    print('---END Debugging---')
+
+def debug_modular():
+    data_folder = main_folder + "/data/procurve-modular/"
+
+    print("---Debugging ", data_folder)
+    modular(data_folder, sys.stdout, ["switch", "modular-switch"])
     print('---END Debugging---')
 
 def debug_dicts(d_folder):
@@ -224,9 +216,9 @@ def debug_dicts(d_folder):
     # Collect all dictionaries in a list
     data_list = [
         #{"modular": False},
-        #devices_json(files, device_type_slags, ["switch"]),
+        devices_json(files, device_type_slags, ["switch"]),
         #modules_json(files),
-        lags_json(files),
+        #lags_json(files),
         #device_interfaces_json(files),
         #vlans_json(files),
         #tagged_vlans_json(files),
@@ -236,24 +228,9 @@ def debug_dicts(d_folder):
     # Print the list of dictionaries
     yaml.dump(data_list, sys.stdout)
 
-    print('---END Debugging---')
+    print('---END Debugging ', data_folder)
 
-
-def debug_modular():
-    data_folder = main_folder + "/data/procurve-modular/"
-
-    print("---Debugging ", data_folder)
-    modular(data_folder, sys.stdout, ["switch", "modular-switch"])
-    print('---END Debugging---')
-
-if __name__ == "__main__":
-    #main()
-
-    ## ------ Debug ----------##
-    #debug_single()
-    #debug_modular()
-
-
+def debug_multiple():
     data_folders = [
         "aruba-8-ports",
         #"aruba-12-ports",
@@ -268,8 +245,15 @@ if __name__ == "__main__":
         #"procurve-modular",
 
         "aruba_6100",
-        #"aruba_6300",
+        "aruba_6300",
     ]
 
     for folder in data_folders:
         debug_dicts(folder)
+
+if __name__ == "__main__":
+    main()
+
+    ## ------ Debug ----------##
+    #debug_multiple()
+

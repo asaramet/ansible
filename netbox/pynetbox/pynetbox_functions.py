@@ -852,7 +852,9 @@ def _main(description: str, function: Callable, **kwargs) -> None:
         "aruba_stack_2920.yaml",
 
         "aruba_modular.yaml",
-        "aruba_modular_stack.yaml"
+        "aruba_modular_stack.yaml",
+        "aruba_6100.yaml",
+        "aruba_6300.yaml"
     ]
     
     for file_name in files_yaml:

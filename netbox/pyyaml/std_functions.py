@@ -56,7 +56,15 @@ device_type_slags = {
     'J9137A': 'hpe-procurve-2520-8-poe',
     'J9776A': 'hpe-aruba-2530-24g',
     'J9779A': 'hpe-aruba-2530-24-poep',
-    'JL075A': 'hpe-aruba-3810m-16sfpp-2-slot-switch'
+    'JL075A': 'hpe-aruba-3810m-16sfpp-2-slot-switch',
+
+    # Aruba OS-CX devices
+    'JL679A': 'hpe-aruba-6100-12g-poe4-2sfpp',
+    'JL679A_stack': 'hpe-aruba-6100-12g-poe4-2sfpp',
+    'JL658A': 'hpe-aruba-6300m-24sfpp-4sfp56',
+    'JL658A_stack': 'hpe-aruba-6300m-24sfpp-4sfp56',
+    'JL659A': 'hpe-aruba-6300m-48sr5-poe6-4sfp56',
+    'JL659A_stack': 'hpe-aruba-6300m-48sr5-poe6-4sfp56',
 }
 
 # --- Base functions ---
@@ -382,12 +390,12 @@ def get_lags(t_file):
             if interface.startswith('lag '):
                 continue
 
-            # Extract just the last part of interface number (e.g., '1' from '1/1/1')
-            interface_num = interface.split('/')[-1]
+            # Keep the full interface name (e.g., '1/1/26') for OS-CX configs
+            interface_name = interface
 
             if lag_number not in lag_dict:
                 lag_dict[lag_number] = []
-            lag_dict[lag_number].append(interface_num)
+            lag_dict[lag_number].append(interface_name)
 
         # Build the lags list
         for lag_num, interfaces in lag_dict.items():
@@ -582,7 +590,8 @@ def get_ip_address(t_file):
     # Try management interface first
     mgmt_ip = extract_ip_from_mgmt(text)
     if mgmt_ip:
-        return None, None, mgmt_ip
+        # Return 'mgmt' as a special marker for vlan_id to indicate management interface
+        return 'mgmt', None, mgmt_ip
 
     # Try AOS_CX VLAN interfaces
     vlan_info = extract_ip_from_aoscx_vlan(text)

@@ -142,7 +142,10 @@ def lags_json(config_files):
 
         for lag in trk_lists:
             if lag == []: continue
-            trk_name = lag['name'].title()
+            #trk_name = lag['name'].title()
+            trk_name = lag['name']
+            if trk_name.startswith('t'):
+                trk_name = trk_name.title()
 
             interfaces = lag['interfaces'].replace('-', ',').split(',')
 
@@ -265,10 +268,10 @@ def device_interfaces_json(config_files):
                 continue
 
             if interface.lower().startswith('vlan '):
-                i_types["type"][interface] = "Virtual"
+                i_types["type"][interface] = "virtual"
 
             if interface.lower().startswith('lag '):
-                i_types["type"][interface] = "LAG"
+                i_types["type"][interface] = "lag"
 
             i_nr = interface.split('/')[-1]
             stack_nr = interface.split('/')[0] if '/' in interface else '0'
@@ -293,10 +296,12 @@ def device_interfaces_json(config_files):
             unique_interfaces.add(entry)
 
         # Interfaces to delete
-        for stack_nr, stack_name in hostname.items():
-            if int(stack_nr) > 0:
-                for interface in i_types['type']:
-                    unique_delete_interfaces.add((stack_name, prefix + interface))
+        # Skip for OS-CX: interfaces already have full member/slot/port paths
+        if os_version and 'CX' not in os_version:
+            for stack_nr, stack_name in hostname.items():
+                if int(stack_nr) > 0:
+                    for interface in i_types['type']:
+                        unique_delete_interfaces.add((stack_name, interface))
 
     # Build final lists
     data['device_interfaces'] = [
@@ -345,7 +350,7 @@ def tagged_vlans_json(config_files):
                     intf = intf.strip()
                     if intf.startswith('Lag '):
                         # LAG interface
-                        interface_list.append(('0', intf))
+                        interface_list.append(('0', intf.lower()))
                     elif '/' in intf:
                         # Format: "1/1/13" -> member 1, keep full interface name
                         parts = intf.split('/')
@@ -370,7 +375,7 @@ def tagged_vlans_json(config_files):
                     continue
 
                 # Find stack number for lags
-                if interface.startswith('Lag '):
+                if interface.startswith('lag '):
                     if os_version == 'ArubaOS-CX':
                         # For OS_CX stacks, LAGs are global - add all members
                         for member in hostnames.keys():
@@ -419,19 +424,26 @@ def ip_addresses_json(config_files):
 
         is_vlan = False
         name = None
-        if vlan_id:
+
+        # Check if this is a management interface
+        if vlan_id == 'mgmt':
+            # Management interface
+            name = 'mgmt'
+            vlan_id = None  # Reset vlan_id to None for mgmt interfaces
+        elif vlan_id:
+            # VLAN interface
             is_vlan = True
             name = 'vlan ' + vlan_id
 
         data['ip_addresses'].append({
-            'hostname': hostname, 
-            'ip': ip, 
-            'vlan_id': vlan_id, 
+            'hostname': hostname,
+            'ip': ip,
+            'vlan_id': vlan_id,
             'vlan_name': vlan_name,
             'vlan': is_vlan,
             'name': name
         })
-    
+
     return data
 
 # return the modules json object
@@ -529,7 +541,7 @@ if __name__ == "__main__":
         #"aruba-12-ports",
         #"aruba-48-ports",
         #"hpe-8-ports",
-        #"aruba-stack",
+        "aruba-stack",
         #"aruba-stack-2920",
         #"aruba-stack-2930",
         #"aruba-modular",

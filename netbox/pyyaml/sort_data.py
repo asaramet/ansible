@@ -188,13 +188,25 @@ def get_switch_type(config_file):
         # Look for switch type in comments or other locations
         alt_pattern = r'\b([A-Z]{2}\d{3}[A-Z])\b'
         matches = re.findall(alt_pattern, content)
-        
+
         if matches:
             # Return the first match that looks like a switch type
             for match in matches:
                 if len(match) == 6:  # Typical format like JL258A
                     return match.upper()
-              
+
+        # Pattern 4: For OS-CX switches without type info, infer from folder name
+        # Check if this is an OS-CX config by looking for ArubaOS-CX in version
+        if 'ArubaOS-CX' in content or 'AOS-CX' in content:
+            parent_folder = config_file.parent.name
+            # Map folder names to default device types
+            folder_to_type = {
+                'aruba_6100': 'JL679A',  # Aruba 6100-12G-POE4-2SFP+
+                'aruba_6300': 'JL658A',  # Aruba 6300M-24SFP+-4SFP56 (default, could also be JL659A for 48-port)
+            }
+            if parent_folder in folder_to_type:
+                return folder_to_type[parent_folder]
+
         return None
 
     except FileNotFoundError:
