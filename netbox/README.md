@@ -60,21 +60,21 @@ sudo pacman -Syu python-pynetbox python-packaging
 
 ### Python scripts
 
-- `add_locations.py` - add collected locations data to a NetBox platform using `pynetbox` library.
-- `extra_functions.py` - more functions used in multiple python scripts.
-- `interfaces.py` - synchronize interfaces on a NetBox platform using `pynetbox` library
-- `ips.py` - IP Address Management Functions for NetBox
-- `json_functions_os_cx.py` - functions to return JSON objects for Aruba OS-CX switches.
-- `json_functions.py` - functions to return JSON objects for Aruba OS switches.
-- `lags.py` - LAG (Link Aggregation Group) management functions for NetBox
-- `modules.py` - process modules for switches on a NetBox platform using `pynetbox` library
-- `nb.py` - in house `pynetbox` API session initialization.
-- `pynetbox_functions.py` - project specific functions for `pynetbox` based apps.
-- `sort_data.py` - Sort collected running config files according to the switch type.
-- `std_functions.py` - standard functions used in multiple python scripts.
-- `switches.py` - add switches to a NetBox platform using `pynetbox` library.
-- `update_data.py` - run yaml data collection scripts.
-- `vlans.py` - synchronize VLANs on a NetBox platform using `pynetbox` library
-- `yaml_aruba_os_cx.py` - Collect Aruba OS-CX devices data from config files and generate a yaml data file.
-- `yaml_aruba.py` - Collect Aruba OS devices data from config files and generate a yaml data file.
-- `yaml_cisco.py` - Collect Cisco devices data from config files and generate a yaml data file.
+- `pynetbox` - populate a NetBox server with the help of `pynetbox` library
+  - `add_locations.py` - add collected locations data
+  - `interfaces.py` - synchronize interfaces
+  - `ips.py` - IP Address management functions
+  - `lags.py` - LAG (Link Aggregation Group) management functions
+  - `modules.py` - process modules
+  - `nb.py` - in house `pynetbox` API session initialization
+  - `pynetbox_functions.py` - project specific functions for `pynetbox` based apps
+  - `switches.py` - process switches
+  - `update_data.py` - populate the server
+  - `vlans.py` - synchronize VLANs
+- `pyyaml` - processing raw data
+  - `extra_functions.py` - more functions used in multiple python scripts
+  - `json_functions.py` - functions to return JSON objects for Aruba OS switches
+  - `sort_data.py` - Sort collected running config files according to the switch type
+  - `std_functions.py` - standard functions used in multiple python scripts
+  - `yaml_aruba.py` - Collect Aruba devices data from config files and generate a yaml data file.
+  - `yaml_cisco.py` - Collect Cisco devices data from config files and generate a yaml data file.
