@@ -2,9 +2,10 @@
 
 #----- Return JSON Objects -----#
 
-import re, os, yaml
+import re, os, sys, yaml 
 from tabulate import tabulate
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sort_data import get_switch_type
 
 from std_functions import device_type_slags, main_folder, config_files

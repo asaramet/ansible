@@ -72,9 +72,11 @@ sudo pacman -Syu python-pynetbox python-packaging
   - `update_data.py` - populate the server
   - `vlans.py` - synchronize VLANs
 - `pyyaml` - processing raw data
-  - `extra_functions.py` - more functions used in multiple python scripts
-  - `json_functions.py` - functions to return JSON objects for Aruba OS switches
   - `sort_data.py` - Sort collected running config files according to the switch type
-  - `std_functions.py` - standard functions used in multiple python scripts
-  - `yaml_aruba.py` - Collect Aruba devices data from config files and generate a yaml data file.
-  - `yaml_cisco.py` - Collect Cisco devices data from config files and generate a yaml data file.
+  - `aruba` - Collect Aruba devices data from config files and generate a yaml data file.
+    - `extra_functions.py` - more functions used in multiple python scripts
+    - `json_functions.py` - functions to return JSON objects for Aruba OS switches
+    - `std_functions.py` - standard functions used in multiple python scripts
+    - `yamerate.py` - Collect data from config files and generate the yaml data file.
+  - `cisco` - Collect Cisco devices data from config files and generate a yaml data file.
+    - `yamerate.py` - Collect data from config files and generate the yaml data file.

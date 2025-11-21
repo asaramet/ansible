@@ -6,10 +6,14 @@ import re
 
 from pathlib import Path
 from tabulate import tabulate
-from std_functions import data_folder
 
-raw_folder = Path(data_folder) / 'raw'
-temp_folder = Path(raw_folder) / 'temp'
+script_path = Path(__file__).resolve()
+pyyaml_dir = script_path.parent
+project_dir = pyyaml_dir.parent
+
+data_folder = project_dir.joinpath('data')
+raw_folder = data_folder.joinpath('raw')
+temp_folder = raw_folder.joinpath('temp')
 
 hw_folders = {
     'JL258A': 'aruba-8-ports',
@@ -510,6 +514,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
     #debug()
 

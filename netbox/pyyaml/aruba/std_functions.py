@@ -6,7 +6,8 @@ import re, os, yaml
 from tabulate import tabulate
 
 this_folder = os.path.dirname(os.path.realpath(__file__))
-main_folder = os.path.dirname(this_folder)
+pyyaml_dir = os.path.dirname(this_folder)
+main_folder = os.path.dirname(pyyaml_dir)
 data_folder = os.path.join(main_folder, 'data')
 
 device_type_slags = {
