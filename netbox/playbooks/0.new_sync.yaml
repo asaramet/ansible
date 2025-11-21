@@ -41,6 +41,8 @@
           - "--include=rg*/running-config"
           - "--include=rw*/"
           - "--include=rw*/running-config"
+          - "--include=aruba_6*/"
+          - "--include=aruba_6*/r*"
           - "--exclude=*"
           - "--prune-empty-dirs"
 
