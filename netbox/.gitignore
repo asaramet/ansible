@@ -1,6 +1,7 @@
 data
 src
 host_vars/rhlx99/
+*/CLAUDE.md
 */__pycache__/
 */*/__pycache__/
 pynetbox/temp
