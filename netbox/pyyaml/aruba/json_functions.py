@@ -7,13 +7,14 @@ from tabulate import tabulate
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sort_data import get_switch_type
+from functions import serial_numbers, get_ip_address, get_device_role, get_vlans_names
 
 from std_functions import device_type_slags, main_folder, config_files
-from std_functions import serial_numbers, convert_interfaces_range
-from std_functions import get_os_version, get_hostname, get_device_role
+from std_functions import convert_interfaces_range
+from std_functions import get_os_version, get_hostname
 from std_functions import get_lags, get_interface_names, get_vlans
-from std_functions import get_untagged_vlans, get_tagged_vlans, get_vlans_names, get_lag_stack
-from std_functions import get_ip_address, get_modules
+from std_functions import get_untagged_vlans, get_tagged_vlans, get_lag_stack
+from std_functions import get_modules
 from std_functions import module_types_dict, modules_interfaces
 from std_functions import convert_range
 
@@ -561,7 +562,7 @@ if __name__ == "__main__":
 
 
         #debug_locations_json(data_folder)
-        #debug_devices_json(data_folder)
+        debug_devices_json(data_folder)
         #debug_device_interfaces_json(data_folder)
         #debug_lags_json(data_folder)
 
@@ -570,6 +571,6 @@ if __name__ == "__main__":
         #debug_tagged_vlans_json(data_folder)
 
 
-        debug_ip_addresses_json(data_folder)
+        #debug_ip_addresses_json(data_folder)
 
         #debug_modules_json(data_folder)

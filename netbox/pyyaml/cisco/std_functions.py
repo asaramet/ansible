@@ -19,7 +19,7 @@ project_dir = pyyaml_dir.parent
 #data_folder = project_dir.joinpath('data', 'cisco')
 data_folder = pyyaml_dir.joinpath('data')
 
-def _main(function: callable, data_folder: Path = data_folder, **kwargs) -> None:
+def _main(function: callable, data_folder: Path = data_folder, *args, **kwargs) -> None:
     """
     Parse Cisco config files and generate YAML data file.
     Args:
@@ -29,68 +29,138 @@ def _main(function: callable, data_folder: Path = data_folder, **kwargs) -> None
     # Configure logging
     logging.basicConfig(level = logging.INFO)
 
-    function(data_folder, **kwargs)
+    function(data_folder, *args, **kwargs)
 
-def get_hostname_and_stack(data_folder):
+def get_hostname_and_stack(config_file):
     """
-    Read Cisco config files from data folder and extract hostname and stack info.
+    Read a Cisco config file and extract hostname and stack info.
+    Supports both regular stacks (2960X, 3850, 9300, etc.) and VSS (Virtual Switching System).
 
     Args:
-        data_folder: Path to the data folder containing Cisco config files
+        config_file: Path to the Cisco config file (Path object or string)
 
     Returns:
-        list: List of dictionaries with keys:
+        dict: Dictionary with keys:
             - hostname: str - Device hostname
             - stack: bool - True if device is in a stack (multiple switches)
             - switches: set - Set of switch numbers found in config
+        Returns None if hostname not found or error occurs
     """
-    results = []
-    data_path = Path(data_folder)
+    if not isinstance(config_file, Path):
+        config_file = Path(config_file)
 
-    if not data_path.exists():
-        logger.error(f"Data folder does not exist: {data_folder}")
-        return results
+    if not config_file.exists():
+        logger.error(f"Config file does not exist: {config_file}")
+        return None
 
-    # Read all files in the data folder
-    for file_path in data_path.iterdir():
-        if file_path.is_file():
-            hostname = None
-            stack_switches = set()
+    hostname = None
+    stack_switches = set()
+    is_vss = False
 
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        # Look for hostname line
-                        hostname_match = re.match(r'^hostname\s+(\S+)', line)
-                        if hostname_match:
-                            hostname = hostname_match.group(1)
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                # Look for hostname line
+                hostname_match = re.match(r'^hostname\s+(\S+)', line)
+                if hostname_match:
+                    hostname = hostname_match.group(1)
 
-                        # Look for switch provision lines (indicates stack)
-                        switch_match = re.match(r'^switch\s+(\d+)\s+provision', line)
-                        if switch_match:
-                            stack_switches.add(switch_match.group(1))
+                # Pattern 1: Regular stack - "switch X provision <model>"
+                switch_match = re.match(r'^switch\s+(\d+)\s+provision', line)
+                if switch_match:
+                    stack_switches.add(switch_match.group(1))
 
-                # If we found a hostname, add it to results
-                if hostname:
-                    is_stack = len(stack_switches) > 1
-                    results.append({
-                        'hostname': hostname,
-                        'stack': is_stack,
-                        'switches': stack_switches
-                    })
-                    logger.debug(f"File {file_path.name}: hostname={hostname}, stack={is_stack}, switches={stack_switches}")
-                else:
-                    logger.warning(f"No hostname found in {file_path.name}")
+                # Pattern 2: VSS (Virtual Switching System) - "module provision switch X"
+                vss_match = re.match(r'^module\s+provision\s+switch\s+(\d+)', line)
+                if vss_match:
+                    stack_switches.add(vss_match.group(1))
+                    is_vss = True
 
-            except Exception as e:
-                logger.error(f"Error reading file {file_path.name}: {e}")
+                # Pattern 3: VSS indicator - "switch mode virtual"
+                if re.search(r'switch\s+mode\s+virtual', line):
+                    is_vss = True
 
-    return results
+        # If we found a hostname, return the result
+        if hostname:
+            # Stack if: more than 1 switch OR VSS configuration
+            is_stack = len(stack_switches) > 1 or (len(stack_switches) > 0 and is_vss)
+            result = {
+                'hostname': hostname,
+                'stack': is_stack,
+                'switches': stack_switches
+            }
+            logger.debug(f"File {config_file.name}: hostname={hostname}, stack={is_stack}, switches={stack_switches}, VSS={is_vss}")
+            return result
+        else:
+            logger.warning(f"No hostname found in {config_file.name}")
+            return None
+
+    except Exception as e:
+        logger.error(f"Error reading file {config_file.name}: {e}")
+        return None
+
+def get_device_type(config_file):
+    """
+    Extract device type from a Cisco configuration file.
+    Supports both regular stacks and VSS/older switches.
+
+    Args:
+        config_file: Path to the Cisco config file (Path object or string)
+
+    Returns:
+        str: Device type (e.g., 'ws-c2960x-24pd-l', 'c9500-40x', 'cat4500es8')
+             Returns None if no device type found
+
+    Example:
+        >>> get_device_type(Path('/path/to/config'))
+        'ws-c2960x-24pd-l'
+    """
+    if not isinstance(config_file, Path):
+        config_file = Path(config_file)
+
+    if not config_file.exists():
+        logger.error(f"Config file does not exist: {config_file}")
+        return None
+
+    boot_system_type = None
+
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                # Pattern 1: Regular stack - "switch 1 provision <device-type>"
+                provision_match = re.match(r'^switch\s+\d+\s+provision\s+(\S+)', line)
+                if provision_match:
+                    device_type = provision_match.group(1)
+                    logger.debug(f"Found device type '{device_type}' via provision in {config_file.name}")
+                    return device_type
+
+                # Pattern 2: VSS/older switches - extract from boot system command
+                # Example: "boot system flash bootflash:cat4500es8-universalk9.SPA.03.11.04.E.152-7.E4.bin"
+                boot_match = re.match(r'^boot\s+system\s+.*?:(cat\d+\w*|ws-c\d+\w*-\w+)', line, re.IGNORECASE)
+                if boot_match:
+                    boot_system_type = boot_match.group(1).lower()
+                    logger.debug(f"Found potential device type '{boot_system_type}' in boot system command")
+
+        # If we found device type from boot system, return it
+        if boot_system_type:
+            logger.debug(f"Using device type '{boot_system_type}' from boot system in {config_file.name}")
+            return boot_system_type
+
+        logger.warning(f"No device type found in {config_file.name}")
+        return None
+
+    except Exception as e:
+        logger.error(f"Error reading config file {config_file.name}: {e}")
+        return None
 
 if __name__ == "__main__":
     import sys, os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
     from functions import _debug
 
-    # Test the get_hostname_and_stack function
-    _debug(get_hostname_and_stack, data_folder)
+    data_path = Path(data_folder)
+    if data_path.exists():
+        for file_path in sorted(data_path.iterdir()):
+            if file_path.is_file():
+                _debug(get_device_type, file_path)

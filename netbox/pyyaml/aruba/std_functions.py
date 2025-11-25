@@ -2,8 +2,11 @@
 
 # Standard reusable functions
 
-import re, os, yaml
+import re, os, sys, yaml
 from tabulate import tabulate
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from functions import recursive_section_search, campuses
 
 this_folder = os.path.dirname(os.path.realpath(__file__))
 pyyaml_dir = os.path.dirname(this_folder)
@@ -100,37 +103,6 @@ def recursive_search(pattern, text, start=False):
 
     return found_lines
 
-# return a tuple (section, value), ex: (interface, interface_name), recursively from a switch config
-def recursive_section_search(text, section, value):
-    """
-    Parses a config text block and returns a list of (section_value, value_found) tuples.
-    Example: [('interface_name', 'interface_description')]
-    """
-    results = []
-    current_section = None
-
-    for line in text:
-        stripped = line.strip()
-
-        # Start of a section
-        if stripped.startswith(section):
-            parts = stripped.split(maxsplit=1)
-            if len(parts) == 2:
-                current_section = parts[1]
-            continue
-        
-        # Value found inside section
-        if current_section and stripped.startswith(value):
-            _, val = stripped.split(' ', 1)
-            results.append((current_section, val.strip('"')))
-            continue
-
-        # End of a section
-        if stripped in {"exit", "!"}:
-            current_section = None
-
-    return results
-
 # Return a list of file paths from a folder
 def config_files(data_folder):
     return [entry.path for entry in os.scandir(data_folder) if entry.is_file()]
@@ -190,6 +162,14 @@ def convert_interfaces_range(interfaces_string):
 
     return i_list
 
+# Return device type for a given hostname
+def device_type(hostname):
+    for device_type, d_list in devices().items():
+        if hostname in d_list:
+            return device_type
+
+    return None
+
 # --- Get functions ---
 def get_os_version(t_file):
 
@@ -238,13 +218,6 @@ def site_slug(t_file):
 
     hostnames = get_hostname(t_file)
     hostname = hostnames['0'] if '0' in hostnames.keys() else hostnames['1']
-
-    campuses = {
-        "h": "flandernstrasse",
-        "g": "gppingen",
-        "s": "stadtmitte",
-        "w": "weststadt"
-    }
 
     location = get_location(t_file)
     if location:
@@ -360,18 +333,6 @@ def room_slug(location):
     return f"{building.lower()}-{room_nr.lower()}"
     
 
-def get_device_role(t_file, hostname):
-    role_code = hostname[2:4]
-    if role_code == "cs":
-        return "distribution-layer-switch"
-
-    vlan_id, _, _ =  get_ip_address(t_file)
-
-    if vlan_id in ["102", "202", "302"]:
-        return "bueroswitch"
-
-    return "access-layer-switch"
-
 def get_lags(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
@@ -437,15 +398,6 @@ def get_vlans(t_file):
 
     vlans = set(recursive_section_search(text, 'vlan', 'name '))
     vlans.add(('1', 'DEFAULT_VLAN'))
-    return vlans
-
-def get_vlans_names(t_file):
-    with open(t_file, "r") as f:
-        text = f.readlines()
-
-    vlans = {}
-    for vlan_id, vlan_name in recursive_section_search(text, 'vlan', 'name '):
-        vlans[vlan_id] = vlan_name
     return vlans
 
 def get_untagged_vlans(t_file):
@@ -561,49 +513,6 @@ def get_tagged_vlans(t_file):
         # Parse Aruba iOS format: vlan sections with "tagged" keyword
         return recursive_section_search(text, 'vlan', 'tagged')
 
-def extract_ip_from_mgmt(text):
-    result = recursive_section_search(text, 'interface mgmt', 'ip static')
-    if result:
-        return result[0][1].split()[1]  # 'static 1.2.3.4'
-    return None
-
-def extract_ip_from_aoscx_vlan(text):
-    result = recursive_section_search(text, 'interface vlan', 'ip address')
-    if result:
-        vlan_id = result[0][0].split()[1]  # 'vlan 101'
-        ip = result[0][1].split()[1]       # 'address 1.2.3.4/24'
-        return vlan_id, ip
-    return None
-
-def extract_ip_from_aruba_vlan(text):
-    result = recursive_section_search(text, 'vlan', 'ip address')
-    if result:
-        vlan_id, ip_string = result[0]
-        _, ip, netmask = ip_string.split()  # 'address 1.2.3.4 255.255.254.0'
-        prefix = sum(bin(int(octet)).count('1') for octet in netmask.split('.'))
-        return vlan_id, f'{ip}/{prefix}'
-    return None
-
-def get_ip_address(t_file):
-    with open(t_file, "r") as f:
-        text = f.readlines()
-
-    # Try management interface first
-    mgmt_ip = extract_ip_from_mgmt(text)
-    if mgmt_ip:
-        # Return 'mgmt' as a special marker for vlan_id to indicate management interface
-        return 'mgmt', None, mgmt_ip
-
-    # Try AOS_CX VLAN interfaces
-    vlan_info = extract_ip_from_aoscx_vlan(text)
-    if not vlan_info:
-        vlan_info = extract_ip_from_aruba_vlan(text)
-
-    vlan_id, ip = vlan_info
-    vlan_name = get_vlans_names(t_file).get(vlan_id, "UNKNOWN")
-
-    return vlan_id, vlan_name, ip
-
 def get_modules(t_file):
     modules = []
 
@@ -707,19 +616,6 @@ def get_modules(t_file):
         modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_list[3], 'name': 'Uplink', 'stack': stack})
 
     return modules
-
-# --- Additional function ---
-# Return a list of devices serial numbers from the yaml file
-def serial_numbers():
-    yaml_file = main_folder + "/src/serial_numbers.yaml"
-
-    s_dict = {}
-    with open(yaml_file, 'r') as f:
-        for v_dict in yaml.safe_load(f):
-            for key, value in v_dict.items():
-                s_dict[key] = value
-
-    return s_dict 
 
 # Return a list of devices dictionary
 def devices():
@@ -897,16 +793,6 @@ def debug_get_flor_nr(data_folder):
     print("\n== Debug: get_flor_nr() ==")
     print(tabulate(table, headers))
 
-def debug_get_device_role(data_folder):
-    table = []
-    headers = ["File name", "Device role"]
-
-    for f in config_files(data_folder):
-        hostname = os.path.basename(f)
-        table.append([os.path.basename(f), get_device_role(f, hostname)])
-    print("\n== Debug: get_device_role ==")
-    print(tabulate(table, headers, "github"))
-
 def debug_get_lags(data_folder):
     table = []
     headers = ["File Name", "lags"]
@@ -943,14 +829,6 @@ def debug_get_untagged_vlans(data_folder):
     for f in config_files(data_folder):
         print(os.path.basename(f), '---> ', get_untagged_vlans(f))
     print('\n')
-
-def debug_get_ip_address(data_folder):
-    table = []
-    headers = ["File Name", "IP"]
-    for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_ip_address(f)])
-    print("\n== Debug: get_ip_address ==")
-    print(tabulate(table, headers))
 
 def debug_get_modules(data_folder):
     table = []
@@ -1018,7 +896,7 @@ if __name__ == "__main__":
 
         print("\n Folder: ", data_folder)
         #debug_get_hostname(data_folder)
-        #debug_site_slug(data_folder)
+        debug_site_slug(data_folder)
         #debug_config_files(data_folder)
         #debug_get_os_version(data_folder)
         #debug_get_device_role(data_folder)
@@ -1029,7 +907,7 @@ if __name__ == "__main__":
         #debug_get_vlans_names(data_folder)
         debug_get_untagged_vlans(data_folder)
         #debug_get_ip_address(data_folder)
-        #debug_device_type(data_folder)
+        debug_device_type(data_folder)
         #debug_get_modules(data_folder)
         #debug_get_location(data_folder)
         #debug_floor_slug(data_folder)
