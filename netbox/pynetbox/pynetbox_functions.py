@@ -837,7 +837,7 @@ def _main(description: str, function: Callable, **kwargs) -> None:
 
     nb.http_session.verify = False # Disable SSL verification
 
-    files_yaml = [
+    files_yaml_bak = [
         "procurve_single.yaml",
         "procurve_modular.yaml",
 
@@ -857,6 +857,8 @@ def _main(description: str, function: Callable, **kwargs) -> None:
         "aruba_6300.yaml"
     ]
     
+    files_yaml = ["cisco.yaml"]
+
     for file_name in files_yaml:
         data_file_path = f"{main_folder}/data/yaml/{file_name}"
         data = load_yaml(data_file_path)

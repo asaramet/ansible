@@ -6,7 +6,7 @@ import logging, sys, yaml
 logger = logging.getLogger(__name__)
 
 from json_functions import devices_json, modules_json, lags_json
-from std_functions import data_folder
+from std_functions import data_folder, project_dir
 
 
 def cisco_ios(data_folder, output_file = sys.stdout):
@@ -24,15 +24,15 @@ def cisco_ios(data_folder, output_file = sys.stdout):
     if output_file == sys.stdout:
         f = sys.stdout
     else:
-        output = data_folder.joinpath("yaml", output_file) # same data folder, different directory
+        output = data_folder.parent.joinpath("yaml", output_file) # same data folder, different directory
         output.parent.mkdir(parents = True, exist_ok = True) # ensure the folder exists
         f = open(output, 'w')
     try:
         yaml.dump(devices_json(data_folder), f)
         yaml.dump(modules_json(data_folder), f)
-        yaml.dump(lags_json(data_folder), f)
-        #yaml.dump(device_interfaces_json(files), f)
         #yaml.dump(vlans_json(files), f)
+        #yaml.dump(device_interfaces_json(files), f)
+        yaml.dump(lags_json(data_folder), f)
         #yaml.dump(tagged_vlans_json(files), f)
         #yaml.dump(ip_addresses_json(files), f)
     finally:
@@ -42,7 +42,7 @@ def cisco_ios(data_folder, output_file = sys.stdout):
 
 if __name__ == "__main__":
     from std_functions import _main
-    #_main(cisco_ios, data_folder, "cisco.yaml")
+    _main(cisco_ios, data_folder, "cisco.yaml")
 
     # -- Debugging 
     import os
@@ -50,4 +50,4 @@ if __name__ == "__main__":
     from functions import _debug
 
     #_debug(cisco_ios, data_folder)
-    _main(cisco_ios, data_folder)
+    #_main(cisco_ios, data_folder)

@@ -18,7 +18,7 @@ ansible-playbook playbooks/0.new_sync.yaml | tee ${logs_folder}/sync_data.logs &
 python3 pyyaml/sort_data.py | tee ${logs_folder}/sync_data.logs  &&
 
 python3 pyyaml/aruba/yamerate.py | tee ${logs_folder}/pynetbox.logs  &&
-#python3 pyyaml/cisco/yamerate.py | tee -a ${logs_folder}/pynetbox.logs  &&
+python3 pyyaml/cisco/yamerate.py | tee -a ${logs_folder}/pynetbox.logs  &&
 
 ansible-playbook playbooks/backup_sql.yaml | tee ${logs_folder}/backup.logs &&
 

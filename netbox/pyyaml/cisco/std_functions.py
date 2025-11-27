@@ -16,8 +16,8 @@ script_path = Path(__file__).resolve()
 cisco_dir = script_path.parent
 pyyaml_dir = cisco_dir.parent
 project_dir = pyyaml_dir.parent
-#data_folder = project_dir.joinpath('data', 'cisco')
-data_folder = pyyaml_dir.joinpath('data')
+data_folder = project_dir.joinpath('data', 'cisco')
+#data_folder = pyyaml_dir.joinpath('data', 'cisco')
 
 def _main(function: callable, data_folder: Path = data_folder, *args, **kwargs) -> None:
     """
@@ -195,6 +195,12 @@ def get_modules(config_file):
         logger.error(f"Error extracting modules from {config_file.name}: {e}")
         return []
 
+# Device type mapping: boot system image name -> actual chassis model
+# Used when "switch X provision" is not available (VSS, older switches)
+device_type_mapping = {
+    'cat4500es8': 'ws-c4506-e',    # Catalyst 4500 Supervisor 8-E chassis
+}
+
 def get_lags(config_file):
     """
     Extract LAG (Port-channel) information from Cisco config file.
@@ -247,16 +253,21 @@ def get_device_type(config_file):
     Extract device type from a Cisco configuration file.
     Supports both regular stacks and VSS/older switches.
 
+    For VSS/older switches without provision commands, boot system image names
+    are mapped to actual chassis types using device_type_mapping dictionary.
+
     Args:
         config_file: Path to the Cisco config file (Path object or string)
 
     Returns:
-        str: Device type (e.g., 'ws-c2960x-24pd-l', 'c9500-40x', 'cat4500es8')
+        str: Device type (e.g., 'ws-c2960x-24pd-l', 'c9500-48y4c', 'ws-c4506-e')
              Returns None if no device type found
 
     Example:
         >>> get_device_type(Path('/path/to/config'))
         'ws-c2960x-24pd-l'
+        >>> get_device_type(Path('/path/to/vss-config'))  # boot system has cat4500es8
+        'ws-c4506-e'  # mapped from cat4500es8
     """
     if not isinstance(config_file, Path):
         config_file = Path(config_file)
@@ -284,10 +295,14 @@ def get_device_type(config_file):
                     boot_system_type = boot_match.group(1).lower()
                     logger.debug(f"Found potential device type '{boot_system_type}' in boot system command")
 
-        # If we found device type from boot system, return it
+        # If we found device type from boot system, check if it needs mapping
         if boot_system_type:
-            logger.debug(f"Using device type '{boot_system_type}' from boot system in {config_file.name}")
-            return boot_system_type
+            # Map boot system type to actual device type if mapping exists
+            mapped_type = device_type_mapping.get(boot_system_type, boot_system_type)
+            if mapped_type != boot_system_type:
+                logger.debug(f"Mapped '{boot_system_type}' to '{mapped_type}' for {config_file.name}")
+            logger.debug(f"Using device type '{mapped_type}' from boot system in {config_file.name}")
+            return mapped_type
 
         logger.warning(f"No device type found in {config_file.name}")
         return None

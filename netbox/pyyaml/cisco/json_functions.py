@@ -121,7 +121,7 @@ def devices_json(data_folder):
             data['devices'].append({
                 'name': hostname,
                 'tags': set_tags(hostname),
-                'device_type': get_device_type(config_file),
+                'device_type': f"cisco-{get_device_type(config_file)}",
                 'serial': serial_nums[hostname],
                 'site': site_slug(hostname),
                 'device_role': get_device_role(config_file, hostname)
@@ -143,7 +143,7 @@ def devices_json(data_folder):
             data['devices'].append({
                 'name': name,
                 'tags': set_tags(name),
-                'device_type': get_device_type(config_file),
+                'device_type': f"cisco-{get_device_type(config_file)}",
                 'serial': serial_nums[name],
                 'site': site_slug(name),
                 'device_role': get_device_role(config_file, hostname),
@@ -293,9 +293,3 @@ if __name__ == "__main__":
     from functions import _debug
 
     _debug(lags_json, data_folder)
-
-'''
-lags:
-- hostname: rscs0007-1
-  name: Trk1
-'''
