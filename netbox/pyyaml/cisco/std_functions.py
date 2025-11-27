@@ -195,6 +195,53 @@ def get_modules(config_file):
         logger.error(f"Error extracting modules from {config_file.name}: {e}")
         return []
 
+def get_lags(config_file):
+    """
+    Extract LAG (Port-channel) information from Cisco config file.
+    Returns list of Port-channel names found in the configuration.
+
+    Args:
+        config_file: Path to the Cisco config file (Path object or string)
+
+    Returns:
+        list: List of dictionaries, each containing:
+            - name: Port-channel name (e.g., 'Port-channel1', 'Port-channel15')
+        Returns empty list if no port-channels found or error occurs
+
+    Example:
+        >>> get_lags(Path('/path/to/config'))
+        [{'name': 'Port-channel1'}, {'name': 'Port-channel2'}]
+    """
+    if not isinstance(config_file, Path):
+        config_file = Path(config_file)
+
+    if not config_file.exists():
+        logger.error(f"Config file does not exist: {config_file}")
+        return []
+
+    lags = []
+
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                # Match: "interface Port-channel<number>"
+                po_match = re.match(r'^interface\s+(Port-channel\d+)', line, re.IGNORECASE)
+                if po_match:
+                    lag_name = po_match.group(1)
+                    lags.append({'name': lag_name})
+                    logger.debug(f"Found LAG: {lag_name}")
+
+        if lags:
+            logger.debug(f"Extracted {len(lags)} LAGs from {config_file.name}")
+        else:
+            logger.debug(f"No LAGs found in {config_file.name}")
+
+        return lags
+
+    except Exception as e:
+        logger.error(f"Error extracting LAGs from {config_file.name}: {e}")
+        return []
+
 def get_device_type(config_file):
     """
     Extract device type from a Cisco configuration file.
@@ -259,4 +306,4 @@ if __name__ == "__main__":
     if data_path.exists():
         for file_path in sorted(data_path.iterdir()):
             if file_path.is_file():
-                _debug(get_modules, file_path)
+                _debug(get_lags, file_path)

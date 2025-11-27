@@ -5,7 +5,7 @@
 import logging, sys, yaml
 logger = logging.getLogger(__name__)
 
-from json_functions import devices_json, modules_json
+from json_functions import devices_json, modules_json, lags_json
 from std_functions import data_folder
 
 
@@ -30,7 +30,7 @@ def cisco_ios(data_folder, output_file = sys.stdout):
     try:
         yaml.dump(devices_json(data_folder), f)
         yaml.dump(modules_json(data_folder), f)
-        #yaml.dump(lags_json(files), f)
+        yaml.dump(lags_json(data_folder), f)
         #yaml.dump(device_interfaces_json(files), f)
         #yaml.dump(vlans_json(files), f)
         #yaml.dump(tagged_vlans_json(files), f)

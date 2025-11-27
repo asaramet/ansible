@@ -6,7 +6,7 @@ import logging
 import re
 from pathlib import Path
 from std_functions import data_folder
-from std_functions import get_hostname_and_stack, get_device_type, get_modules
+from std_functions import get_hostname_and_stack, get_device_type, get_modules, get_lags
 
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -217,7 +217,85 @@ def modules_json(data_folder):
     logger.debug(f"Extracted {len(data['modules'])} modules from {data_folder}")
     return data
 
+def lags_json(data_folder):
+    """
+    Extract LAG (Port-channel) information from all Cisco config files in data folder.
+    Returns dictionary formatted for NetBox integration via pynetbox.
+
+    Args:
+        data_folder: Path to folder containing Cisco config files
+
+    Returns:
+        dict: Dictionary with 'lags' key containing list of LAG dicts, each with:
+            - hostname: Device hostname (e.g., 'rhcs1234' or 'rgcs1234-1')
+            - name: LAG/Port-channel name (e.g., 'Port-channel1', 'Port-channel15')
+
+    Note:
+        For stacks/VSS, Port-channels are global to the stack but are assigned to
+        the first switch member (hostname-1) following NetBox conventions.
+
+    Example output:
+        {
+            'lags': [
+                {
+                    'hostname': 'rgcs1234-1',
+                    'name': 'Port-channel1'
+                },
+                {
+                    'hostname': 'rgcs1234-1',
+                    'name': 'Port-channel15'
+                },
+                {
+                    'hostname': 'rhcs1234',
+                    'name': 'Port-channel5'
+                }
+            ]
+        }
+    """
+    data = {"lags": []}
+
+    data_path = Path(data_folder)
+    if not data_path.exists():
+        logger.error(f"Data folder does not exist: {data_folder}")
+        return data
+
+    # Iterate through each config file in the data folder
+    for config_file in data_path.iterdir():
+        if not config_file.is_file():
+            continue
+
+        # Get hostname and stack info
+        hostname_info = get_hostname_and_stack(config_file)
+        if not hostname_info:
+            continue
+
+        hostname = hostname_info['hostname']
+        is_stack = hostname_info['stack']
+
+        # For stacks, assign LAGs to the first switch member
+        if is_stack:
+            hostname = f"{hostname}-1"
+
+        # Get all LAGs from this config file
+        lags = get_lags(config_file)
+
+        # Add each LAG to the data
+        for lag in lags:
+            data['lags'].append({
+                'hostname': hostname,
+                'name': lag['name']
+            })
+
+    logger.debug(f"Extracted {len(data['lags'])} LAGs from {data_folder}")
+    return data 
+
 if __name__ == "__main__":
     from functions import _debug
 
-    _debug(modules_json, data_folder)
+    _debug(lags_json, data_folder)
+
+'''
+lags:
+- hostname: rscs0007-1
+  name: Trk1
+'''
