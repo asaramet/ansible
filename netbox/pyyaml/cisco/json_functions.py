@@ -6,7 +6,7 @@ import logging
 import re
 from pathlib import Path
 from std_functions import data_folder
-from std_functions import get_hostname_and_stack, get_device_type, get_modules, get_lags
+from std_functions import get_hostname_and_stack, get_device_type, get_modules, get_lags, get_vlans
 
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -289,7 +289,65 @@ def lags_json(data_folder):
     logger.debug(f"Extracted {len(data['lags'])} LAGs from {data_folder}")
     return data 
 
+def vlans_json(data_folder):
+    """
+    Extract unique VLAN definitions from all Cisco config files in data folder.
+    Returns dictionary formatted for NetBox integration via pynetbox.
+
+    Args:
+        data_folder: Path to folder containing Cisco config files
+
+    Returns:
+        dict: Dictionary with 'vlans' key containing list of unique VLAN dicts, each with:
+            - id: VLAN ID as string (e.g., '20', '20')
+            - name: VLAN name (e.g., 'ADMIN', 'USER')
+
+    Note:
+        VLANs are deduplicated across all config files. If the same VLAN ID appears
+        in multiple files with different names, the first occurrence is used.
+
+    Example output:
+        {
+            'vlans': [
+                {'id': '10', 'name': 'ADMIN'},
+                {'id': '20', 'name': 'USER'}
+            ]
+        }
+    """
+    data = {'vlans': []}
+
+    data_path = Path(data_folder)
+    if not data_path.exists():
+        logger.error(f"Data folder does not exist: {data_folder}")
+        return data
+
+    # Collect unique VLANs across all config files
+    # Use a set to automatically handle duplicates
+    all_vlans = set()
+
+    # Iterate through each config file in the data folder
+    for config_file in data_path.iterdir():
+        if not config_file.is_file():
+            continue
+
+        # Get VLANs from this config file
+        vlans = get_vlans(config_file)
+        all_vlans.update(vlans)
+
+    # Convert set to sorted list of dictionaries
+    # Sort by VLAN ID (numerically)
+    sorted_vlans = sorted(all_vlans, key=lambda x: int(x[0]))
+
+    for vlan_id, vlan_name in sorted_vlans:
+        data['vlans'].append({
+            'id': vlan_id,
+            'name': vlan_name
+        })
+
+    logger.debug(f"Extracted {len(data['vlans'])} unique VLANs from {data_folder}")
+    return data
+
 if __name__ == "__main__":
     from functions import _debug
 
-    _debug(lags_json, data_folder)
+    _debug(vlans_json, data_folder)

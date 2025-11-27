@@ -248,6 +248,67 @@ def get_lags(config_file):
         logger.error(f"Error extracting LAGs from {config_file.name}: {e}")
         return []
 
+def get_vlans(config_file):
+    """
+    Extract VLAN definitions from Cisco config file.
+    Returns set of tuples containing VLAN ID and name.
+
+    Args:
+        config_file: Path to the Cisco config file (Path object or string)
+
+    Returns:
+        set: Set of tuples (vlan_id, vlan_name), e.g., {('10', 'ADMIN'), ('20', 'USERS')}
+             Returns empty set if no VLANs found or error occurs
+
+    Example:
+        >>> get_vlans(Path('/path/to/config'))
+        {('10', 'ADMIN'), ('20', 'USERS'), ('40', 'BE')}
+    """
+    if not isinstance(config_file, Path):
+        config_file = Path(config_file)
+
+    if not config_file.exists():
+        logger.error(f"Config file does not exist: {config_file}")
+        return set()
+
+    vlans = set()
+    current_vlan_id = None
+
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                # Match: "vlan <ID>"
+                vlan_match = re.match(r'^vlan\s+(\d+)\s*$', line)
+                if vlan_match:
+                    current_vlan_id = vlan_match.group(1)
+                    continue
+
+                # Match: " name <NAME>" (must have current_vlan_id set)
+                if current_vlan_id:
+                    name_match = re.match(r'^\s+name\s+(.+?)\s*$', line)
+                    if name_match:
+                        vlan_name = name_match.group(1)
+                        vlans.add((current_vlan_id, vlan_name))
+                        logger.debug(f"Found VLAN: ID={current_vlan_id}, Name={vlan_name}")
+                        current_vlan_id = None  # Reset after finding name
+                        continue
+
+                # If we hit a line that's not indented and we had a vlan_id, reset it
+                # (VLAN without a name, or moved to next section)
+                if current_vlan_id and not line.startswith(' ') and not line.startswith('\t'):
+                    current_vlan_id = None
+
+        if vlans:
+            logger.debug(f"Extracted {len(vlans)} VLANs from {config_file.name}")
+        else:
+            logger.debug(f"No VLANs found in {config_file.name}")
+
+        return vlans
+
+    except Exception as e:
+        logger.error(f"Error extracting VLANs from {config_file.name}: {e}")
+        return set()
+
 def get_device_type(config_file):
     """
     Extract device type from a Cisco configuration file.
@@ -321,4 +382,4 @@ if __name__ == "__main__":
     if data_path.exists():
         for file_path in sorted(data_path.iterdir()):
             if file_path.is_file():
-                _debug(get_lags, file_path)
+                _debug(get_vlans, file_path)
