@@ -5,7 +5,7 @@
 import logging, sys, yaml
 logger = logging.getLogger(__name__)
 
-from json_functions import devices_json
+from json_functions import devices_json, modules_json
 from std_functions import data_folder
 
 
@@ -29,6 +29,12 @@ def cisco_ios(data_folder, output_file = sys.stdout):
         f = open(output, 'w')
     try:
         yaml.dump(devices_json(data_folder), f)
+        yaml.dump(modules_json(data_folder), f)
+        #yaml.dump(lags_json(files), f)
+        #yaml.dump(device_interfaces_json(files), f)
+        #yaml.dump(vlans_json(files), f)
+        #yaml.dump(tagged_vlans_json(files), f)
+        #yaml.dump(ip_addresses_json(files), f)
     finally:
         if f is not sys.stdout: # Don't close stdout
             f.close()
@@ -43,4 +49,5 @@ if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from functions import _debug
 
-    _debug(cisco_ios, data_folder)
+    #_debug(cisco_ios, data_folder)
+    _main(cisco_ios, data_folder)

@@ -6,7 +6,7 @@ import logging
 import re
 from pathlib import Path
 from std_functions import data_folder
-from std_functions import get_hostname_and_stack, get_device_type
+from std_functions import get_hostname_and_stack, get_device_type, get_modules
 
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,6 +35,69 @@ def site_slug(hostname):
 
 
 def devices_json(data_folder):
+    """
+    Extract device and chassis information from all Cisco config files in data folder.
+    Returns dictionary formatted for NetBox integration via pynetbox.
+
+    Args:
+        data_folder: Path to folder containing Cisco config files
+
+    Returns:
+        dict: Dictionary with 'devices' and 'chassis' keys:
+            - devices: List of device dicts, each with:
+                - name: Device hostname (e.g., 'rhcs0007' or 'rgcs0003-1')
+                - tags: List of tags (e.g., ['switch'], ['switch', 'stack'])
+                - device_type: Device model (e.g., 'ws-c2960x-24pd-l', 'cat4500es8')
+                - serial: Serial number from serial_numbers.yaml
+                - site: Site slug (e.g., 'campus-h')
+                - device_role: Device role from get_device_role()
+                - virtual_chassis: (stack only) Chassis name
+                - vc_position: (stack only) Position in stack (int)
+                - vc_priority: (stack only) Priority (255=primary, 128=secondary, 64=default)
+
+            - chassis: List of virtual chassis dicts (for stacks), each with:
+                - master: Master switch name (e.g., 'rgcs0003-1')
+                - name: Chassis name (e.g., 'rgcs0003')
+
+    Example output for single switch:
+        {
+            'devices': [
+                {
+                    'name': 'rhcs1111',
+                    'tags': ['switch'],
+                    'device_type': 'ws-c2960x-24pd-l',
+                    'serial': 'FOCXXXXABCD',
+                    'site': 'campus-h',
+                    'device_role': 'access-switch'
+                }
+            ],
+            'chassis': []
+        }
+
+    Example output for stack:
+        {
+            'devices': [
+                {
+                    'name': 'rgcs1234-1',
+                    'tags': ['switch', 'stack'],
+                    'device_type': 'cat4500es8',
+                    'serial': 'CAT1123456G',
+                    'site': 'campus-g',
+                    'device_role': 'core-switch',
+                    'virtual_chassis': 'rgcs1234',
+                    'vc_position': 1,
+                    'vc_priority': 255
+                },
+                ...
+            ],
+            'chassis': [
+                {
+                    'master': 'rgcs1234-1',
+                    'name': 'rgcs1234'
+                }
+            ]
+        }
+    """
     data = {'devices': [], 'chassis': []}
 
     data_path = Path(data_folder)
@@ -91,7 +154,70 @@ def devices_json(data_folder):
 
     return data
 
+def modules_json(data_folder):
+    """
+    Extract module information from all Cisco config files in data folder.
+    Returns dictionary formatted for NetBox integration via pynetbox.
+
+    Args:
+        data_folder: Path to folder containing Cisco config files
+
+    Returns:
+        dict: Dictionary with 'modules' key containing list of module dicts, each with:
+            - device: Device hostname (e.g., 'rgcs0003-1')
+            - module_bay: Slot number as string (e.g., '1', '2')
+            - name: Descriptive name (e.g., 'Slot 1')
+            - new_position: Switch/slot format (e.g., '1/1', '2/3')
+            - type: Module model name (e.g., 'WS-X45-SUP8-E')
+
+    Example output:
+        {
+            'modules': [
+                {
+                    'device': 'rgcs1234-1',
+                    'module_bay': '1',
+                    'name': 'Slot 1',
+                    'new_position': '1/1',
+                    'type': 'WS-X45-SUP8-E'
+                },
+                ...
+            ]
+        }
+    """
+    data = {'modules': []}
+
+    data_path = Path(data_folder)
+    if not data_path.exists():
+        logger.error(f"Data folder does not exist: {data_folder}")
+        return data
+
+    # Iterate through each config file in the data folder
+    for config_file in data_path.iterdir():
+        if not config_file.is_file():
+            continue
+
+        # Get modules from this config file
+        modules = get_modules(config_file)
+
+        # Transform each module to NetBox format
+        for module in modules:
+            # Skip if module model is unknown
+            if not module['module_model']:
+                logger.warning(f"Unknown module type {module['slot_type']} in {config_file.name}, skipping")
+                continue
+
+            data['modules'].append({
+                'device': module['hostname'],
+                'module_bay': module['slot'],
+                'name': f"Slot {module['slot']}",
+                'new_position': f"{module['switch']}/{module['slot']}",
+                'type': module['module_model']
+            })
+
+    logger.debug(f"Extracted {len(data['modules'])} modules from {data_folder}")
+    return data
+
 if __name__ == "__main__":
     from functions import _debug
 
-    _debug(devices_json, data_folder)
+    _debug(modules_json, data_folder)
