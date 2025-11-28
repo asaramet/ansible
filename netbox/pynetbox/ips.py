@@ -147,7 +147,7 @@ def _resolve_tenant(nb_session: NetBoxApi, tenant_name: str) -> Optional[int]:
         return None
 
 
-def _resolve_ip_role(nb_session: NetBoxApi, role_name: str) -> Optional[int | str]:
+def _resolve_ip_role(nb_session: NetBoxApi, role_name: str) -> Optional:
     """
     Resolve IP address role name to role ID or role string.
     

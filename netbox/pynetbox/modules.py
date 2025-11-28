@@ -21,7 +21,7 @@ from pynetbox_functions import (
 logger = logging.getLogger(__name__)
 
 
-def module_bays(nb_session: NetBoxApi, data: dict[str, list[dict]]) -> list[dict[str, str | int]]:
+def module_bays(nb_session: NetBoxApi, data: dict[str, list[dict]]) -> list[dict]:
     """
     Update switch module bays on a NetBox server from YAML data.
     
@@ -123,7 +123,7 @@ def module_bays(nb_session: NetBoxApi, data: dict[str, list[dict]]) -> list[dict
     return create_payloads + update_payloads
 
 
-def modules(nb_session: NetBoxApi, data: dict[str, list[dict]]) -> list[dict[str, str | int]]:
+def modules(nb_session: NetBoxApi, data: dict[str, list[dict]]) -> list[dict]:
     """
     Install modules into module bays on a NetBox server from YAML data.
     
@@ -680,8 +680,8 @@ def _build_module_payload(
     module_name: str,
     device_id: int,
     description: str,
-    label: str | None = None,
-    existing_id: int | None = None
+    label: str = None,
+    existing_id: int = None
 ) -> dict:
     """
     Build a module bay payload for create or update operation.
@@ -721,7 +721,7 @@ def _build_module_payload(
     return payload
 
 
-def _resolve_module_type(nb_session: NetBoxApi, module_type_name: str) -> int | None:
+def _resolve_module_type(nb_session: NetBoxApi, module_type_name: str) -> int:
     """
     Resolve module type name to module type ID.
     
@@ -949,8 +949,8 @@ def _build_module_installation_payload(
     device_id: int,
     module_bay_id: int,
     module_type_id: int,
-    label: str | None = None,
-    existing_id: int | None = None
+    label: str = None,
+    existing_id: int = None
 ) -> dict:
     """
     Build a module installation payload for create or update operation.

@@ -678,7 +678,7 @@ def _get_object_identifier(obj) -> str:
     # Really last resort
     return str(obj)
 
-def _resolve_tags(nb_session: NetBoxApi, tags: list[str] | str | None) -> list[int]:
+def _resolve_tags(nb_session: NetBoxApi, tags: any) -> list[int]:
     """
     Resolve tag names to tag IDs, creating tags if they don't exist.
     Args:
@@ -735,8 +735,8 @@ def _resolve_or_create(
     endpoint: Endpoint, 
     identifier: str, 
     lookup_field: str = 'name',
-    create_payload: dict | None = None
-) -> int | None:
+    create_payload: dict = None
+) -> int:
     """
     Generic get-or-create function for NetBox objects.
     
