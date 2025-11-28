@@ -107,6 +107,103 @@ module_type_slags = {
     387: 'WS-X4712-SFP+E',     # 12-port 10GE SFP+
 }
 
+# Interface type mappings for Cisco devices
+# Maps device models to interface characteristics (type, PoE mode, PoE type) by interface pattern
+interface_type_mapping = {
+    'ws-c2960x-24pd-l': {
+        # 24-port PoE+ model
+        r'GigabitEthernet\d+/0/([1-9]|1\d|2[0-4])$': {
+            'type': '1000base-t',
+            'poe_mode': 'pse',
+            'poe_type': 'type2-ieee802.3at'  # PoE+ (up to 30W)
+        },
+        r'GigabitEthernet\d+/0/(25|26)$': {
+            'type': '1000base-x-sfp',
+            'poe_mode': None,
+            'poe_type': None
+        },
+        r'TenGigabitEthernet\d+/0/[12]$': {
+            'type': '10gbase-x-sfpp',
+            'poe_mode': None,
+            'poe_type': None
+        }
+    },
+    'ws-c2960x-48fpd-l': {
+        # 48-port PoE+ model
+        r'GigabitEthernet\d+/0/([1-9]|[1-4]\d|48)$': {
+            'type': '1000base-t',
+            'poe_mode': 'pse',
+            'poe_type': 'type2-ieee802.3at'  # PoE+ (up to 30W)
+        },
+        r'GigabitEthernet\d+/0/(49|5[0-2])$': {
+            'type': '1000base-x-sfp',
+            'poe_mode': None,
+            'poe_type': None
+        },
+        r'TenGigabitEthernet\d+/0/[12]$': {
+            'type': '10gbase-x-sfpp',
+            'poe_mode': None,
+            'poe_type': None
+        }
+    },
+    'c9500-48y4c': {
+        # 48x 25G + 4x 100G model
+        r'TwentyFiveGigE\d+/0/([1-9]|[1-4]\d|48)$': {
+            'type': '25gbase-x-sfp28',
+            'poe_mode': None,
+            'poe_type': None
+        },
+        r'HundredGigE\d+/0/(49|5[0-2])$': {
+            'type': '100gbase-x-qsfp28',
+            'poe_mode': None,
+            'poe_type': None
+        }
+    },
+    'c9500-40x': {
+        # 40x 10G model
+        r'TenGigabitEthernet\d+/0/([1-9]|[1-3]\d|40)$': {
+            'type': '10gbase-x-sfpp',
+            'poe_mode': None,
+            'poe_type': None
+        }
+    },
+    'c9500-32c': {
+        # 32x 100G model
+        r'HundredGigE\d+/0/([1-9]|[12]\d|3[0-2])$': {
+            'type': '100gbase-x-qsfp28',
+            'poe_mode': None,
+            'poe_type': None
+        }
+    },
+    'ws-c4506-e': {
+        # Modular chassis - interfaces depend on line cards
+        # Supervisor 8-E uplink ports
+        r'TenGigabitEthernet\d+/1/\d+$': {
+            'type': '10gbase-x-sfpp',
+            'poe_mode': None,
+            'poe_type': None
+        },
+        # WS-X4724-SFP-E: 24-port SFP (slot 2)
+        r'GigabitEthernet\d+/2/([1-9]|1\d|2[0-4])$': {
+            'type': '1000base-x-sfp',
+            'poe_mode': None,
+            'poe_type': None
+        },
+        # WS-X4748-UPOE+E: 48-port PoE+ (slot 3)
+        r'GigabitEthernet\d+/3/([1-9]|[1-4]\d|48)$': {
+            'type': '1000base-t',
+            'poe_mode': 'pse',
+            'poe_type': 'type4-cisco-upoe'  # UPOE (up to 60W)
+        },
+        # WS-X4712-SFP+E: 12-port 10G SFP+ (slot 4)
+        r'TenGigabitEthernet\d+/4/([1-9]|1[0-2])$': {
+            'type': '10gbase-x-sfpp',
+            'poe_mode': None,
+            'poe_type': None
+        }
+    }
+}
+
 def get_modules(config_file):
     """
     Extract module/slot information from Cisco config file.
@@ -309,6 +406,140 @@ def get_vlans(config_file):
         logger.error(f"Error extracting VLANs from {config_file.name}: {e}")
         return set()
 
+def get_interfaces(config_file):
+    """
+    Extract interface configurations from Cisco config file.
+    Returns list of interface dictionaries with name, description, VLAN, LAG, and PoE info.
+
+    Args:
+        config_file: Path to the Cisco config file (Path object or string)
+
+    Returns:
+        list: List of dictionaries, each containing:
+            - interface: Interface name (e.g., 'GigabitEthernet1/0/1')
+            - description: Interface description (str or None)
+            - vlan_id: Access VLAN ID (str or None)
+            - channel_group: LAG/Port-channel number (str or None)
+            - power_inline: PoE configuration (str or None) - 'never', 'auto', or 'static'
+            - power_inline_max: Max PoE wattage in milliwatts (int or None)
+        Returns empty list if no interfaces found or error occurs
+
+    Example:
+        >>> get_interfaces(Path('/path/to/config'))
+        [{'interface': 'GigabitEthernet1/0/1', 'description': 'Uplink to core',
+          'vlan_id': None, 'channel_group': '1', 'power_inline': None, 'power_inline_max': None},
+         {'interface': 'GigabitEthernet1/0/5', 'description': 'Access port',
+          'vlan_id': '100', 'channel_group': None, 'power_inline': 'auto', 'power_inline_max': 30000}]
+    """
+    if not isinstance(config_file, Path):
+        config_file = Path(config_file)
+
+    if not config_file.exists():
+        logger.error(f"Config file does not exist: {config_file}")
+        return []
+
+    interfaces = []
+    current_interface = None
+    current_data = {}
+
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                # Match: "interface <type><number>"
+                # Supported: GigabitEthernet, TenGigabitEthernet, TwentyFiveGigE, FortyGigE, HundredGigE
+                # Skip: Loopback, Port-channel, Vlan, AppGigabit, FastEthernet0 (mgmt)
+                interface_match = re.match(r'^interface\s+((?:TwentyFive|Forty|Hundred|Ten)?Gig(?:abit)?(?:Ethernet|E)\d+/\d+/\d+)(?:\s|$)', line)
+
+                if interface_match:
+                    # Save previous interface if exists
+                    if current_interface:
+                        interfaces.append({
+                            'interface': current_interface,
+                            'description': current_data.get('description'),
+                            'vlan_id': current_data.get('vlan_id'),
+                            'channel_group': current_data.get('channel_group'),
+                            'power_inline': current_data.get('power_inline'),
+                            'power_inline_max': current_data.get('power_inline_max')
+                        })
+
+                    # Start new interface
+                    current_interface = interface_match.group(1)
+                    current_data = {}
+                    logger.debug(f"Found interface: {current_interface}")
+                    continue
+
+                # If we're in an interface block, parse its configuration
+                if current_interface:
+                    # Check if we've left the interface block (non-indented line)
+                    if line and not line.startswith((' ', '\t', '!')):
+                        # Save current interface and reset
+                        interfaces.append({
+                            'interface': current_interface,
+                            'description': current_data.get('description'),
+                            'vlan_id': current_data.get('vlan_id'),
+                            'channel_group': current_data.get('channel_group'),
+                            'power_inline': current_data.get('power_inline'),
+                            'power_inline_max': current_data.get('power_inline_max')
+                        })
+                        current_interface = None
+                        current_data = {}
+                        continue
+
+                    # Parse description
+                    desc_match = re.match(r'^\s+description\s+(.+?)\s*$', line)
+                    if desc_match:
+                        current_data['description'] = desc_match.group(1)
+                        continue
+
+                    # Parse access VLAN
+                    vlan_match = re.match(r'^\s+switchport\s+access\s+vlan\s+(\d+)', line)
+                    if vlan_match:
+                        current_data['vlan_id'] = vlan_match.group(1)
+                        continue
+
+                    # Parse channel-group (LAG membership)
+                    lag_match = re.match(r'^\s+channel-group\s+(\d+)\s+mode', line)
+                    if lag_match:
+                        current_data['channel_group'] = lag_match.group(1)
+                        continue
+
+                    # Parse power inline
+                    # Pattern 1: "power inline never"
+                    poe_never_match = re.match(r'^\s+power\s+inline\s+never', line)
+                    if poe_never_match:
+                        current_data['power_inline'] = 'never'
+                        continue
+
+                    # Pattern 2: "power inline auto max <milliwatts>"
+                    poe_auto_match = re.match(r'^\s+power\s+inline\s+(auto|static)(?:\s+max\s+(\d+))?', line)
+                    if poe_auto_match:
+                        current_data['power_inline'] = poe_auto_match.group(1)
+                        if poe_auto_match.group(2):
+                            current_data['power_inline_max'] = int(poe_auto_match.group(2))
+                        continue
+
+        # Don't forget the last interface
+        if current_interface:
+            interfaces.append({
+                'interface': current_interface,
+                'description': current_data.get('description'),
+                'vlan_id': current_data.get('vlan_id'),
+                'channel_group': current_data.get('channel_group'),
+                'power_inline': current_data.get('power_inline'),
+                'power_inline_max': current_data.get('power_inline_max')
+            })
+
+        if interfaces:
+            logger.debug(f"Extracted {len(interfaces)} interfaces from {config_file.name}")
+        else:
+            logger.debug(f"No interfaces found in {config_file.name}")
+
+        return interfaces
+
+    except Exception as e:
+        logger.error(f"Error extracting interfaces from {config_file.name}: {e}")
+        return []
+
 def get_device_type(config_file):
     """
     Extract device type from a Cisco configuration file.
@@ -382,4 +613,4 @@ if __name__ == "__main__":
     if data_path.exists():
         for file_path in sorted(data_path.iterdir()):
             if file_path.is_file():
-                _debug(get_vlans, file_path)
+                _debug(get_interfaces, file_path)
