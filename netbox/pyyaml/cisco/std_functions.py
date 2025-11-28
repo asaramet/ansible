@@ -192,8 +192,10 @@ interface_type_mapping = {
         # WS-X4748-UPOE+E: 48-port PoE+ (slot 3)
         r'GigabitEthernet\d+/3/([1-9]|[1-4]\d|48)$': {
             'type': '1000base-t',
-            'poe_mode': 'pse',
-            'poe_type': 'type4-cisco-upoe'  # UPOE (up to 60W)
+            #'poe_mode': 'pse',
+            #poe_type': 'type4-cisco-upoe'  # UPOE (up to 60W)
+            'poe_mode': None,
+            'poe_type': None
         },
         # WS-X4712-SFP+E: 12-port 10G SFP+ (slot 4)
         r'TenGigabitEthernet\d+/4/([1-9]|1[0-2])$': {

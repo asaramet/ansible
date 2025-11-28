@@ -570,12 +570,17 @@ def device_interfaces_json(data_folder):
             else:
                 device_hostname = hostname
 
+            # Get description, use "no description" if not present
+            description = iface.get('description')
+            if not description:
+                description = "no description"
+
             # Keep full Cisco interface name (e.g., TwentyFiveGigE1/0/1, GigabitEthernet1/0/1)
             # Unlike Aruba which uses simple numeric names like "1/1/1"
             data['device_interfaces'].append({
                 'hostname': device_hostname,
                 'interface': interface_name,
-                'name': iface.get('description'),
+                'name': description,
                 'type': interface_type,
                 'poe_mode': poe_mode,
                 'poe_type': poe_type,
@@ -587,7 +592,232 @@ def device_interfaces_json(data_folder):
     logger.debug(f"Extracted {len(data['device_interfaces'])} interfaces from {data_folder}")
     return data
 
+def parse_vlan_list(vlan_string):
+    """
+    Parse a Cisco VLAN list string into individual VLAN IDs.
+    Handles comma-separated values and ranges.
+
+    Args:
+        vlan_string: String like "2,5,10-15,20" or "301-303,309-311"
+
+    Returns:
+        set: Set of VLAN IDs as strings
+
+    Example:
+        >>> parse_vlan_list("2,5,10-12,20")
+        {'2', '5', '10', '11', '12', '20'}
+    """
+    vlans = set()
+
+    # Split by comma
+    parts = vlan_string.split(',')
+
+    for part in parts:
+        part = part.strip()
+        if '-' in part:
+            # Handle range like "301-303"
+            start, end = part.split('-')
+            for vlan_id in range(int(start), int(end) + 1):
+                vlans.add(str(vlan_id))
+        else:
+            # Single VLAN
+            vlans.add(part)
+
+    return vlans
+
+def get_trunk_vlans(config_file):
+    """
+    Extract trunk VLAN information from Cisco config file.
+    Returns dict mapping interface names to sets of allowed VLAN IDs.
+
+    Args:
+        config_file: Path to the Cisco config file (Path object or string)
+
+    Returns:
+        dict: Dictionary mapping interface name -> set of VLAN IDs
+              e.g., {'Port-channel1': {'2', '5', '301', '302', '303'}}
+
+    Example:
+        >>> get_trunk_vlans(Path('/path/to/config'))
+        {'Port-channel14': {'2', '272', '282', '301', '302', '303'},
+         'TwentyFiveGigE1/0/9': {'64', '74', '802'}}
+    """
+    if not isinstance(config_file, Path):
+        config_file = Path(config_file)
+
+    if not config_file.exists():
+        logger.error(f"Config file does not exist: {config_file}")
+        return {}
+
+    trunk_vlans = {}
+    current_interface = None
+
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                # Match interface lines (Port-channel or physical interfaces)
+                interface_match = re.match(r'^interface\s+((?:Port-channel|(?:TwentyFive|Forty|Hundred|Ten)?Gig(?:abit)?(?:Ethernet|E))\d+(?:/\d+/\d+)?)', line)
+
+                if interface_match:
+                    current_interface = interface_match.group(1)
+                    # Initialize trunk_vlans for this interface if not exists
+                    if current_interface not in trunk_vlans:
+                        trunk_vlans[current_interface] = set()
+                    continue
+
+                # If we're in an interface block, look for trunk VLAN commands
+                if current_interface:
+                    # Check if we've left the interface block
+                    if line and not line.startswith((' ', '\t', '!')):
+                        current_interface = None
+                        continue
+
+                    # Match: "switchport trunk allowed vlan <list>"
+                    trunk_match = re.match(r'^\s+switchport\s+trunk\s+allowed\s+vlan\s+(?:add\s+)?(.+)', line)
+                    if trunk_match:
+                        vlan_list = trunk_match.group(1).strip()
+                        vlans = parse_vlan_list(vlan_list)
+                        trunk_vlans[current_interface].update(vlans)
+                        logger.debug(f"Found trunk VLANs on {current_interface}: {len(vlans)} VLANs")
+
+        # Remove interfaces with no trunk VLANs
+        trunk_vlans = {iface: vlans for iface, vlans in trunk_vlans.items() if vlans}
+
+        if trunk_vlans:
+            total_trunk_interfaces = len(trunk_vlans)
+            total_vlans = sum(len(vlans) for vlans in trunk_vlans.values())
+            logger.debug(f"Extracted {total_trunk_interfaces} trunk interfaces with {total_vlans} total VLAN assignments from {config_file.name}")
+        else:
+            logger.debug(f"No trunk VLANs found in {config_file.name}")
+
+        return trunk_vlans
+
+    except Exception as e:
+        logger.error(f"Error extracting trunk VLANs from {config_file.name}: {e}")
+        return {}
+
+def tagged_vlans_json(data_folder):
+    """
+    Extract tagged VLAN information for trunk interfaces from all Cisco config files.
+    Returns dictionary formatted for NetBox integration via pynetbox.
+
+    Args:
+        data_folder: Path to folder containing Cisco config files
+
+    Returns:
+        dict: Dictionary with 'tagged_vlans' key containing list of dicts, each with:
+            - hostname: Device hostname (e.g., 'rhcs0007' or 'rgcs0003-1')
+            - interface: Interface name (e.g., 'Port-channel1', 'TwentyFiveGigE1/0/9')
+            - tagged_vlans: List of VLAN dicts, each with:
+                - vlan_id: VLAN ID as string
+                - name: VLAN name (from VLAN definitions)
+
+    Example output:
+        {
+            'tagged_vlans': [
+                {
+                    'hostname': 'rgcs0003-1',
+                    'interface': 'Port-channel14',
+                    'tagged_vlans': [
+                        {'vlan_id': '2', 'name': 'PC'},
+                        {'vlan_id': '301', 'name': 'BB-GP'},
+                        {'vlan_id': '302', 'name': 'RSM-GP'}
+                    ]
+                }
+            ]
+        }
+    """
+    data = {'tagged_vlans': []}
+
+    data_path = Path(data_folder)
+    if not data_path.exists():
+        logger.error(f"Data folder does not exist: {data_folder}")
+        return data
+
+    # Build VLAN ID -> name mapping from all config files
+    vlan_map = {}
+    for config_file in data_path.iterdir():
+        if not config_file.is_file():
+            continue
+        vlans = get_vlans(config_file)
+        for vlan_id, vlan_name in vlans:
+            if vlan_id not in vlan_map:
+                vlan_map[vlan_id] = vlan_name
+
+    # Iterate through each config file
+    for config_file in data_path.iterdir():
+        if not config_file.is_file():
+            continue
+
+        # Get hostname and stack info
+        hostname_info = get_hostname_and_stack(config_file)
+        if not hostname_info:
+            continue
+
+        hostname = hostname_info['hostname']
+        is_stack = hostname_info['stack']
+
+        # Get trunk VLANs from this config file
+        trunk_vlans = get_trunk_vlans(config_file)
+
+        if not trunk_vlans:
+            continue
+
+        # Process each trunk interface
+        for interface_name, vlan_ids in trunk_vlans.items():
+            # For stacks, determine which switch member owns this interface
+            # Physical interfaces: TwentyFiveGigE1/0/5 -> switch 1
+            # Port-channels are global and assigned to switch member 1
+            if is_stack:
+                if interface_name.startswith('Port-channel'):
+                    # Port-channels are global, assign to first member
+                    device_hostname = f"{hostname}-1"
+                else:
+                    # Physical interface - extract switch number
+                    switch_match = re.match(r'^.*?(\d+)/\d+/\d+$', interface_name)
+                    if switch_match:
+                        switch_num = switch_match.group(1)
+                        device_hostname = f"{hostname}-{switch_num}"
+                    else:
+                        device_hostname = f"{hostname}-1"
+            else:
+                device_hostname = hostname
+
+            # Build tagged VLAN list with names
+            tagged_vlan_list = []
+            for vlan_id in sorted(vlan_ids, key=int):
+                vlan_name = vlan_map.get(vlan_id)
+                tagged_vlan_list.append({
+                    'vlan_id': vlan_id,
+                    'name': vlan_name if vlan_name else f"VLAN{vlan_id}"
+                })
+
+            data['tagged_vlans'].append({
+                'hostname': device_hostname,
+                'interface': interface_name,
+                'tagged_vlans': tagged_vlan_list
+            })
+
+    logger.debug(f"Extracted {len(data['tagged_vlans'])} trunk interfaces from {data_folder}")
+    return data
+
 if __name__ == "__main__":
     from functions import _debug
 
-    _debug(delete_interfaces_json, data_folder)
+    _debug(tagged_vlans_json, data_folder)
+
+'''
+ip_addresses:
+- hostname: rsgw1u110sp-1
+  ip: 192.168.105.10/23
+  name: vlan 201
+  vlan: true
+  vlan_id: '201'
+  vlan_name: BB-SM
+- hostname: rsgw1312sp-1
+  ip: 192.168.104.10/23
+  name: vlan 201
+  vlan: true
+  vlan_id: '201'
+  vlan_name: BB-SM
+'''
