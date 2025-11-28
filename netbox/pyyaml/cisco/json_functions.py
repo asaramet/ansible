@@ -356,25 +356,3 @@ if __name__ == "__main__":
     from functions import _debug
 
     _debug(vlans_json, data_folder)
-
-'''
-device_interfaces:
-- hostname: rscs0007-1
-  interface: 1/C2
-  is_lag: false
-  name: V.S05.313.0 rsgw5313sp/uplink/xx
-  poe_mode: null
-  poe_type: null
-  type: 10gbase-x-sfpp
-  vlan_id: null
-  vlan_name: null
-- hostname: rscs0007-2
-  interface: 2/C6
-  is_lag: false
-  name: V.S19.1xx.0 rsgw191xxsp/uplink/trk1
-  poe_mode: null
-  poe_type: null
-  type: 10gbase-x-sfpp
-  vlan_id: null
-  vlan_name: null
-'''
