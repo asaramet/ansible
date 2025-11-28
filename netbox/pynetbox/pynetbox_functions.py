@@ -853,10 +853,11 @@ def _main(description: str, function: callable, **kwargs) -> None:
         "aruba_modular.yaml",
         "aruba_modular_stack.yaml",
         "aruba_6100.yaml",
-        "aruba_6300.yaml"
+        "aruba_6300.yaml", 
+        
+        "cisco.yaml"
     ]
     
-    files_yaml = ["cisco.yaml"]
 
     for file_name in files_yaml:
         data_file_path = f"{main_folder}/data/yaml/{file_name}"

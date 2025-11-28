@@ -52,8 +52,8 @@ def update(nb_session: NetBoxApi, data: dict[str, list[str]]) -> None:
     logger.info("-- Synchronize LAG interfaces --")
     lags(nb_session, data)
 
-    #logger.info("-- Assign IPs to devices --")
-    #ips(nb_session, data)
+    logger.info("-- Assign IPs to devices --")
+    ips(nb_session, data)
 
 if __name__ == '__main__':
     from pynetbox_functions import _main

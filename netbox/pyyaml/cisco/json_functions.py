@@ -6,7 +6,7 @@ import logging
 import re
 from pathlib import Path
 from std_functions import data_folder
-from std_functions import get_hostname_and_stack, get_device_type, get_modules, get_lags, get_vlans, get_interfaces
+from std_functions import get_hostname_and_stack, get_device_type, get_modules, get_lags, get_vlans, get_interfaces, get_ip_addresses
 from std_functions import interface_type_mapping
 
 import sys, os
@@ -817,27 +817,130 @@ def tagged_vlans_json(data_folder):
     return data
 
 def ip_addresses_json(data_folder):
+    """
+    Extract IP address assignments from all Cisco config files in data folder.
+    Returns dictionary formatted for NetBox integration via pynetbox.
+
+    Args:
+        data_folder: Path to folder containing Cisco config files
+
+    Returns:
+        dict: Dictionary with 'ip_addresses' key containing list of IP assignment dicts, each with:
+            - hostname: Device hostname (e.g., 'rhcs0007-1' or 'rgcs0003-1')
+            - ip: IP address with CIDR notation (e.g., '192.168.198.252/24')
+            - name: Interface name (e.g., 'Vlan802', 'Loopback0')
+            - vlan: Boolean - True if interface is a VLAN interface (SVI)
+            - vlan_id: VLAN ID as string (only for VLAN interfaces, e.g., '802')
+            - vlan_name: VLAN name from VLAN definitions (only for VLAN interfaces)
+
+    Example output:
+        {
+            'ip_addresses': [
+                {
+                    'hostname': 'rhcs0007-1',
+                    'ip': '192.168.198.252/24',
+                    'name': 'Vlan802',
+                    'vlan': True,
+                    'vlan_id': '802',
+                    'vlan_name': 'RZ-NAS-VIR'
+                },
+                {
+                    'hostname': 'rscs0003-1',
+                    'ip': '10.0.0.1/32',
+                    'name': 'Loopback0',
+                    'vlan': False,
+                    'vlan_id': None,
+                    'vlan_name': None
+                }
+            ]
+        }
+    """
     data = {'ip_addresses': []}
 
+    data_path = Path(data_folder)
+    if not data_path.exists():
+        logger.error(f"Data folder does not exist: {data_folder}")
+        return data
+
+    # Build a VLAN ID -> name mapping from all config files
+    vlan_map = {}
+    for config_file in data_path.iterdir():
+        if not config_file.is_file():
+            continue
+        vlans = get_vlans(config_file)
+        for vlan_id, vlan_name in vlans:
+            # Use first occurrence of VLAN name
+            if vlan_id not in vlan_map:
+                vlan_map[vlan_id] = vlan_name
+
+    # Iterate through each config file in the data folder
+    for config_file in data_path.iterdir():
+        if not config_file.is_file():
+            continue
+
+        # Get hostname and stack info
+        hostname_info = get_hostname_and_stack(config_file)
+        if not hostname_info:
+            continue
+
+        hostname = hostname_info['hostname']
+        is_stack = hostname_info['stack']
+
+        # Get IP addresses from this config file
+        ip_addresses = get_ip_addresses(config_file)
+
+        # Process each IP address
+        for ip_addr in ip_addresses:
+            interface_name = ip_addr['interface']
+
+            # Determine if this is a VLAN interface
+            is_vlan_interface = interface_name.startswith('Vlan')
+
+            # Extract VLAN ID from interface name if it's a VLAN interface
+            vlan_id = None
+            vlan_name = None
+            if is_vlan_interface:
+                vlan_match = re.match(r'Vlan(\d+)', interface_name)
+                if vlan_match:
+                    vlan_id = vlan_match.group(1)
+                    vlan_name = vlan_map.get(vlan_id)
+
+            # For stacks, VLAN interfaces and Loopback interfaces are assigned to first member
+            # (they're logical/Layer 3 interfaces spanning the whole stack)
+            if is_stack:
+                device_hostname = f"{hostname}-1"
+            else:
+                device_hostname = hostname
+
+            data['ip_addresses'].append({
+                'hostname': device_hostname,
+                'ip': ip_addr['ip'],
+                'name': interface_name,
+                'vlan': is_vlan_interface,
+                'vlan_id': vlan_id,
+                'vlan_name': vlan_name
+            })
+
+    logger.debug(f"Extracted {len(data['ip_addresses'])} IP addresses from {data_folder}")
     return data 
 
 if __name__ == "__main__":
     from functions import _debug
 
-    _debug(tagged_vlans_json, data_folder)
+    _debug(ip_addresses_json, data_folder)
 
 '''
 ip_addresses:
-- hostname: rsgw1u110sp-1
-  ip: 192.168.105.10/23
-  name: vlan 201
+- hostname: rhcs0007-1
+  ip: 192.168.198.252/24
+  name: Vlan802
   vlan: true
-  vlan_id: '201'
-  vlan_name: BB-SM
-- hostname: rsgw1312sp-1
-  ip: 192.168.104.10/23
-  name: vlan 201
+  vlan_id: '802'
+  vlan_name: RZ-NAS-VIR
+- hostname: rhcs0007-1
+  ip: 192.168.219.6/29
+  name: Vlan870
   vlan: true
-  vlan_id: '201'
-  vlan_name: BB-SM
+  vlan_id: '870'
+  vlan_name: TF-NAS-VIR
 '''

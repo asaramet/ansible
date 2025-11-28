@@ -543,6 +543,121 @@ def get_interfaces(config_file):
         logger.error(f"Error extracting interfaces from {config_file.name}: {e}")
         return []
 
+def subnet_mask_to_cidr(subnet_mask):
+    """
+    Convert subnet mask to CIDR prefix length.
+
+    Args:
+        subnet_mask: Subnet mask string (e.g., '255.255.255.0', '255.255.255.248')
+
+    Returns:
+        int: CIDR prefix length (e.g., 24, 29)
+        Returns None if invalid subnet mask
+
+    Example:
+        >>> subnet_mask_to_cidr('255.255.255.0')
+        24
+        >>> subnet_mask_to_cidr('255.255.255.248')
+        29
+    """
+    try:
+        # Convert subnet mask to binary and count 1s
+        octets = subnet_mask.split('.')
+        binary = ''.join([bin(int(octet))[2:].zfill(8) for octet in octets])
+        return binary.count('1')
+    except Exception as e:
+        logger.error(f"Error converting subnet mask '{subnet_mask}' to CIDR: {e}")
+        return None
+
+def get_ip_addresses(config_file):
+    """
+    Extract IP address configurations from Cisco config file.
+    Returns list of IP address dictionaries with interface and IP info.
+
+    Args:
+        config_file: Path to the Cisco config file (Path object or string)
+
+    Returns:
+        list: List of dictionaries, each containing:
+            - interface: Interface name (e.g., 'Vlan802', 'Loopback0')
+            - ip: IP address with CIDR notation (e.g., '192.168.198.252/24')
+            - description: Interface description (str or None)
+        Returns empty list if no IP addresses found or error occurs
+
+    Example:
+        >>> get_ip_addresses(Path('/path/to/config'))
+        [{'interface': 'Vlan802', 'ip': '192.168.198.2/24', 'description': 'NAS-VIR'},
+         {'interface': 'Vlan870', 'ip': '192.168.219.6/29', 'description': 'TF-VIR'}]
+    """
+    if not isinstance(config_file, Path):
+        config_file = Path(config_file)
+
+    if not config_file.exists():
+        logger.error(f"Config file does not exist: {config_file}")
+        return []
+
+    ip_addresses = []
+    current_interface = None
+    current_description = None
+
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                # Match: "interface <type><number>"
+                # Focus on VLAN interfaces (SVIs) and Loopback interfaces
+                interface_match = re.match(r'^interface\s+(Vlan\d+|Loopback\d+)(?:\s|$)', line)
+
+                if interface_match:
+                    # Start new interface
+                    current_interface = interface_match.group(1)
+                    current_description = None
+                    logger.debug(f"Found IP interface: {current_interface}")
+                    continue
+
+                # If we're in an interface block, parse its configuration
+                if current_interface:
+                    # Check if we've left the interface block (non-indented line)
+                    if line and not line.startswith((' ', '\t', '!')):
+                        current_interface = None
+                        current_description = None
+                        continue
+
+                    # Parse description
+                    desc_match = re.match(r'^\s+description\s+(.+?)\s*$', line)
+                    if desc_match:
+                        current_description = desc_match.group(1)
+                        continue
+
+                    # Parse IP address: "ip address 192.168.198.252 255.255.255.0"
+                    ip_match = re.match(r'^\s+ip\s+address\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)', line)
+                    if ip_match:
+                        ip_addr = ip_match.group(1)
+                        subnet_mask = ip_match.group(2)
+
+                        # Convert subnet mask to CIDR
+                        cidr_prefix = subnet_mask_to_cidr(subnet_mask)
+                        if cidr_prefix is not None:
+                            ip_with_cidr = f"{ip_addr}/{cidr_prefix}"
+
+                            ip_addresses.append({
+                                'interface': current_interface,
+                                'ip': ip_with_cidr,
+                                'description': current_description
+                            })
+
+                            logger.debug(f"Found IP on {current_interface}: {ip_with_cidr}")
+
+        if ip_addresses:
+            logger.debug(f"Extracted {len(ip_addresses)} IP addresses from {config_file.name}")
+        else:
+            logger.debug(f"No IP addresses found in {config_file.name}")
+
+        return ip_addresses
+
+    except Exception as e:
+        logger.error(f"Error extracting IP addresses from {config_file.name}: {e}")
+        return []
+
 def get_device_type(config_file):
     """
     Extract device type from a Cisco configuration file.
