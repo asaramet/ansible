@@ -928,19 +928,3 @@ if __name__ == "__main__":
     from functions import _debug
 
     _debug(ip_addresses_json, data_folder)
-
-'''
-ip_addresses:
-- hostname: rhcs0007-1
-  ip: 192.168.198.252/24
-  name: Vlan802
-  vlan: true
-  vlan_id: '802'
-  vlan_name: RZ-NAS-VIR
-- hostname: rhcs0007-1
-  ip: 192.168.219.6/29
-  name: Vlan870
-  vlan: true
-  vlan_id: '870'
-  vlan_name: TF-NAS-VIR
-'''
