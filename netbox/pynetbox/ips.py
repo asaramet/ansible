@@ -7,7 +7,7 @@ Handles creation of VLAN interfaces and IP address assignment for switches
 '''
 
 import logging
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 from pynetbox.core.api import Api as NetBoxApi
 from pynetbox.core.endpoint import Endpoint
@@ -25,7 +25,7 @@ from pynetbox_functions import (
 logger = logging.getLogger(__name__)
 
 
-def ips(nb_session: NetBoxApi, data: Dict) -> bool:
+def ips(nb_session: NetBoxApi, data: dict) -> bool:
     """
     Update switch IPs on a NetBox server from YAML data.
     
@@ -37,7 +37,7 @@ def ips(nb_session: NetBoxApi, data: Dict) -> bool:
     
     Args:
         nb_session: pynetbox API session
-        data: Dictionary containing 'ip_addresses' list with structure:
+        data: dictionary containing 'ip_addresses' list with structure:
               - hostname: device hostname
               - ip: IP address with CIDR (e.g., 192.168.104.16/23)
               - name: interface name (e.g., "vlan 201")
@@ -225,18 +225,18 @@ def _resolve_ip_role(nb_session: NetBoxApi, role_name: str) -> Optional[int | st
 
 def _prepare_interface_and_ip_data(
     nb_session: NetBoxApi,
-    ip_data_list: List[Dict],
-    device_cache: Dict[str, object],
+    ip_data_list: list[dict],
+    device_cache: dict[str, object],
     tenant_id: Optional[int],
     role_id: Optional[Union[int, str]]
-) -> Tuple[List[Dict], List[Dict]]:
+) -> Tuple[list[dict], list[dict]]:
     """
     Prepare interface specifications and IP specifications from YAML data.
     
     Args:
         nb_session: pynetbox API session
-        ip_data_list: List of IP address entries from YAML
-        device_cache: Dictionary of cached device objects
+        ip_data_list: list of IP address entries from YAML
+        device_cache: dictionary of cached device objects
         tenant_id: Tenant ID for IP addresses
         role_id: Role ID (int) or role name (str) for IP addresses.
                  Can be int if roles are objects, str if roles are choice fields.
@@ -290,19 +290,19 @@ def _prepare_interface_and_ip_data(
 
 def _ensure_vlan_interfaces(
     nb_session: NetBoxApi,
-    interface_specs: List[Dict],
-    device_cache: Dict[str, object]
-) -> Dict[Tuple[str, str], object]:
+    interface_specs: list[dict],
+    device_cache: dict[str, object]
+) -> dict[Tuple[str, str], object]:
     """
     Ensure VLAN interfaces exist, creating them if necessary.
     
     Args:
         nb_session: pynetbox API session
-        interface_specs: List of interface specifications
-        device_cache: Dictionary of cached device objects
+        interface_specs: list of interface specifications
+        device_cache: dictionary of cached device objects
     
     Returns:
-        Dictionary mapping (hostname, interface_name) to interface object
+        dictionary mapping (hostname, interface_name) to interface object
     """
     interface_map = {}
     interfaces_to_create = []
@@ -356,17 +356,17 @@ def _ensure_vlan_interfaces(
 
 def _create_interfaces(
     nb_session: NetBoxApi,
-    interface_specs: List[Dict]
-) -> List[object]:
+    interface_specs: list[dict]
+) -> list[object]:
     """
     Create interfaces in bulk.
     
     Args:
         nb_session: pynetbox API session
-        interface_specs: List of interface specifications
+        interface_specs: list of interface specifications
     
     Returns:
-        List of created interface objects
+        list of created interface objects
     """
     # Prepare payloads for bulk creation
     payloads = []
@@ -390,7 +390,7 @@ def _should_reassign_ip(
     current_interface_id: int,
     target_interface_id: int,
     target_device_name: str
-) -> Tuple[bool, Optional[str], Optional[Dict]]:
+) -> Tuple[bool, Optional[str], Optional[dict]]:
     """
     Determine if an IP should be reassigned based on device statuses.
     
@@ -405,7 +405,7 @@ def _should_reassign_ip(
         Tuple of (should_reassign, reason, old_device_info)
         - should_reassign: True if reassignment should proceed
         - reason: String explaining the decision (for logging)
-        - old_device_info: Dict with old device details for audit trail, or None
+        - old_device_info: dict with old device details for audit trail, or None
     """
     try:
         # Get current (old) interface and device
@@ -505,10 +505,10 @@ def _clear_primary_ip_if_needed(device_obj: object, ip_id: int) -> bool:
 def _process_existing_ip(
     nb_session: NetBoxApi,
     existing_ip: object,
-    spec: Dict,
+    spec: dict,
     interface: object,
-    interface_map: Dict
-) -> Optional[Dict]:
+    interface_map: dict
+) -> Optional[dict]:
     """
     Process an existing IP address and determine if it needs updating.
     
@@ -585,7 +585,7 @@ def _process_existing_ip(
         return None
 
 
-def _create_new_ip(spec: Dict, interface: object) -> Dict:
+def _create_new_ip(spec: dict, interface: object) -> dict:
     """
     Create payload for a new IP address.
     
@@ -613,8 +613,8 @@ def _create_new_ip(spec: Dict, interface: object) -> Dict:
 
 def _compare_ip_attributes(
     existing_ip: object,
-    spec: Dict,
-    update_payload: Dict
+    spec: dict,
+    update_payload: dict
 ) -> bool:
     """
     Compare IP attributes and add updates to payload if needed.
@@ -622,7 +622,7 @@ def _compare_ip_attributes(
     Args:
         existing_ip: Existing IP object from NetBox
         spec: Specification dict with desired values
-        update_payload: Dict to add updates to
+        update_payload: dict to add updates to
     
     Returns:
         True if any updates were added
@@ -667,13 +667,13 @@ def _compare_ip_attributes(
     return needs_update
 
 
-def _build_audit_trail(existing_description: str, old_device_info: Dict) -> str:
+def _build_audit_trail(existing_description: str, old_device_info: dict) -> str:
     """
     Build audit trail for IP reassignment.
     
     Args:
         existing_description: Current IP description
-        old_device_info: Dict with old device details
+        old_device_info: dict with old device details
     
     Returns:
         Updated description with audit trail
@@ -693,16 +693,16 @@ def _build_audit_trail(existing_description: str, old_device_info: Dict) -> str:
 
 def _process_ip_addresses(
     nb_session: NetBoxApi,
-    ip_specs: List[Dict],
-    interface_map: Dict[Tuple[str, str], object]
+    ip_specs: list[dict],
+    interface_map: dict[Tuple[str, str], object]
 ) -> bool:
     """
     Process IP addresses: create if missing, assign to interfaces, handle updates.
     
     Args:
         nb_session: pynetbox API session
-        ip_specs: List of IP address specifications
-        interface_map: Dictionary mapping (hostname, interface_name) to interface object
+        ip_specs: list of IP address specifications
+        interface_map: dictionary mapping (hostname, interface_name) to interface object
     
     Returns:
         True if successful, False if errors occurred
@@ -778,17 +778,17 @@ def _process_ip_addresses(
 
 def _get_existing_ip_addresses(
     nb_session: NetBoxApi,
-    ip_addresses: List[str]
-) -> Dict[str, object]:
+    ip_addresses: list[str]
+) -> dict[str, object]:
     """
     Get existing IP addresses from NetBox.
     
     Args:
         nb_session: pynetbox API session
-        ip_addresses: List of IP addresses to query (with CIDR)
+        ip_addresses: list of IP addresses to query (with CIDR)
     
     Returns:
-        Dictionary mapping IP address to IP object
+        dictionary mapping IP address to IP object
     """
     existing_ips = {}
     
@@ -817,16 +817,16 @@ def _get_existing_ip_addresses(
 
 def _set_primary_ips_on_devices(
     nb_session: NetBoxApi,
-    ip_data_list: List[Dict],
-    device_cache: Dict[str, object]
+    ip_data_list: list[dict],
+    device_cache: dict[str, object]
 ) -> None:
     """
     Set primary_ip4 on devices based on IP assignments.
     
     Args:
         nb_session: pynetbox API session
-        ip_data_list: List of IP address entries from YAML
-        device_cache: Dictionary of cached device objects
+        ip_data_list: list of IP address entries from YAML
+        device_cache: dictionary of cached device objects
     """
     logger.info("Setting primary IPs on devices...")
     

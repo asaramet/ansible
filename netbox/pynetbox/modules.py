@@ -7,7 +7,7 @@ This module provides functions to manage switch modules (module bays) in NetBox,
 including deletion of old modules and creation of new ones based on YAML data.
 """
 
-from typing import Dict, List, Tuple
+from typing import Tuple
 from pynetbox.core.api import Api as NetBoxApi
 import logging
 
@@ -21,7 +21,7 @@ from pynetbox_functions import (
 logger = logging.getLogger(__name__)
 
 
-def module_bays(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> List[Dict[str, str | int]]:
+def module_bays(nb_session: NetBoxApi, data: dict[str, list[dict]]) -> list[dict[str, str | int]]:
     """
     Update switch module bays on a NetBox server from YAML data.
     
@@ -36,10 +36,10 @@ def module_bays(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> List[Dict
     
     Args:
         nb_session: pynetbox API session
-        data: Dictionary containing 'modules' list with module configurations
+        data: dictionary containing 'modules' list with module configurations
         
     Returns:
-        List of payloads processed (created or updated)
+        list of payloads processed (created or updated)
         
     Example YAML structure:
         modules:
@@ -123,7 +123,7 @@ def module_bays(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> List[Dict
     return create_payloads + update_payloads
 
 
-def modules(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> List[Dict[str, str | int]]:
+def modules(nb_session: NetBoxApi, data: dict[str, list[dict]]) -> list[dict[str, str | int]]:
     """
     Install modules into module bays on a NetBox server from YAML data.
     
@@ -139,10 +139,10 @@ def modules(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> List[Dict[str
     
     Args:
         nb_session: pynetbox API session
-        data: Dictionary containing 'modules' list with module configurations
+        data: dictionary containing 'modules' list with module configurations
         
     Returns:
-        List of payloads processed (created)
+        list of payloads processed (created)
         
     Example YAML structure:
         modules:
@@ -195,15 +195,15 @@ def modules(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> List[Dict[str
     return create_payloads
 
 
-def _extract_unique_device_names(modules_data: List[Dict]) -> List[str]:
+def _extract_unique_device_names(modules_data: list[dict]) -> list[str]:
     """
     Extract unique device names from modules data.
     
     Args:
-        modules_data: List of module configuration dictionaries
+        modules_data: list of module configuration dictionaries
         
     Returns:
-        List of unique device names
+        list of unique device names
     """
     device_names = set()
     
@@ -220,12 +220,12 @@ def _extract_unique_device_names(modules_data: List[Dict]) -> List[str]:
     return device_list
 
 
-def _bulk_delete_modules(modules: List[object]) -> int:
+def _bulk_delete_modules(modules: list[object]) -> int:
     """
     Delete module bays using the standard _delete_netbox_obj function.
     
     Args:
-        modules: List of module bay objects to delete
+        modules: list of module bay objects to delete
         
     Returns:
         Number of successfully deleted module bays
@@ -246,12 +246,12 @@ def _bulk_delete_modules(modules: List[object]) -> int:
     return deleted_count
 
 
-def _bulk_delete_installed_modules(modules: List[object]) -> int:
+def _bulk_delete_installed_modules(modules: list[object]) -> int:
     """
     Delete installed modules (not module bays) using the standard _delete_netbox_obj function.
     
     Args:
-        modules: List of module objects to delete
+        modules: list of module objects to delete
         
     Returns:
         Number of successfully deleted modules
@@ -274,9 +274,9 @@ def _bulk_delete_installed_modules(modules: List[object]) -> int:
 
 def _collect_all_old_format_bays(
     nb_session: NetBoxApi,
-    modules_data: List[Dict],
-    devices_cache: Dict[str, object]
-) -> List[object]:
+    modules_data: list[dict],
+    devices_cache: dict[str, object]
+) -> list[object]:
     """
     Collect all old-format module bays that need to be deleted.
     
@@ -288,11 +288,11 @@ def _collect_all_old_format_bays(
     
     Args:
         nb_session: pynetbox API session
-        modules_data: List of module configuration dictionaries
-        devices_cache: Dictionary mapping device names to device objects
+        modules_data: list of module configuration dictionaries
+        devices_cache: dictionary mapping device names to device objects
         
     Returns:
-        List of old-format module bay objects to delete
+        list of old-format module bay objects to delete
     """
     modules_to_delete = []
     
@@ -357,9 +357,9 @@ def _collect_all_old_format_bays(
 
 def _collect_existing_modules_to_delete(
     nb_session: NetBoxApi,
-    modules_data: List[Dict],
-    devices_cache: Dict[str, object]
-) -> List[object]:
+    modules_data: list[dict],
+    devices_cache: dict[str, object]
+) -> list[object]:
     """
     Collect existing modules (installed in module bays) that need to be deleted.
     
@@ -372,11 +372,11 @@ def _collect_existing_modules_to_delete(
     
     Args:
         nb_session: pynetbox API session
-        modules_data: List of module configuration dictionaries
-        devices_cache: Dictionary mapping device names to device objects
+        modules_data: list of module configuration dictionaries
+        devices_cache: dictionary mapping device names to device objects
         
     Returns:
-        List of existing module objects to delete
+        list of existing module objects to delete
     """
     modules_to_delete = []
     
@@ -442,9 +442,9 @@ def _collect_existing_modules_to_delete(
 
 def _process_module_operations(
     nb_session: NetBoxApi, 
-    modules_data: List[Dict],
-    devices_cache: Dict[str, object]
-) -> Tuple[List[Dict], List[Dict], List[object], int]:
+    modules_data: list[dict],
+    devices_cache: dict[str, object]
+) -> Tuple[list[dict], list[dict], list[object], int]:
     """
     Process module configurations to determine create, update, and delete operations.
     
@@ -459,8 +459,8 @@ def _process_module_operations(
     
     Args:
         nb_session: pynetbox API session
-        modules_data: List of module configuration dictionaries
-        devices_cache: Dictionary mapping device names to device objects
+        modules_data: list of module configuration dictionaries
+        devices_cache: dictionary mapping device names to device objects
         
     Returns:
         Tuple of (create_payloads, update_payloads, modules_to_delete, deleted_count)
@@ -682,7 +682,7 @@ def _build_module_payload(
     description: str,
     label: str | None = None,
     existing_id: int | None = None
-) -> Dict:
+) -> dict:
     """
     Build a module bay payload for create or update operation.
     
@@ -752,9 +752,9 @@ def _resolve_module_type(nb_session: NetBoxApi, module_type_name: str) -> int | 
 
 def _process_module_installations(
     nb_session: NetBoxApi,
-    modules_data: List[Dict],
-    devices_cache: Dict[str, object]
-) -> Tuple[List[Dict], int]:
+    modules_data: list[dict],
+    devices_cache: dict[str, object]
+) -> Tuple[list[dict], int]:
     """
     Process module configurations to install modules into module bays.
     
@@ -769,8 +769,8 @@ def _process_module_installations(
     
     Args:
         nb_session: pynetbox API session
-        modules_data: List of module configuration dictionaries
-        devices_cache: Dictionary mapping device names to device objects
+        modules_data: list of module configuration dictionaries
+        devices_cache: dictionary mapping device names to device objects
         
     Returns:
         Tuple of (create_payloads, skipped_count)
@@ -951,7 +951,7 @@ def _build_module_installation_payload(
     module_type_id: int,
     label: str | None = None,
     existing_id: int | None = None
-) -> Dict:
+) -> dict:
     """
     Build a module installation payload for create or update operation.
     

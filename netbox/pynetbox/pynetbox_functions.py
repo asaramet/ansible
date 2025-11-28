@@ -7,7 +7,6 @@ Project specific functions for pynetbox based apps
 import pynetbox, yaml, logging, argparse
 
 from pathlib import Path
-from typing import Callable, Dict, List
 
 from pynetbox.core.api import Api as NetBoxApi
 from pynetbox.models.dcim import Devices
@@ -26,7 +25,7 @@ def read_data(nb_session: NetBoxApi) -> None:
     for device in nb_session.dcim.devices.all():
         logger.info(f"{device.name} ({device.device_type.display}) in {device.site.name}")
 
-def load_yaml(file_path: Path) -> Dict:
+def load_yaml(file_path: Path) -> dict:
     yaml_file = Path(file_path)
 
     with yaml_file.open('r') as f:
@@ -51,7 +50,7 @@ def _get_device(nb_session: NetBoxApi, name: str) -> Devices:
 
     return d_obj
 
-def _extract_stack_number(device_name: str, data: Dict[str, str]) -> str:
+def _extract_stack_number(device_name: str, data: dict[str, str]) -> str:
     """
     Extract stack number from device name or data dictionary.
     Args:
@@ -77,14 +76,14 @@ def _extract_stack_number(device_name: str, data: Dict[str, str]) -> str:
 
     return None
 
-def _cache_devices(nb_session: NetBoxApi, device_names: List[str]) -> Dict[str, object]:
+def _cache_devices(nb_session: NetBoxApi, device_names: list[str]) -> dict[str, object]:
     """
     Get devices in a bulk and return them as cached dictionary
     Args:
         nb_session: pynetbox API session
         device_names: A list of device hostnames
     Return:
-        Dictionary of device objects in the form of:
+        dictionary of device objects in the form of:
             hostname: device object
     """
     devices = nb_session.dcim.devices.filter(name = device_names)
@@ -95,7 +94,7 @@ def _cache_devices(nb_session: NetBoxApi, device_names: List[str]) -> Dict[str, 
 
     return {device.name: device for device in devices}
 
-def _bulk_create(endpoint: Endpoint, payloads: List[Dict], kind: str) -> List:
+def _bulk_create(endpoint: Endpoint, payloads: list[dict], kind: str) -> list:
     """
     Bulk create objects on a NetBox platform
     Args:
@@ -103,7 +102,7 @@ def _bulk_create(endpoint: Endpoint, payloads: List[Dict], kind: str) -> List:
         payloads: A list of objects characteristics dictionaries to add to NetBox
         kind: A string describing the objects to create
     Returns:
-        List of successfully created objects.
+        list of successfully created objects.
     """
     if not payloads: 
         return []
@@ -154,17 +153,17 @@ def _bulk_create(endpoint: Endpoint, payloads: List[Dict], kind: str) -> List:
     # Bulk create failed, fall back to individual creates
     return _individual_create_fallback(endpoint, payloads, kind)
 
-def _individual_create_fallback(endpoint: Endpoint, payloads: List[Dict], kind: str) -> List:
+def _individual_create_fallback(endpoint: Endpoint, payloads: list[dict], kind: str) -> list:
     """
     Fallback to individual creates when bulk create fails.
     
     Args:
         endpoint: pynetbox endpoint space
-        payloads: List of object dictionaries to create
+        payloads: list of object dictionaries to create
         kind: Object type description
     
     Returns:
-        List of successfully created objects
+        list of successfully created objects
     """
     created = []
     failed = 0
@@ -200,7 +199,7 @@ def _individual_create_fallback(endpoint: Endpoint, payloads: List[Dict], kind: 
     
     return created
 
-def _extract_identifier(payload: Dict, obj: object = None) -> str:
+def _extract_identifier(payload: dict, obj: object = None) -> str:
     """
     Extract a meaningful identifier from payload or created object for logging.
     
@@ -282,7 +281,7 @@ def _extract_error_detail(exc: Exception) -> str:
     # Fallback to exception message
     return str(exc)
 
-def _bulk_update(endpoint: Endpoint, payloads: List[Dict], kind: str) -> List:
+def _bulk_update(endpoint: Endpoint, payloads: list[dict], kind: str) -> list:
     """
     Args:
         endpoint: pynetbox endpoint space
@@ -291,7 +290,7 @@ def _bulk_update(endpoint: Endpoint, payloads: List[Dict], kind: str) -> List:
         kind: A string describing the objects to update
     
     Returns:
-        List of successfully updated objects
+        list of successfully updated objects
     """
     if not payloads:
         return []
@@ -357,19 +356,19 @@ def _bulk_update(endpoint: Endpoint, payloads: List[Dict], kind: str) -> List:
     # Bulk update failed, fall back to individual updates
     return _individual_update_fallback(endpoint, payloads, object_ids, kind)
 
-def _individual_update_fallback(endpoint: Endpoint, payloads: List[Dict], 
-                                object_ids: List[int], kind: str) -> List:
+def _individual_update_fallback(endpoint: Endpoint, payloads: list[dict], 
+                                object_ids: list[int], kind: str) -> list:
     """
     Fallback to individual updates when bulk update fails.
     
     Args:
         endpoint: pynetbox endpoint space
-        payloads: List of update payloads
-        object_ids: List of object IDs to update
+        payloads: list of update payloads
+        object_ids: list of object IDs to update
         kind: Object type description
     
     Returns:
-        List of successfully updated objects
+        list of successfully updated objects
     """
     # Cache all objects that need to be updated to minimize API calls
     cached_objects = _cache_objects_for_update(endpoint, object_ids, kind)
@@ -428,17 +427,17 @@ def _individual_update_fallback(endpoint: Endpoint, payloads: List[Dict],
 
     return updated_items
 
-def _cache_objects_for_update(endpoint: Endpoint, object_ids: List[int], kind: str) -> Dict[int, object]:
+def _cache_objects_for_update(endpoint: Endpoint, object_ids: list[int], kind: str) -> dict[int, object]:
     """
     Cache objects by ID for efficient updates.
     
     Args:
         endpoint: pynetbox endpoint space
-        object_ids: List of object IDs to cache
+        object_ids: list of object IDs to cache
         kind: Object type description
     
     Returns:
-        Dictionary mapping ID to object
+        dictionary mapping ID to object
     """
     try:
         # Fetch all objects in one call using filter
@@ -461,18 +460,18 @@ def _cache_objects_for_update(endpoint: Endpoint, object_ids: List[int], kind: s
         )
         return {}
 
-def _apply_updates_to_object(obj: object, payload: Dict, obj_id: int, kind: str) -> tuple:
+def _apply_updates_to_object(obj: object, payload: dict, obj_id: int, kind: str) -> tuple:
     """
     Apply updates from payload to object and track changes.
     
     Args:
         obj: NetBox object to update
-        payload: Dictionary of fields to update
+        payload: dictionary of fields to update
         obj_id: Object ID (for logging)
         kind: Object type description
     
     Returns:
-        Tuple of (changes_made: bool, changes_log: List[str])
+        Tuple of (changes_made: bool, changes_log: list[str])
     """
     changes_made = False
     changes_log = []
@@ -517,7 +516,7 @@ def _normalize_value(value):
     Handles:
     - Nested NetBox objects (compare by ID)
     - None vs empty string
-    - Lists vs tuples
+    - lists vs tuples
     - Case-sensitive strings
     
     Args:
@@ -568,7 +567,7 @@ def _format_value_for_log(value) -> str:
         else:
             return f"ID: {value.id}"
     
-    # Lists/tuples - show count
+    # lists/tuples - show count
     if isinstance(value, (list, tuple)):
         if len(value) > 5:
             return f"[{len(value)} items]"
@@ -679,14 +678,14 @@ def _get_object_identifier(obj) -> str:
     # Really last resort
     return str(obj)
 
-def _resolve_tags(nb_session: NetBoxApi, tags: List[str] | str | None) -> List[int]:
+def _resolve_tags(nb_session: NetBoxApi, tags: list[str] | str | None) -> list[int]:
     """
     Resolve tag names to tag IDs, creating tags if they don't exist.
     Args:
         nb_session: pynetbox API session
         tags: string, list of strings, None
     Returns: 
-        List of IDs
+        list of IDs
     """
     if not tags: return []
 
@@ -736,7 +735,7 @@ def _resolve_or_create(
     endpoint: Endpoint, 
     identifier: str, 
     lookup_field: str = 'name',
-    create_payload: Dict | None = None
+    create_payload: dict | None = None
 ) -> int | None:
     """
     Generic get-or-create function for NetBox objects.
@@ -801,7 +800,7 @@ def _resolve_or_create(
         )
         return None
 
-def _main(description: str, function: Callable, **kwargs) -> None:
+def _main(description: str, function: callable, **kwargs) -> None:
     """
     Initialize NetBox API with custom session
     Args:
@@ -837,7 +836,7 @@ def _main(description: str, function: Callable, **kwargs) -> None:
 
     nb.http_session.verify = False # Disable SSL verification
 
-    files_yaml_bak = [
+    files_yaml = [
         "procurve_single.yaml",
         "procurve_modular.yaml",
 
@@ -857,7 +856,7 @@ def _main(description: str, function: Callable, **kwargs) -> None:
         "aruba_6300.yaml"
     ]
     
-    files_yaml = ["cisco.yaml"]
+    files_yaml_bak = ["cisco.yaml"]
 
     for file_name in files_yaml:
         data_file_path = f"{main_folder}/data/yaml/{file_name}"
@@ -866,7 +865,7 @@ def _main(description: str, function: Callable, **kwargs) -> None:
         # Call the passed function, with additional arguments
         function(nb, data, **kwargs)
 
-def _debug(description: str, function: Callable, **kwargs) -> None:
+def _debug(description: str, function: callable, **kwargs) -> None:
     """
     Debug NetBox API with custom session
     Args:

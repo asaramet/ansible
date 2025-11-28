@@ -6,7 +6,7 @@ Handles creation, update, and deletion of device interfaces with VLAN assignment
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Optional
 from pynetbox.core.api import Api as NetBoxApi
 
 # Import the standard delete function from pynetbox_functions
@@ -40,7 +40,7 @@ INTERFACE_TYPE_MAPPING = {
     #'1g': '1000base-t',
 }
 
-def interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
+def interfaces(nb_session: NetBoxApi, data: dict[str, list[dict]]) -> None:
     """
     Create or update interfaces in NetBox based on YAML data.
     
@@ -51,10 +51,10 @@ def interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
     
     Args:
         nb_session: pynetbox API session
-        data: Dictionary containing:
-            - 'delete_interfaces': List of interfaces to delete
-            - 'device_interfaces': List of interfaces to create/update
-            - 'tagged_vlans': List of trunk interfaces with tagged VLANs
+        data: dictionary containing:
+            - 'delete_interfaces': list of interfaces to delete
+            - 'device_interfaces': list of interfaces to create/update
+            - 'tagged_vlans': list of trunk interfaces with tagged VLANs
     """
     
     # Step 1: Delete interfaces if specified
@@ -95,7 +95,7 @@ def _normalize_interface_type(interface_type: str) -> str:
     return interface_type
 
 
-def delete_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
+def delete_device_interfaces(nb_session: NetBoxApi, data: dict[str, list[dict]]) -> None:
     """
     Delete module interfaces that are incorrectly assigned to devices.
     
@@ -111,7 +111,7 @@ def delete_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]])
     
     Args:
         nb_session: pynetbox API session
-        data: Dictionary containing 'device_interfaces' with interface data
+        data: dictionary containing 'device_interfaces' with interface data
     """
     
     if 'device_interfaces' not in data or not data['device_interfaces']:
@@ -205,12 +205,12 @@ def delete_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]])
     logger.info("=== Module interface cleanup completed ===")
 
 
-def _bulk_delete_interfaces(interfaces: List[object]) -> int:
+def _bulk_delete_interfaces(interfaces: list[object]) -> int:
     """
     Delete interfaces using the standard _delete_netbox_obj function.
     
     Args:
-        interfaces: List of interface objects to delete
+        interfaces: list of interface objects to delete
     
     Returns:
         Number of successfully deleted interfaces
@@ -232,13 +232,13 @@ def _bulk_delete_interfaces(interfaces: List[object]) -> int:
     return deleted_count
 
 
-def _delete_interfaces(nb_session: NetBoxApi, delete_list: List[Dict[str, str]]) -> None:
+def _delete_interfaces(nb_session: NetBoxApi, delete_list: list[dict[str, str]]) -> None:
     """
     Delete specified interfaces from NetBox using bulk operations.
     
     Args:
         nb_session: pynetbox API session
-        delete_list: List of dicts with 'hostname' and 'interface' keys
+        delete_list: list of dicts with 'hostname' and 'interface' keys
     """
     if not delete_list:
         return
@@ -299,13 +299,13 @@ def _delete_interfaces(nb_session: NetBoxApi, delete_list: List[Dict[str, str]])
     logger.info(f"Deletion summary: {deleted_count} deleted, {not_found_count} not found")
 
 
-def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
+def _process_device_interfaces(nb_session: NetBoxApi, data: dict[str, list[dict]]) -> None:
     """
     Process and create/update device interfaces with VLAN assignments using bulk operations.
     
     Args:
         nb_session: pynetbox API session
-        data: Dictionary containing 'device_interfaces' and optionally 'tagged_vlans'
+        data: dictionary containing 'device_interfaces' and optionally 'tagged_vlans'
     """
     device_interfaces = data.get('device_interfaces', [])
     tagged_vlans_data = data.get('tagged_vlans', [])
@@ -452,15 +452,15 @@ def _process_device_interfaces(nb_session: NetBoxApi, data: Dict[str, List[Dict]
     logger.info(f"Interface processing summary: {len(created_interfaces)} created, {len(updated_interfaces)} updated")
 
 
-def _build_tagged_vlans_lookup(tagged_vlans_data: List[Dict]) -> Dict[str, List[Dict]]:
+def _build_tagged_vlans_lookup(tagged_vlans_data: list[dict]) -> dict[str, list[dict]]:
     """
     Build a lookup dictionary for tagged VLANs by hostname and interface.
     
     Args:
-        tagged_vlans_data: List of dicts with 'hostname', 'interface', and 'tagged_vlans'
+        tagged_vlans_data: list of dicts with 'hostname', 'interface', and 'tagged_vlans'
     
     Returns:
-        Dictionary with keys like "hostname:interface" mapping to list of tagged VLANs
+        dictionary with keys like "hostname:interface" mapping to list of tagged VLANs
     """
     lookup = {}
     
@@ -476,7 +476,7 @@ def _build_tagged_vlans_lookup(tagged_vlans_data: List[Dict]) -> Dict[str, List[
     return lookup
 
 
-def _cache_modules_for_devices(nb_session: NetBoxApi, cached_devices: Dict[str, object]) -> Dict[str, object]:
+def _cache_modules_for_devices(nb_session: NetBoxApi, cached_devices: dict[str, object]) -> dict[str, object]:
     """
     Cache all modules for given devices in bulk.
     
@@ -486,10 +486,10 @@ def _cache_modules_for_devices(nb_session: NetBoxApi, cached_devices: Dict[str, 
     
     Args:
         nb_session: pynetbox API session
-        cached_devices: Dictionary of cached device objects
+        cached_devices: dictionary of cached device objects
     
     Returns:
-        Dictionary with keys "device_name:module_letter" mapping to module objects
+        dictionary with keys "device_name:module_letter" mapping to module objects
         Example: {"swgw1001p-2:A": <module object>}
     """
     if not cached_devices:
@@ -554,16 +554,16 @@ def _cache_modules_for_devices(nb_session: NetBoxApi, cached_devices: Dict[str, 
         return {}
 
 
-def _cache_interfaces_by_device(nb_session: NetBoxApi, device_ids: List[int]) -> Dict[str, object]:
+def _cache_interfaces_by_device(nb_session: NetBoxApi, device_ids: list[int]) -> dict[str, object]:
     """
     Cache all interfaces for given device IDs in bulk.
     
     Args:
         nb_session: pynetbox API session
-        device_ids: List of device IDs
+        device_ids: list of device IDs
     
     Returns:
-        Dictionary with keys "device_id:interface_name" mapping to interface objects
+        dictionary with keys "device_id:interface_name" mapping to interface objects
     """
     if not device_ids:
         return {}
@@ -591,16 +591,16 @@ def _cache_interfaces_by_device(nb_session: NetBoxApi, device_ids: List[int]) ->
         return {}
 
 
-def _cache_vlans_for_devices(nb_session: NetBoxApi, cached_devices: Dict[str, object]) -> Dict[str, object]:
+def _cache_vlans_for_devices(nb_session: NetBoxApi, cached_devices: dict[str, object]) -> dict[str, object]:
     """
     Cache ALL VLANs from NetBox platform for assignment to interfaces.
     
     Args:
         nb_session: pynetbox API session
-        cached_devices: Dictionary of cached device objects (not used, kept for compatibility)
+        cached_devices: dictionary of cached device objects (not used, kept for compatibility)
     
     Returns:
-        Dictionary with structure: {vid_or_name: vlan_object}
+        dictionary with structure: {vid_or_name: vlan_object}
         Where vid_or_name can be either the VLAN ID (as string) or the VLAN name
     """
     cached_vlans = {}
@@ -632,7 +632,7 @@ def _cache_vlans_for_devices(nb_session: NetBoxApi, cached_devices: Dict[str, ob
 
 
 def _get_vlan_object(nb_session: NetBoxApi, device: object, vlan_id: Optional[str], 
-                     vlan_name: Optional[str], cached_vlans: Dict) -> Optional[object]:
+                     vlan_name: Optional[str], cached_vlans: dict) -> Optional[object]:
     """
     Get VLAN object from global cache or NetBox.
     
@@ -738,8 +738,8 @@ def _extract_module_letter(interface_name: str) -> Optional[str]:
     return None
 
 
-def _prepare_interface_payload(device: object, entry: Dict, is_trunk: bool,
-                              cached_vlans: Dict, cached_modules: Dict, nb_session: NetBoxApi) -> Dict:
+def _prepare_interface_payload(device: object, entry: dict, is_trunk: bool,
+                              cached_vlans: dict, cached_modules: dict, nb_session: NetBoxApi) -> dict:
     """
     Prepare interface payload for bulk create/update.
     
@@ -829,17 +829,17 @@ def _prepare_interface_payload(device: object, entry: Dict, is_trunk: bool,
     return interface_payload
 
 
-def _assign_tagged_vlans_bulk(nb_session: NetBoxApi, interfaces_data: List[Dict],
-                              created_interfaces: List, updated_interfaces: List,
-                              cached_vlans: Dict) -> None:
+def _assign_tagged_vlans_bulk(nb_session: NetBoxApi, interfaces_data: list[dict],
+                              created_interfaces: list, updated_interfaces: list,
+                              cached_vlans: dict) -> None:
     """
     Assign tagged VLANs to trunk interfaces after they've been created/updated.
     
     Args:
         nb_session: pynetbox API session
-        interfaces_data: List of dicts with interface and VLAN info
-        created_interfaces: List of newly created interface objects
-        updated_interfaces: List of updated interface objects
+        interfaces_data: list of dicts with interface and VLAN info
+        created_interfaces: list of newly created interface objects
+        updated_interfaces: list of updated interface objects
         cached_vlans: Cached VLANs dictionary
     """
     # Build a lookup for newly created interfaces by device_id and name

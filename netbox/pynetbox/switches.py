@@ -6,7 +6,7 @@ Add or update switches on a NetBox platform using `pynetbox` library
 Main function to import:
     switches(nb_session, data):
         - nb_session: pynetbox API session
-        - data: Dictionary containing 'devices' list (YAML format)
+        - data: dictionary containing 'devices' list (YAML format)
 
 Supports:
     - Creating new switches
@@ -16,7 +16,7 @@ Supports:
 '''
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Optional, Tuple
 
 from pynetbox.core.api import Api as NetBoxApi
 
@@ -32,7 +32,7 @@ from pynetbox_functions import (
 logger = logging.getLogger(__name__)
 
 
-def _resolve_dependencies(nb_session: NetBoxApi, switch_dict: Dict) -> Optional[Dict[str, int]]:
+def _resolve_dependencies(nb_session: NetBoxApi, switch_dict: dict) -> Optional[dict[str, int]]:
     """
     Resolve all NetBox dependencies for a switch.
     
@@ -100,7 +100,7 @@ def _resolve_dependencies(nb_session: NetBoxApi, switch_dict: Dict) -> Optional[
         return None
 
 
-def process_chassis(nb_session: NetBoxApi, chassis_data: List[Dict]) -> Dict[str, int]:
+def process_chassis(nb_session: NetBoxApi, chassis_data: list[dict]) -> dict[str, int]:
     """
     Process chassis section - create virtual chassis and set master devices.
     
@@ -108,10 +108,10 @@ def process_chassis(nb_session: NetBoxApi, chassis_data: List[Dict]) -> Dict[str
     
     Args:
         nb_session: pynetbox API session
-        chassis_data: List of chassis dictionaries with 'name' and 'master' fields
+        chassis_data: list of chassis dictionaries with 'name' and 'master' fields
         
     Returns:
-        Dictionary mapping chassis name to chassis ID
+        dictionary mapping chassis name to chassis ID
     """
     if not chassis_data:
         logger.debug("No chassis data to process")
@@ -181,9 +181,9 @@ def process_chassis(nb_session: NetBoxApi, chassis_data: List[Dict]) -> Dict[str
 
 def _build_switch_payload(
     nb_session: NetBoxApi, 
-    switch_dict: Dict, 
-    dependencies: Dict[str, int]
-) -> Optional[Dict]:
+    switch_dict: dict, 
+    dependencies: dict[str, int]
+) -> Optional[dict]:
     """
     Build payload for creating a new switch.
     
@@ -250,10 +250,10 @@ def _build_switch_payload(
 
 def _build_update_payload(
     nb_session: NetBoxApi,
-    switch_dict: Dict,
+    switch_dict: dict,
     existing_switch: object,
-    dependencies: Dict[str, int]
-) -> Optional[Dict]:
+    dependencies: dict[str, int]
+) -> Optional[dict]:
     """
     Build payload for updating an existing switch (only changed fields).
     
@@ -356,14 +356,14 @@ def _build_update_payload(
 
 def _categorize_switches(
     nb_session: NetBoxApi,
-    switches_data: List[Dict]
-) -> Tuple[List[Dict], List[Dict], int]:
+    switches_data: list[dict]
+) -> Tuple[list[dict], list[dict], int]:
     """
     Categorize switches into: to_create, to_update, and error_count.
     
     Args:
         nb_session: pynetbox API session
-        switches_data: List of switch dictionaries from YAML
+        switches_data: list of switch dictionaries from YAML
         
     Returns:
         Tuple of (create_payloads, update_payloads, error_count)
@@ -423,7 +423,7 @@ def _categorize_switches(
     return create_payloads, update_payloads, error_count
 
 
-def switches(nb_session: NetBoxApi, data: Dict) -> List:
+def switches(nb_session: NetBoxApi, data: dict) -> list:
     """
     Add or update switches on NetBox server from YAML data.
     
@@ -440,9 +440,9 @@ def switches(nb_session: NetBoxApi, data: Dict) -> List:
     
     Args:
         nb_session: pynetbox API session
-        data: Dictionary containing:
-            - 'devices': List of switch configurations
-            - 'chassis' (optional): List of virtual chassis definitions
+        data: dictionary containing:
+            - 'devices': list of switch configurations
+            - 'chassis' (optional): list of virtual chassis definitions
         
     Returns:
         List of created and updated device objects

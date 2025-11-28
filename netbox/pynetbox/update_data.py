@@ -11,7 +11,6 @@ Main function, to import:
 
 import logging
 
-from typing import Dict, List
 from pynetbox.core.api import Api as NetBoxApi
 
 #from add_locations import add_locations
@@ -25,7 +24,7 @@ from ips import ips
 # Get logger
 logger = logging.getLogger(__name__)
 
-def update(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
+def update(nb_session: NetBoxApi, data: dict[str, list[str]]) -> None:
     """
     Update/Add data to a NetBox server from YAML data.
 

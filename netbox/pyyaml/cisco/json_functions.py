@@ -347,6 +347,11 @@ def vlans_json(data_folder):
     logger.debug(f"Extracted {len(data['vlans'])} unique VLANs from {data_folder}")
     return data
 
+def device_interfaces_json(data_folder):
+    data = {'device_interfaces': []}
+
+    return data
+
 if __name__ == "__main__":
     from functions import _debug
 

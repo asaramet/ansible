@@ -5,7 +5,7 @@ LAG (Link Aggregation Group) management functions for NetBox
 '''
 
 import logging
-from typing import Dict, List, Tuple, Set
+from typing import Tuple
 from collections import defaultdict
 
 from pynetbox.core.api import Api as NetBoxApi
@@ -19,7 +19,7 @@ from pynetbox_functions import (
 
 logger = logging.getLogger(__name__)
 
-def lags(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
+def lags(nb_session: NetBoxApi, data: dict[str, list[dict]]) -> None:
     """
     Update switch LAGs on a NetBox server from YAML data.
 
@@ -30,7 +30,7 @@ def lags(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
 
     Args:
         nb_session: pynetbox API session
-        data: Dictionary containing 'lags' and 'lag_interfaces' lists
+        data: dictionary containing 'lags' and 'lag_interfaces' lists
     
     Returns:
         None
@@ -96,16 +96,16 @@ def lags(nb_session: NetBoxApi, data: Dict[str, List[Dict]]) -> None:
     logger.info("LAG processing completed successfully")
 
 
-def _extract_unique_device_names(lag_list: List[Dict], lag_interface_list: List[Dict]) -> Set[str]:
+def _extract_unique_device_names(lag_list: list[dict], lag_interface_list: list[dict]) -> set[str]:
     """
     Extract all unique device names from LAG and LAG interface lists.
     
     Args:
-        lag_list: List of LAG definitions
-        lag_interface_list: List of LAG member interface definitions
+        lag_list: list of LAG definitions
+        lag_interface_list: list of LAG member interface definitions
     
     Returns:
-        Set of unique device hostnames
+        set of unique device hostnames
     """
     device_names = set()
     
@@ -122,8 +122,8 @@ def _extract_unique_device_names(lag_list: List[Dict], lag_interface_list: List[
 
 def _cache_interfaces_for_devices(
     nb_session: NetBoxApi,
-    devices_cache: Dict[str, object]
-) -> Dict[Tuple[str, str], object]:
+    devices_cache: dict[str, object]
+) -> dict[Tuple[str, str], object]:
     """
     Cache all interfaces for a list of devices and their virtual chassis members.
     
@@ -133,10 +133,10 @@ def _cache_interfaces_for_devices(
     
     Args:
         nb_session: pynetbox API session
-        devices_cache: Dictionary mapping device name to device object
+        devices_cache: dictionary mapping device name to device object
     
     Returns:
-        Dictionary mapping (hostname, interface_name) to interface object
+        dictionary mapping (hostname, interface_name) to interface object
     """
     if not devices_cache:
         return {}
@@ -198,16 +198,16 @@ def _cache_interfaces_for_devices(
 
 def _process_lag_interfaces(
     nb_session: NetBoxApi,
-    lag_list: List[Dict],
-    devices_cache: Dict[str, object],
-    interfaces_cache: Dict[Tuple[str, str], object]
+    lag_list: list[dict],
+    devices_cache: dict[str, object],
+    interfaces_cache: dict[Tuple[str, str], object]
 ) -> None:
     """
     Process LAG interfaces - create those that don't exist.
     
     Args:
         nb_session: pynetbox API session
-        lag_list: List of LAG definitions from YAML
+        lag_list: list of LAG definitions from YAML
         devices_cache: Cached device objects
         interfaces_cache: Cached interface objects
     """
@@ -229,15 +229,15 @@ def _process_lag_interfaces(
 
 
 def _identify_missing_lags(
-    lag_list: List[Dict],
-    devices_cache: Dict[str, object],
-    interfaces_cache: Dict[Tuple[str, str], object]
-) -> Tuple[List[Dict], List[Dict]]:
+    lag_list: list[dict],
+    devices_cache: dict[str, object],
+    interfaces_cache: dict[Tuple[str, str], object]
+) -> Tuple[list[dict], list[dict]]:
     """
     Identify which LAGs already exist and which need to be created.
     
     Args:
-        lag_list: List of LAG definitions
+        lag_list: list of LAG definitions
         devices_cache: Cached device objects
         interfaces_cache: Cached interface objects
     
@@ -274,19 +274,19 @@ def _identify_missing_lags(
 
 def _create_lag_interfaces(
     nb_session: NetBoxApi,
-    missing_lags: List[Dict],
-    devices_cache: Dict[str, object]
-) -> List[object]:
+    missing_lags: list[dict],
+    devices_cache: dict[str, object]
+) -> list[object]:
     """
     Create LAG interfaces in NetBox.
     
     Args:
         nb_session: pynetbox API session
-        missing_lags: List of LAG definitions to create
+        missing_lags: list of LAG definitions to create
         devices_cache: Cached device objects
     
     Returns:
-        List of created interface objects
+        list of created interface objects
     """
     payloads = []
     
@@ -330,16 +330,16 @@ def _create_lag_interfaces(
 
 def _process_member_interfaces(
     nb_session: NetBoxApi,
-    lag_interface_list: List[Dict],
-    devices_cache: Dict[str, object],
-    interfaces_cache: Dict[Tuple[str, str], object]
+    lag_interface_list: list[dict],
+    devices_cache: dict[str, object],
+    interfaces_cache: dict[Tuple[str, str], object]
 ) -> None:
     """
     Process member interfaces - update them to associate with their LAG.
     
     Args:
         nb_session: pynetbox API session
-        lag_interface_list: List of member interface definitions
+        lag_interface_list: list of member interface definitions
         devices_cache: Cached device objects
         interfaces_cache: Cached interface objects (including LAGs)
     """
@@ -363,20 +363,20 @@ def _process_member_interfaces(
 
 
 def _build_member_interface_payloads(
-    lag_interface_list: List[Dict],
-    devices_cache: Dict[str, object],
-    interfaces_cache: Dict[Tuple[str, str], object]
-) -> List[Dict]:
+    lag_interface_list: list[dict],
+    devices_cache: dict[str, object],
+    interfaces_cache: dict[Tuple[str, str], object]
+) -> list[dict]:
     """
     Build update payloads for member interfaces.
     
     Args:
-        lag_interface_list: List of member interface definitions
+        lag_interface_list: list of member interface definitions
         devices_cache: Cached device objects
         interfaces_cache: Cached interface objects
     
     Returns:
-        List of update payloads with interface IDs and LAG associations
+        list of update payloads with interface IDs and LAG associations
     """
     payloads = []
     skipped = 0
@@ -443,15 +443,15 @@ def _build_member_interface_payloads(
     return payloads
 
 
-def _group_lags_by_device(lag_list: List[Dict]) -> Dict[str, List[str]]:
+def _group_lags_by_device(lag_list: list[dict]) -> dict[str, list[str]]:
     """
     Group LAG names by device hostname.
     
     Args:
-        lag_list: List of LAG definitions
+        lag_list: list of LAG definitions
     
     Returns:
-        Dictionary mapping hostname to list of LAG names
+        dictionary mapping hostname to list of LAG names
     """
     grouped = defaultdict(list)
     
