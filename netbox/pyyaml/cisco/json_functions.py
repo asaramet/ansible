@@ -529,30 +529,39 @@ def device_interfaces_json(data_folder):
         for iface in interfaces:
             interface_name = iface['interface']
 
-            # Determine interface type, PoE mode, and PoE type from mapping
-            interface_type = None
-            poe_mode = None
-            poe_type = None
+            # Check if this is a VLAN interface (SVI - Switch Virtual Interface)
+            is_vlan_interface = interface_name.startswith('Vlan')
 
-            for pattern, characteristics in type_patterns.items():
-                if re.match(pattern, interface_name):
-                    interface_type = characteristics['type']
-                    poe_mode = characteristics['poe_mode']
-                    poe_type = characteristics['poe_type']
-                    break
-
-            if not interface_type:
-                logger.debug(f"Could not determine type for interface {interface_name} on {hostname}, skipping")
-                continue
-
-            # Override PoE settings if "power inline never" is configured
-            if iface.get('power_inline') == 'never':
+            if is_vlan_interface:
+                # VLAN interfaces are virtual (Layer 3 SVIs)
+                interface_type = 'virtual'
                 poe_mode = None
                 poe_type = None
-            # Override PoE settings if explicit wattage is configured
-            elif iface.get('power_inline_max'):
-                # Keep the poe_mode and poe_type from mapping, but note the explicit config
-                pass
+            else:
+                # Physical interface - determine type, PoE mode, and PoE type from mapping
+                interface_type = None
+                poe_mode = None
+                poe_type = None
+
+                for pattern, characteristics in type_patterns.items():
+                    if re.match(pattern, interface_name):
+                        interface_type = characteristics['type']
+                        poe_mode = characteristics['poe_mode']
+                        poe_type = characteristics['poe_type']
+                        break
+
+                if not interface_type:
+                    logger.debug(f"Could not determine type for interface {interface_name} on {hostname}, skipping")
+                    continue
+
+                # Override PoE settings if "power inline never" is configured
+                if iface.get('power_inline') == 'never':
+                    poe_mode = None
+                    poe_type = None
+                # Override PoE settings if explicit wattage is configured
+                elif iface.get('power_inline_max'):
+                    # Keep the poe_mode and poe_type from mapping, but note the explicit config
+                    pass
 
             # Get VLAN name from VLAN ID
             vlan_id = iface.get('vlan_id')
@@ -562,13 +571,19 @@ def device_interfaces_json(data_folder):
             is_lag = bool(iface.get('channel_group'))
 
             # For stacks, determine which switch member owns this interface
-            # Interface format: <Type><switch>/<module>/<port>
-            switch_match = re.match(r'^.*?(\d+)/\d+/\d+$', interface_name)
-            if switch_match and is_stack:
-                switch_num = switch_match.group(1)
-                device_hostname = f"{hostname}-{switch_num}"
+            # Physical interfaces: Extract switch number from interface name
+            # VLAN interfaces: Assign to first stack member (they're Layer 3, spanning the whole stack)
+            if is_vlan_interface:
+                # VLAN interfaces are logical and assigned to first member in stacks
+                device_hostname = f"{hostname}-1" if is_stack else hostname
             else:
-                device_hostname = hostname
+                # Physical interface - extract switch number
+                switch_match = re.match(r'^.*?(\d+)/\d+/\d+$', interface_name)
+                if switch_match and is_stack:
+                    switch_num = switch_match.group(1)
+                    device_hostname = f"{hostname}-{switch_num}"
+                else:
+                    device_hostname = hostname
 
             # Get description, use "no description" if not present
             description = iface.get('description')
@@ -706,7 +721,7 @@ def tagged_vlans_json(data_folder):
 
     Returns:
         dict: Dictionary with 'tagged_vlans' key containing list of dicts, each with:
-            - hostname: Device hostname (e.g., 'rhcs0007' or 'rgcs0003-1')
+            - hostname: Device hostname (e.g., 'rhcs1111' or 'rgcs1111-1')
             - interface: Interface name (e.g., 'Port-channel1', 'TwentyFiveGigE1/0/9')
             - tagged_vlans: List of VLAN dicts, each with:
                 - vlan_id: VLAN ID as string
@@ -716,7 +731,7 @@ def tagged_vlans_json(data_folder):
         {
             'tagged_vlans': [
                 {
-                    'hostname': 'rgcs0003-1',
+                    'hostname': 'rgcs1111-1',
                     'interface': 'Port-channel14',
                     'tagged_vlans': [
                         {'vlan_id': '2', 'name': 'PC'},
@@ -800,6 +815,11 @@ def tagged_vlans_json(data_folder):
 
     logger.debug(f"Extracted {len(data['tagged_vlans'])} trunk interfaces from {data_folder}")
     return data
+
+def ip_addresses_json(data_folder):
+    data = {'ip_addresses': []}
+
+    return data 
 
 if __name__ == "__main__":
     from functions import _debug

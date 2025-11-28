@@ -448,9 +448,10 @@ def get_interfaces(config_file):
         with open(config_file, 'r', encoding='utf-8') as f:
             for line in f:
                 # Match: "interface <type><number>"
-                # Supported: GigabitEthernet, TenGigabitEthernet, TwentyFiveGigE, FortyGigE, HundredGigE
-                # Skip: Loopback, Port-channel, Vlan, AppGigabit, FastEthernet0 (mgmt)
-                interface_match = re.match(r'^interface\s+((?:TwentyFive|Forty|Hundred|Ten)?Gig(?:abit)?(?:Ethernet|E)\d+/\d+/\d+)(?:\s|$)', line)
+                # Physical: GigabitEthernet, TenGigabitEthernet, TwentyFiveGigE, FortyGigE, HundredGigE
+                # Virtual: Vlan interfaces (SVIs - Switch Virtual Interfaces)
+                # Skip: Loopback, Port-channel, AppGigabit, FastEthernet0 (mgmt)
+                interface_match = re.match(r'^interface\s+((?:(?:TwentyFive|Forty|Hundred|Ten)?Gig(?:abit)?(?:Ethernet|E)\d+/\d+/\d+)|(?:Vlan\d+))(?:\s|$)', line)
 
                 if interface_match:
                     # Save previous interface if exists
