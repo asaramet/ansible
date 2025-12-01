@@ -2,16 +2,26 @@
 
 # Standard reusable functions
 
-import re, os, sys, yaml
+import re, sys, yaml, logging
+from pathlib import Path
 from tabulate import tabulate
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from functions import recursive_section_search, campuses
 
-this_folder = os.path.dirname(os.path.realpath(__file__))
-pyyaml_dir = os.path.dirname(this_folder)
-main_folder = os.path.dirname(pyyaml_dir)
-data_folder = os.path.join(main_folder, 'data')
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Pre-compiled regex patterns for convert_range() - performance optimization
+_RANGE_NON_DIGIT_RE = re.compile(r'[^\d]+')
+_RANGE_DIGIT_RE = re.compile(r'\d+')
+
+# Path definitions
+script_path = Path(__file__).resolve()
+aruba_dir = script_path.parent
+pyyaml_dir = aruba_dir.parent
+project_dir = pyyaml_dir.parent
+data_folder = project_dir / 'data'
 
 device_type_slags = {
     'J9085A': 'hpe-procurve-2610-24',
@@ -73,16 +83,41 @@ device_type_slags = {
 
 # --- Base functions ---
 def search_line(expression, t_file):
-    with open(t_file, "r") as f:
-        lines = f.readlines()
-    
-    for i, line in enumerate(lines):
-        if re.search(expression, line): return line
+    """
+    Search for a line matching a regex pattern in a file.
+
+    Args:
+        expression: Regex pattern string to search for
+        t_file: Path to file to search (Path object or string)
+
+    Returns:
+        str: First matching line, or None if no match found
+    """
+    # Pre-compile regex pattern for better performance
+    pattern = re.compile(expression)
+
+    # Convert to Path object if needed
+    file_path = Path(t_file) if not isinstance(t_file, Path) else t_file
+
+    with open(file_path, "r") as f:
+        for line in f:  # Iterate line-by-line instead of loading entire file
+            if pattern.search(line):
+                return line
 
     return None
     
-# search lines in a text recursively, when line start with a pattern
 def recursive_search(pattern, text, start=False):
+    """
+    Search lines in a text recursively, when line starts with or contains a pattern.
+
+    Args:
+        pattern: String pattern to search for
+        text: List of text lines to search through
+        start: If True, match lines that start with pattern; if False, match lines containing pattern
+
+    Returns:
+        list: List of matching lines (stripped)
+    """
     # base case
     if not text:
         return []
@@ -93,22 +128,50 @@ def recursive_search(pattern, text, start=False):
             found_lines.append(line.strip())
 
             found_lines += recursive_search(pattern, text[i+1:], True)
-            break 
+            break
 
         if not start and pattern in line:
             found_lines.append(line.strip())
 
             found_lines += recursive_search(pattern, text[i+1:], False)
-            break 
+            break
 
     return found_lines
 
 # Return a list of file paths from a folder
 def config_files(data_folder):
-    return [entry.path for entry in os.scandir(data_folder) if entry.is_file()]
+    """
+    Return a list of file paths from a folder.
 
-# Convert a range string, i.e A1-A4, to a list of elements, i.e [A1,A2,A3,A4]
+    Args:
+        data_folder: Path object or string representing the folder
+
+    Returns:
+        list: List of Path objects for files in the folder
+    """
+    folder = Path(data_folder) if not isinstance(data_folder, Path) else data_folder
+    return [f for f in folder.iterdir() if f.is_file()]
+
 def convert_range(range_str):
+    """
+    Convert a range string to a list of elements.
+
+    Examples:
+        'A1-A4' -> ['A1', 'A2', 'A3', 'A4']
+        'B10-B13' -> ['B10', 'B11', 'B12', 'B13']
+        '1/1-1/4' -> ['1/1', '1/2', '1/3', '1/4']
+        '2/A2-2/A4' -> ['2/A2', '2/A3', '2/A4']
+        'A21' -> ['A21'] (no range)
+
+    Args:
+        range_str: String representing a range (e.g., 'A1-A4') or single element
+
+    Returns:
+        list: List of elements in the range
+
+    Raises:
+        ValueError: If prefixes in start and end don't match
+    """
     if '-' not in range_str:
         return [range_str]
 
@@ -122,28 +185,43 @@ def convert_range(range_str):
         p_end, end = end.split('/')
         prefix_start += p_start + "/"
         prefix_end += p_end + "/"
-    
+
     # Extract the prefix and numeric parts of the start and end
-    if re.match(r'[^\d]+', start): 
-        prefix_start += re.match(r'[^\d]+', start).group()
-        prefix_end += re.match(r'[^\d]+', end).group()
+    non_digit_match = _RANGE_NON_DIGIT_RE.match(start)
+    if non_digit_match:
+        prefix_start += non_digit_match.group()
+        prefix_end += _RANGE_NON_DIGIT_RE.match(end).group()
 
         # Ensure the prefixes are the same
         if prefix_start != prefix_end:
             raise ValueError("Prefixes do not match")
-        
-        start = re.search(r'\d+', start).group()
-        end = re.search(r'\d+', end).group()
-        
+
+        start = _RANGE_DIGIT_RE.search(start).group()
+        end = _RANGE_DIGIT_RE.search(end).group()
+
     if prefix_start:
         # Generate the list of elements
         return [f"{prefix_start}{num}" for num in range(int(start), int(end) + 1)]
-    
-    return [num for num in range(int(start), int(end)+1)]
 
-# Convert and interfaces range string, such as 'B10-B13,B15-B20,E2,E4,E6,E8,F2,F4,F6,F8'
-# to a valid list of interfaces
+    return [num for num in range(int(start), int(end) + 1)]
+
 def convert_interfaces_range(interfaces_string):
+    """
+    Convert an interface range string to a list of (stack, interface) tuples.
+
+    Examples:
+        'B10-B13,B15-B20,E2,E4' -> [('0','B10'), ('0','B11'), ('0','B12'), ('0','B13'),
+                                     ('0','B15'), ('0','B16'), ('0','B17'), ('0','B18'),
+                                     ('0','B19'), ('0','B20'), ('0','E2'), ('0','E4')]
+        '1/2-1/4,1/16,2/1' -> [('1','1/2'), ('1','1/3'), ('1','1/4'), ('1','1/16'), ('2','2/1')]
+        'A1,Trk1-Trk2' -> [('0','A1'), ('0','Trk1'), ('0','Trk2')]
+
+    Args:
+        interfaces_string: Comma-separated string of interface ranges and single interfaces
+
+    Returns:
+        list: List of (stack, interface) tuples where stack is '0' for non-stacked interfaces
+    """
     i_list = []
 
     for el in interfaces_string.split(","):
@@ -153,17 +231,25 @@ def convert_interfaces_range(interfaces_string):
                 # convert range string to list interfaces list and save them
                 if '/' in str(interface):
                     stack, _ = interface.split('/')
-                i_list.append((stack,interface))
+                i_list.append((stack, interface))
             continue
 
         if '/' in str(el):
             stack = el.split('/')[0]
-        i_list.append((stack,el))
+        i_list.append((stack, el))
 
     return i_list
 
-# Return device type for a given hostname
 def device_type(hostname):
+    """
+    Return device type for a given hostname.
+
+    Args:
+        hostname: Hostname string to lookup
+
+    Returns:
+        str: Device type if found, None otherwise
+    """
     for device_type, d_list in devices().items():
         if hostname in d_list:
             return device_type
@@ -172,7 +258,19 @@ def device_type(hostname):
 
 # --- Get functions ---
 def get_os_version(t_file):
+    """
+    Extract OS version from Aruba/HPE config file.
 
+    Detects two formats:
+    - AOS (Aruba OS): Files containing "; Ver"
+    - Other versions: Lines starting with "!Version"
+
+    Args:
+        t_file: Path to config file (Path object or string)
+
+    Returns:
+        str: "AOS" for Aruba OS, version string for others, or None if not found
+    """
     if search_line("; Ver", t_file):
         return "AOS"
 
@@ -180,44 +278,62 @@ def get_os_version(t_file):
     if os_line:
         return os_line.split(' ')[1]
 
-    return
+    return None
 
 def get_hostname(t_file):
-    hostname_line = search_line("hostname", t_file)
+    """
+    Extract hostname and stack member information from config file.
 
-    hostname = hostname_line.split()[1].replace('"','') if not hostname_line.isspace() else " "
+    Args:
+        t_file: Path to config file (Path object or string)
 
-    #if not search_line("stacking", t_file):
-    if not search_line("member", t_file):
+    Returns:
+        dict: Dictionary mapping member ID to hostname
+              - Single switch: {'0': 'hostname'}
+              - Stack: {'1': 'hostname-1', '2': 'hostname-2', ...}
+    """
+    # Convert to Path object if needed
+    file_path = Path(t_file) if not isinstance(t_file, Path) else t_file
+
+    hostname_line = search_line("hostname", file_path)
+    hostname = hostname_line.split()[1].replace('"', '') if not hostname_line.isspace() else " "
+
+    # Check if this is a stack
+    if not search_line("member", file_path):
         # Not a stack
-        return { '0': hostname}
+        return {'0': hostname}
 
-    with open(t_file, "r") as f:
-        raw_text = f.readlines()
-
-    text = []
-    for line in raw_text:
-        text.append(line.strip())
+    # Stack configuration - read file and extract member information
+    with open(file_path, "r") as f:
+        text = [line.strip() for line in f]  # Read and strip in one comprehension
 
     stacks = set()
     for line in recursive_search("member", text):
         line_data = line.split()
 
-        if 'vsf' in line_data: # Aruba OS-CX switches
+        if 'vsf' in line_data:  # Aruba OS-CX switches
             stacks.add(line_data[2])
         else:
             stacks.add(line_data[1])
 
     hostnames = {}
     for member in stacks:
-        hostnames[member] = hostname + "-" + member
+        hostnames[member] = f"{hostname}-{member}"
 
     return hostnames
 
 def site_slug(t_file):
+    """
+    Generate a site slug based on hostname and location.
 
+    Args:
+        t_file: Path to config file (Path object or string)
+
+    Returns:
+        str: Site slug (e.g., 'hengstenbergareal', 'campus-n', 'campus-s')
+    """
     hostnames = get_hostname(t_file)
-    hostname = hostnames['0'] if '0' in hostnames.keys() else hostnames['1']
+    hostname = hostnames['0'] if '0' in hostnames else hostnames['1']
 
     location = get_location(t_file)
     if location:
@@ -227,12 +343,29 @@ def site_slug(t_file):
     if location == 'W20':
         return "hengstenbergareal"
 
-    return "campus-" + campuses[hostname[1]]
+    return f"campus-{campuses[hostname[1]]}"
 
 def get_location(file):
+    """
+    Extract and normalize location information from config file.
+
+    Parses location strings in formats like:
+    - "V.C01.123" (rack in building C, room 123)
+    - "C01.123" (building C, room 123)
+
+    Args:
+        file: Path to config file (Path object or string)
+
+    Returns:
+        tuple: (normalized_location, room, rack_flag) or None if no location found
+               - normalized_location: Format "C01.123"
+               - room: Room number string
+               - rack_flag: Boolean indicating if this is a rack location (starts with "V.")
+    """
     location_line = search_line("location", file)
 
-    if not location_line or location_line.isspace(): return None
+    if not location_line or location_line.isspace():
+        return None
 
     location = location_line.split()[-1].strip('"')
     rack = False
@@ -243,18 +376,32 @@ def get_location(file):
 
     building, room = location.split(".", 1)
 
-    building_nr = str(int(building[1:])) # convert "01" to "1", for example
+    building_nr = str(int(building[1:]))  # convert "01" to "1", for example
     if len(building_nr) == 1:
         # add "0" to single digit buildings
         building_nr = "0" + building_nr
 
-    location = building[0] + building_nr + "." + room
+    location = f"{building[0]}{building_nr}.{room}"
 
     return (location, room, rack)
 
-# get flor number from room number
 def get_flor_nr(room_nr):
-    if not room_nr: return None
+    """
+    Extract floor number from room number string.
+
+    Examples:
+        '123' -> '1' (first character)
+        'u05' -> '-0' (underground, 'u' prefix becomes negative)
+        '205' -> '2'
+
+    Args:
+        room_nr: Room number string (e.g., '123', 'u05', '205')
+
+    Returns:
+        str: Floor number as string, or None if room_nr is None
+    """
+    if not room_nr:
+        return None
 
     if room_nr[0] == 'u':
         room_nr = '-' + room_nr[1:]
@@ -264,8 +411,24 @@ def get_flor_nr(room_nr):
 
     return str(flor)
 
-# get flor name from room number
 def get_flor_name(room_nr):
+    """
+    Get floor number and German floor name from room number.
+
+    Args:
+        room_nr: Room number string (e.g., '123', 'u05')
+
+    Returns:
+        tuple: (floor_number, floor_name_german)
+               - Negative/0 floors use predefined names (Untergeschoss, Erdgeschoss)
+               - Positive floors use format "Etage N"
+
+    Examples:
+        'u05' -> ('-0', 'Untergeschoss')
+        '005' -> ('0', 'Erdgeschoss')
+        '123' -> ('1', 'Etage 1')
+        '205' -> ('2', 'Etage 2')
+    """
     flor_name = {
         "-3": "Untergeschoss 3",
         "-2": "Untergeschoss 2",
@@ -277,10 +440,24 @@ def get_flor_name(room_nr):
     if int(flor) < 1:
         return (flor, flor_name[flor])
 
-    return (flor, "Etage " + flor)
+    return (flor, f"Etage {flor}")
 
-# get location's parent
 def get_parent_location(location):
+    """
+    Get parent location slug for a building.
+
+    Args:
+        location: Location string (e.g., 'C01.123', 'S08.205')
+
+    Returns:
+        str: Parent location slug (e.g., 'fl-gebude-01', 'sm-gebude-08')
+
+    Examples:
+        'F01.123' -> 'fl-gebude-01'
+        'G05.456' -> 'gp-gebude-05'
+        'S08.205' -> 'sm-gebude-08'
+        'W20.100' -> 'ws-gebude-20'
+    """
     prefixes = {
         "F": "fl",
         "G": "gp",
@@ -289,16 +466,30 @@ def get_parent_location(location):
     }
 
     building = location.split(".")[0]
-    return prefixes[building[0]] + "-" + "gebude" + "-" + building[1:]
+    return f"{prefixes[building[0]]}-gebude-{building[1:]}"
 
-# define floor location slug
 def floor_slug(location):
-    if not location: return None
+    """
+    Generate floor location slug from location string.
+
+    Args:
+        location: Location string or tuple (location_string, room, rack)
+
+    Returns:
+        str: Floor slug in format "building-floor_number-floor_name" or None if no location
+
+    Examples:
+        'S01.205' -> 's01-2-etage-2'
+        'C08.005' -> 'c08-0-erdgeschoss'
+        'F02.u05' -> 'f02-0-untergeschoss'
+        ('S01.205', '205', False) -> 's01-2-etage-2'
+    """
+    if not location:
+        return None
 
     if isinstance(location, tuple):
         location = location[0]
 
-    # ex: s01-2-etage-2
     flor_tags = {
         "-3": "untergeschoss-3",
         "-2": "untergeschoss-2",
@@ -307,21 +498,38 @@ def floor_slug(location):
     }
     building, room_nr = location.split(".", 1)
     flor = get_flor_nr(room_nr)
-    flor_fx = str(abs(int(flor))) # string to use in the label
-    flor_tag = flor_tags[flor] if int(flor) < 1 else "etage-" + flor
+    flor_fx = str(abs(int(flor)))  # string to use in the label
+    flor_tag = flor_tags[flor] if int(flor) < 1 else f"etage-{flor}"
 
     return f"{building.lower()}-{flor_fx}-{flor_tag}"
 
 def room_slug(location):
-    if not location: return None
+    """
+    Generate room location slug from location string.
+
+    Args:
+        location: Location string or tuple (location_string, room, rack)
+
+    Returns:
+        str or tuple: Room slug in format "building-room_number", or
+                      tuple (room_slug, rack_number) if rack is specified,
+                      or None if no location
+
+    Examples:
+        'S08.205' -> 's08-205'
+        'C01.u05' -> 'c01-u05'
+        'F02.123.C2' -> ('f02-123', 'c2')  # with rack
+        ('S08.205', '205', False) -> 's08-205'
+    """
+    if not location:
+        return None
 
     if isinstance(location, tuple):
         location = location[0]
 
-    # ex: s08-u105-c2
     building, room_nr = location.split(".", 1)
 
-    # convert '-' to 'u'
+    # convert '-' to 'u' for underground rooms
     if room_nr[0] == '-':
         room_nr = f"u{room_nr[1:]}"
 
@@ -334,11 +542,33 @@ def room_slug(location):
     
 
 def get_lags(t_file):
-    with open(t_file, "r") as f:
-        text = f.readlines()
+    """
+    Extract LAG (Link Aggregation Group) configurations from Aruba config file.
+
+    Supports two formats:
+    - ArubaOS-CX: 'interface lag <number>' with interface assignments
+    - Aruba ProCurve/iOS: 'trunk <interfaces> <name> lacp'
+
+    Args:
+        t_file: Path to config file (Path object or string)
+
+    Returns:
+        list: List of dictionaries with keys:
+              - 'name': LAG name (e.g., 'lag 1', 'trk1')
+              - 'interfaces': Comma-separated interface list (e.g., '9-10', '1/1/26,1/1/27')
+
+    Examples:
+        ArubaOS-CX format -> [{'name': 'lag 1', 'interfaces': '1/1/26,1/1/27'}]
+        ProCurve format -> [{'name': 'trk1', 'interfaces': '9-10'}]
+    """
+    # Convert to Path object if needed
+    file_path = Path(t_file) if not isinstance(t_file, Path) else t_file
+
+    with open(file_path, "r") as f:
+        text = [line for line in f]  # Read lines into list
 
     lags = []
-    os_version = get_os_version(t_file)
+    os_version = get_os_version(file_path)
 
     if os_version == 'ArubaOS-CX':
         # Parse OS_CX format: interface lag <number> and interface blocks with lag commands
@@ -374,6 +604,25 @@ def get_lags(t_file):
     return lags
 
 def get_lag_stack(t_file):
+    """
+    Extract LAG to stack member mappings from config file.
+
+    Processes LAG configurations to create tuples mapping LAG names to stack members.
+    For stacked switches, extracts the stack number from interface names (e.g., '1/1/26' -> '1').
+    For non-stacked switches, defaults to stack '0'.
+
+    Args:
+        t_file: Path to config file (Path object or string)
+
+    Returns:
+        list: List of tuples (lag_name, stack_number)
+              - lag_name: LAG name in title case (e.g., 'Lag 1', 'Trk1')
+              - stack_number: Stack member number as string (e.g., '1', '2', or '0')
+
+    Examples:
+        Stacked switch: [('Lag 1', '1'), ('Lag 1', '1'), ('Trk2', '2')]
+        Single switch: [('Trk1', '9'), ('Trk1', '10')]
+    """
     lags = []
 
     for lag_dict in get_lags(t_file):
@@ -384,8 +633,23 @@ def get_lag_stack(t_file):
     return lags
 
 def get_interface_names(t_file):
-    with open(t_file, "r") as f:
-        text = f.readlines()
+    """
+    Extract interface names and descriptions from config file.
+
+    Searches for both 'name' and 'description' attributes within interface blocks.
+
+    Args:
+        t_file: Path to config file (Path object or string)
+
+    Returns:
+        list: List of tuples (interface, name_or_description)
+              Examples: [('1/1/1', 'Uplink to Core'), ('1/1/2', 'Server Port')]
+    """
+    # Convert to Path object if needed
+    file_path = Path(t_file) if not isinstance(t_file, Path) else t_file
+
+    with open(file_path, "r") as f:
+        text = [line for line in f]
 
     names = recursive_section_search(text, 'interface', 'name')
     names += recursive_section_search(text, 'interface', 'description')
@@ -393,16 +657,59 @@ def get_interface_names(t_file):
     return names
 
 def get_vlans(t_file):
-    with open(t_file, "r") as f:
-        text = f.readlines()
+    """
+    Extract VLAN definitions with names from config file.
+
+    Searches for VLAN blocks with 'name' attributes and automatically adds default VLAN 1.
+
+    Args:
+        t_file: Path to config file (Path object or string)
+
+    Returns:
+        set: Set of tuples (vlan_id, vlan_name)
+             Always includes ('1', 'DEFAULT_VLAN')
+
+    Examples:
+        {('1', 'DEFAULT_VLAN'), ('10', 'ADMIN'), ('20', 'USERS'), ('100', 'SERVERS')}
+    """
+    # Convert to Path object if needed
+    file_path = Path(t_file) if not isinstance(t_file, Path) else t_file
+
+    with open(file_path, "r") as f:
+        text = [line for line in f]
 
     vlans = set(recursive_section_search(text, 'vlan', 'name '))
     vlans.add(('1', 'DEFAULT_VLAN'))
     return vlans
 
 def get_untagged_vlans(t_file):
-    with open(t_file, "r") as f:
-        text = f.readlines()
+    """
+    Extract untagged VLAN assignments from config file.
+
+    Handles three different configuration formats:
+    1. Aruba OS ProCurve: VLAN blocks with 'untagged <interfaces>' statements
+    2. ArubaOS-CX Access VLANs: Interface blocks with 'vlan access <id>' statements
+    3. ArubaOS-CX Native VLANs: Interface blocks with 'vlan trunk native <id>' statements
+
+    Args:
+        t_file: Path to config file (Path object or string)
+
+    Returns:
+        list: List of tuples (vlan_id, interface_list, is_trunk_native)
+              - vlan_id: VLAN ID as string
+              - interface_list: Comma-separated interface names or range string
+              - is_trunk_native: None for ProCurve, False for access, True for trunk native
+
+    Examples:
+        ProCurve: [('10', 'A1-A8,B2', None), ('20', 'C1-C4', None)]
+        OS-CX Access: [('10', '1/1/1,1/1/2', False), ('20', '1/1/5', False)]
+        OS-CX Native: [('100', 'lag 1', True)]
+    """
+    # Convert to Path object if needed
+    file_path = Path(t_file) if not isinstance(t_file, Path) else t_file
+
+    with open(file_path, "r") as f:
+        text = [line for line in f]
 
     untagged = []
 
@@ -422,7 +729,7 @@ def get_untagged_vlans(t_file):
     for vlan_id, interfaces in access_vlan_map.items():
         untagged.append((vlan_id, ','.join(interfaces), False))
 
-    # --- lag Native VLANs ---
+    # --- LAG Native VLANs ---
     native_vlan_map = {}
     for interface, vlan_line in recursive_section_search(text, 'interface', 'vlan trunk'):
         parts = vlan_line.split()
@@ -436,10 +743,36 @@ def get_untagged_vlans(t_file):
     return untagged
 
 def get_tagged_vlans(t_file):
-    with open(t_file, "r") as f:
-        text = f.readlines()
+    """
+    Extract tagged VLAN assignments from config file.
 
-    os_version = get_os_version(t_file)
+    Handles two different configuration formats:
+    1. ArubaOS-CX: Interface blocks with 'vlan trunk allowed' and 'vlan trunk native' statements
+       - Parses trunk interfaces and their allowed VLANs
+       - Excludes native VLANs (they are untagged)
+       - Supports 'all' keyword for all VLANs
+       - Formats LAG names properly (e.g., 'lag 1' -> 'Lag 1')
+    2. Aruba OS ProCurve: VLAN blocks with 'tagged <interfaces>' statements
+
+    Args:
+        t_file: Path to config file (Path object or string)
+
+    Returns:
+        list: List of tuples (vlan_id, interface_list)
+              - vlan_id: VLAN ID as string
+              - interface_list: Comma-separated interface names
+
+    Examples:
+        ArubaOS-CX: [('10', '1/1/1,1/1/2,Lag 1'), ('20', '1/1/5,Lag 2')]
+        ProCurve: [('10', 'A1-A8,B2'), ('20', 'C1-C4,Trk1')]
+    """
+    # Convert to Path object if needed
+    file_path = Path(t_file) if not isinstance(t_file, Path) else t_file
+
+    with open(file_path, "r") as f:
+        text = [line for line in f]
+
+    os_version = get_os_version(file_path)
 
     if os_version == 'ArubaOS-CX':
         # Parse OS_CX format: interface with "vlan trunk allowed" commands
@@ -514,6 +847,34 @@ def get_tagged_vlans(t_file):
         return recursive_section_search(text, 'vlan', 'tagged')
 
 def get_modules(t_file):
+    """
+    Extract module/slot information from modular Aruba/HPE switches.
+
+    Handles multiple switch types with different module configurations:
+    - Aruba 2920 stacks (hardcoded module mappings for specific hostnames)
+    - Aruba modular chassis (e.g., 5406R with line cards)
+    - ProCurve 2910al with expansion modules
+    - HPE OS flexible-module configurations
+    - Aruba OS module configurations
+
+    Args:
+        t_file: Path to config file (Path object or string)
+
+    Returns:
+        list: List of dictionaries with keys:
+              - hostname: Device hostname (with stack number for stacks)
+              - module: Module slot identifier (e.g., 'A', 'B', '1', '2')
+              - type: Module type/model (e.g., 'j9729a', 'j9993a')
+              - name: Module name (optional, e.g., 'Module A', 'Uplink')
+              - stack: Stack member number (optional)
+
+    Examples:
+        [{'hostname': 'switch-1', 'module': 'A', 'type': 'j9729a',
+          'name': 'Module A', 'stack': '1'}]
+    """
+    # Convert to Path object if needed
+    file_path = Path(t_file) if not isinstance(t_file, Path) else t_file
+
     modules = []
 
     stacks_dict = {
@@ -521,13 +882,13 @@ def get_modules(t_file):
         '7': 'G', '8': 'H', '9': 'I', '10': 'J', '11': 'K', '12': 'L'
     }
 
-    hostnames = get_hostname(t_file)
+    hostnames = get_hostname(file_path)
     stack = '0'
 
-    with open(t_file, "r") as f:
-        text = f.readlines()
+    with open(file_path, "r") as f:
+        text = [line for line in f]
 
-    if '0' in hostnames.keys():
+    if '0' in hostnames:
         clean_hostname = hostnames['0']
     else:
         clean_hostname, _ = hostnames['1'].split('-')
@@ -551,9 +912,10 @@ def get_modules(t_file):
         'STK': 'Stacking Module'
     }
 
-    if clean_hostname in module_2920.keys():
+    if clean_hostname in module_2920:
         for stack, module, m_type in module_2920[clean_hostname]:
-            if '0' in hostnames.keys(): stack = '0'
+            if '0' in hostnames:
+                stack = '0'
             modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': names_2920[module], 'stack': stack})
         return modules
 
@@ -566,7 +928,7 @@ def get_modules(t_file):
          ]
     }
 
-    if clean_hostname in module_chassis.keys():
+    if clean_hostname in module_chassis:
         for stack, module, m_type in module_chassis[clean_hostname]:
             modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': module, 'stack': stack})
         return modules
@@ -577,7 +939,7 @@ def get_modules(t_file):
         'rsgw2u127bp': [('A', 'j9008a')]
     }
 
-    if clean_hostname in module_2910al.keys():
+    if clean_hostname in module_2910al:
         for module, m_type in module_2910al[clean_hostname]:
             modules.append({'hostname': clean_hostname, 'module': module, 'type': m_type})
         return modules
@@ -591,7 +953,7 @@ def get_modules(t_file):
             module = m_list[1] if len(m_list) == 4 else m_list[3]
             m_type = m_list[-1]
 
-            if m_list[1] in stacks_dict.keys():
+            if m_list[1] in stacks_dict:
                 stack = m_list[1]
 
             modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_type, 'name': 'Uplink', 'stack': stack})
@@ -610,69 +972,140 @@ def get_modules(t_file):
         if '/' in stack:
             stack, module = stack.split('/')
 
-        if module in stacks_dict.keys():
+        if module in stacks_dict:
             module = stacks_dict[module]
 
         modules.append({'hostname': hostnames[stack], 'module': module, 'type': m_list[3], 'name': 'Uplink', 'stack': stack})
 
     return modules
 
-# Return a list of devices dictionary
 def devices():
-    yaml_file = main_folder + "/src/devices.yaml"
+    """
+    Load devices dictionary from YAML configuration file.
+
+    Returns:
+        dict: Device type to hostname list mapping, e.g.,
+              {'aruba-2930m-48g': ['rggw1004sp', 'rsgw7009p'], ...}
+              Returns None if file cannot be loaded.
+
+    Example:
+        devices = devices()
+        # {'aruba-2930m-48g': ['switch1', 'switch2'], ...}
+    """
+    yaml_file = project_dir.joinpath("src", "devices.yaml")
 
     with open(yaml_file, 'r') as f:
         return yaml.safe_load(f)
 
     return None
 
-# Return device type for a given hostname
 def device_type(hostname):
-    for device_type, d_list in devices().items():
+    """
+    Look up device type for a given hostname from devices.yaml.
+
+    Args:
+        hostname: Device hostname to look up
+
+    Returns:
+        str: Device type slug (e.g., 'aruba-2930m-48g') or None if not found
+
+    Example:
+        device_type('rggw1004sp')  # Returns 'aruba-2930m-48g'
+    """
+    for dev_type, d_list in devices().items():
         if hostname in d_list:
-            return device_type
+            return dev_type
 
     return None
 
-# Return a interfaces dictionary from a yaml file
 def interfaces_dict():
-    yaml_file = main_folder + "/src/interfaces.yaml"
+    """
+    Load interfaces dictionary from YAML configuration file.
+
+    Returns:
+        dict: Interface type mappings for device models
+              Returns None if file cannot be loaded.
+
+    Example:
+        interfaces = interfaces_dict()
+        # {'aruba-2930m-48g': {'1-48': '1000base-t', ...}, ...}
+    """
+    yaml_file = project_dir.joinpath("src", "interfaces.yaml")
 
     with open(yaml_file, 'r') as f:
         return yaml.safe_load(f)
 
     return None
 
-# Return a module types dictionary from a yaml file
 def module_types_dict():
-    yaml_file = main_folder + "/src/module_types.yaml"
+    """
+    Load module types dictionary from YAML configuration file.
+
+    Returns:
+        dict: Module type to NetBox slug mappings
+              Returns None if file cannot be loaded.
+
+    Example:
+        module_types = module_types_dict()
+        # {'j9729a': 'aruba-2920-2sfp-module', ...}
+    """
+    yaml_file = project_dir.joinpath("src", "module_types.yaml")
 
     with open(yaml_file, 'r') as f:
         return yaml.safe_load(f)
 
     return None
 
-# Convert interfaces ranges from 'A' prefix to any other
 def convert_prefix(range_str, new_prefix):
-    prefix = range_str[0]
+    """
+    Convert interface range prefix from 'A' to a different prefix.
 
-    if prefix == "A":
+    Useful for stack members where interfaces are prefixed with stack letters
+    (A, B, C, etc.) and need to be converted to a different prefix.
 
+    Args:
+        range_str: Interface range string (e.g., 'A1-A24', 'A1')
+        new_prefix: New prefix to replace 'A' with (e.g., 'B', 'C')
+
+    Returns:
+        str: Range string with new prefix or original if prefix is not 'A'
+
+    Examples:
+        convert_prefix('A1-A24', 'B')  # Returns 'B1-B24'
+        convert_prefix('A5', 'C')      # Returns 'C5'
+        convert_prefix('B1-B10', 'C')  # Returns 'B1-B10' (no change)
+    """
+    if range_str[0] == "A":
         if '-' in range_str:
             start, end = range_str.split('-')
-            range_str = new_prefix + start[1:] + '-' + new_prefix + end[1:]
-
-            return range_str
-
-        return new_prefix + range_str[1:]
+            return f"{new_prefix}{start[1:]}-{new_prefix}{end[1:]}"
+        return f"{new_prefix}{range_str[1:]}"
 
     return range_str
 
-# Return a modules interfaces types dictionary from a yaml file
-def modules_interfaces(model, stack_prefix = "A"):
-    model = model.lower()
+def modules_interfaces(model, stack_prefix="A"):
+    """
+    Load module interface configurations with stack prefix conversion.
 
-    yaml_file = main_folder + "/src/modules_interfaces.yaml"
+    Reads interface types, PoE modes, and PoE types for a given module model
+    and converts interface ranges from 'A' prefix to the specified stack prefix.
+
+    Args:
+        model: Module model code (e.g., 'j9729a')
+        stack_prefix: Stack member prefix (default: 'A')
+
+    Returns:
+        dict: Dictionary with keys 'types', 'poe_mode', 'poe_types', each containing
+              interface ranges mapped to their respective values
+
+    Example:
+        modules_interfaces('j9729a', 'B')
+        # Returns: {'types': {'B1-B2': '1000base-x-sfp'},
+        #           'poe_mode': {'B1-B2': None},
+        #           'poe_types': {'B1-B2': None}}
+    """
+    model = model.lower()
+    yaml_file = project_dir.joinpath("src", "modules_interfaces.yaml")
 
     with open(yaml_file, 'r') as f:
         modules = yaml.safe_load(f)
@@ -682,9 +1115,14 @@ def modules_interfaces(model, stack_prefix = "A"):
     for key in modules['types'][model]:
         converted_key = convert_prefix(key, stack_prefix)
         data['types'][converted_key] = modules['types'][model][key]
-        
-        data['poe_mode'][converted_key] = None if key not in modules['poe_mode'] else modules['poe_mode'][model][key] 
-        data['poe_types'][converted_key] = None if key not in modules['poe_types'] else modules['poe_types'][model][key] 
+
+        # Handle optional poe_mode and poe_types entries
+        data['poe_mode'][converted_key] = (
+            modules['poe_mode'][model].get(key) if 'poe_mode' in modules and model in modules['poe_mode'] else None
+        )
+        data['poe_types'][converted_key] = (
+            modules['poe_types'][model].get(key) if 'poe_types' in modules and model in modules['poe_types'] else None
+        )
 
     return data
 
@@ -693,7 +1131,7 @@ def debug_config_files(data_folder):
     table = []
     headers = ["File name", "Path"]
     for f in config_files(data_folder):
-        table.append([ os.path.basename(f), f ])
+        table.append([f.name, str(f)])
     print(tabulate(table, headers, "github"))
 
 def debug_convert_range():
@@ -735,7 +1173,7 @@ def debug_get_os_version(data_folder):
     table = []
     headers = ["File name", "OS"]
     for f in config_files(data_folder):
-        table.append([ os.path.basename(f), get_os_version(f) ])
+        table.append([f.name, get_os_version(f)])
     print("\n== Debug: get_os_version ==")
     print(tabulate(table, headers, "github"))
 
@@ -743,7 +1181,7 @@ def debug_get_hostname(data_folder):
     table = []
     headers = ["File name", "Hostname"]
     for f in config_files(data_folder):
-        table.append([ os.path.basename(f), get_hostname(f) ])
+        table.append([f.name, get_hostname(f)])
     print("\n== Debug: get_hostname ==")
     print(tabulate(table, headers, "github"))
 
@@ -751,8 +1189,8 @@ def debug_site_slug(data_folder):
     table = []
     headers = ["File Name", "Location", "Site"]
     for f in config_files(data_folder):
-        hostname = os.path.basename(f)
-        table.append([ hostname, get_location(f), site_slug(f) ])
+        hostname = f.name
+        table.append([hostname, get_location(f), site_slug(f)])
     print("\n== Debug: site_slug ==")
     print(tabulate(table, headers, "github"))
 
@@ -760,7 +1198,7 @@ def debug_get_location(data_folder):
     table = []
     headers = ["File Name", "Location"]
     for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_location(f)])
+        table.append([f.name, get_location(f)])
     print("\n== Debug: get_location() ==")
     print(tabulate(table, headers))
 
@@ -774,7 +1212,7 @@ def debug_get_room_location(data_folder):
         if location:
             location, _ = location
 
-        table.append([os.path.basename(f), get_room_location(location)])
+        table.append([f.name, get_room_location(location)])
     print("\n== Debug: get_room_location() ==")
     print(tabulate(table, headers))
 
@@ -789,7 +1227,7 @@ def debug_get_flor_nr(data_folder):
         if location:
             location , room = location
 
-        table.append([os.path.basename(f), location, get_flor_nr(room)])
+        table.append([f.name, location, get_flor_nr(room)])
     print("\n== Debug: get_flor_nr() ==")
     print(tabulate(table, headers))
 
@@ -797,7 +1235,7 @@ def debug_get_lags(data_folder):
     table = []
     headers = ["File Name", "lags"]
     for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_lags(f)])
+        table.append([f.name, get_lags(f)])
     print("\n== Debug: get_lags ==")
     print(tabulate(table, headers))
 
@@ -805,36 +1243,31 @@ def debug_get_lag_stack(data_folder):
     table = []
     headers = ["File Name", "lags sets"]
     for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_lag_stack(f)])
+        table.append([f.name, get_lag_stack(f)])
     print("\n== Debug: get_lags ==")
     print(tabulate(table, headers))
 
 def debug_get_interface_names(data_folder):
     print("\n== Debug: get_interface_names ==")
     for f in config_files(data_folder):
-        print(os.path.basename(f), '---> ', get_interface_names(f))
+        print(f.name, '---> ', get_interface_names(f))
 
 def debug_get_vlans(data_folder):
     print("\n== Debug: get_vlans ==")
     for f in config_files(data_folder):
-        print(os.path.basename(f), '---> ', get_vlans(f))
-
-def debug_get_vlans_names(data_folder):
-    print("\n== Debug: get_vlans_names ==")
-    for f in config_files(data_folder):
-        print(os.path.basename(f), '---> ', get_vlans_names(f))
+        print(f.name, '---> ', get_vlans(f))
 
 def debug_get_untagged_vlans(data_folder):
     print("\n== Collect interfaces ranges for untagged vlans ==")
     for f in config_files(data_folder):
-        print(os.path.basename(f), '---> ', get_untagged_vlans(f))
+        print(f.name, '---> ', get_untagged_vlans(f))
     print('\n')
 
 def debug_get_modules(data_folder):
     table = []
     headers = ["File Name", "Modules"]
     for f in config_files(data_folder):
-        table.append([os.path.basename(f), get_modules(f)])
+        table.append([f.name, get_modules(f)])
     print("\n== Debug: get_modules ==")
     print(tabulate(table, headers))
 
@@ -852,7 +1285,7 @@ def debug_floor_slug(data_folder):
     headers = ["File name", "Location", "Slug"]
 
     for f in config_files(data_folder):
-        hostname = os.path.basename(f)
+        hostname = f.name
         location = get_location(f)
         slug = floor_slug(location)
         table.append([hostname, location, slug])
@@ -864,7 +1297,7 @@ def debug_room_slug(data_folder):
     headers = ["File name", "Location", "Slug"]
 
     for f in config_files(data_folder):
-        hostname = os.path.basename(f)
+        hostname = f.name
         location = get_location(f)
         slug = room_slug(location)
         table.append([hostname, location, slug])
@@ -875,50 +1308,44 @@ if __name__ == "__main__":
     print("\n=== Debuging ===")
 
     data_folders = [
-        #"/data/aruba-8-ports/",
-        #"/data/aruba-12-ports/",
-        # "/data/aruba-48-ports/",
-        #"/data/hpe-8-ports/",
-        # "/data/hpe-24-ports/",
-        # "/data/aruba-stack/",
-         "/data/aruba-stack-2920/",
-        # "/data/aruba-stack-2930/",
-        # "/data/aruba-modular/",
-        # "/data/aruba-modular-stack/",
-        # "/data/procurve-single/",
-        # "/data/procurve-modular/",
-        #"/data/aruba_6100/",
-        #"/data/aruba_6300/"
+        #"aruba-8-ports",
+        #"aruba-12-ports",
+         "aruba-stack-2920",
+        #"aruba-48-ports",
+        #"hpe-8-ports",
+        #"hpe-24-ports",
+        #"aruba-stack",
+        #"aruba-stack-2930",
+        #"aruba-modular",
+        #"aruba-modular-stack",
+        #"procurve-single",
+        #"procurve-modular",
+        #"aruba_6100",
+        #"aruba_6300"
     ]
 
+    data_folder = project_dir.joinpath('data')
     for folder in data_folders:
-        data_folder = main_folder + folder
+        print(data_folder)
+        configs_folder = data_folder.joinpath(folder)
+        print(configs_folder)
 
-        print("\n Folder: ", data_folder)
-        #debug_get_hostname(data_folder)
-        debug_site_slug(data_folder)
-        #debug_config_files(data_folder)
-        #debug_get_os_version(data_folder)
-        #debug_get_device_role(data_folder)
-        #debug_site_slug(data_folder)
-        debug_get_lags(data_folder)
-        #debug_get_interface_names(data_folder)
-        #debug_get_vlans(data_folder)
-        #debug_get_vlans_names(data_folder)
-        debug_get_untagged_vlans(data_folder)
-        #debug_get_ip_address(data_folder)
-        debug_device_type(data_folder)
-        #debug_get_modules(data_folder)
-        #debug_get_location(data_folder)
-        #debug_floor_slug(data_folder)
-        #debug_room_slug(data_folder)
+        print("\n Folder: ", configs_folder)
+        debug_get_hostname(configs_folder)
+        debug_site_slug(configs_folder)
+        debug_config_files(configs_folder)
+        debug_get_os_version(configs_folder)
+        debug_site_slug(configs_folder)
+        debug_get_lags(configs_folder)
+        debug_get_interface_names(configs_folder)
+        debug_get_vlans(configs_folder)
+        debug_get_untagged_vlans(configs_folder)
+        debug_device_type(configs_folder)
+        debug_get_modules(configs_folder)
+        debug_get_location(configs_folder)
+        debug_floor_slug(configs_folder)
+        debug_room_slug(configs_folder)
 
-    #print("\n=== No files functions ===")
-    #debug_convert_range()
-    #debug_convert_interfaces_range()
-
-    #print(yaml.dump(interfaces_dict()))
-    #print(yaml.dump(module_types_dict()))
-    #print(yaml.dump(modules_interfaces("J9537A")))
-    #print(yaml.dump(modules_interfaces("J9537a", "B")))
-    #debug_get_interface_names(data_folder)
+    print("\n=== No files functions ===")
+    debug_convert_range()
+    debug_convert_interfaces_range()
