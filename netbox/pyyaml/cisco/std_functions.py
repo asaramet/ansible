@@ -31,6 +31,40 @@ def _main(function: callable, data_folder: Path = data_folder, *args, **kwargs) 
 
     function(data_folder, *args, **kwargs)
 
+# Pre-compiled regex patterns for get_hostname_and_stack() - performance optimization
+_HOSTNAME_RE = re.compile(r'^hostname\s+(\S+)')
+_STACK_PROVISION_RE = re.compile(r'^switch\s+(\d+)\s+provision')
+_MODULE_SWITCH_RE = re.compile(r'^module\s+provision\s+switch\s+(\d+)')  # Also used by get_modules()
+_VSS_MODE_RE = re.compile(r'switch\s+mode\s+virtual')
+
+# Pre-compiled regex patterns for get_device_type() - performance optimization
+_DEVICE_TYPE_PROVISION_RE = re.compile(r'^switch\s+\d+\s+provision\s+(\S+)')
+_DEVICE_TYPE_BOOT_RE = re.compile(r'^boot\s+system\s+.*?:(cat\d+\w*|ws-c\d+\w*-\w+)', re.IGNORECASE)
+
+# Pre-compiled regex patterns for get_ip_addresses() - performance optimization
+_IP_INTERFACE_RE = re.compile(r'^interface\s+(Vlan\d+|Loopback\d+)(?:\s|$)')
+_IP_DESCRIPTION_RE = re.compile(r'^\s+description\s+(.+?)\s*$')
+_IP_ADDRESS_RE = re.compile(r'^\s+ip\s+address\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)')
+
+# Pre-compiled regex patterns for get_interfaces() - performance optimization
+_INTERFACE_RE = re.compile(r'^interface\s+((?:(?:TwentyFive|Forty|Hundred|Ten)?Gig(?:abit)?(?:Ethernet|E)\d+/\d+/\d+)|(?:Vlan\d+))(?:\s|$)')
+_INTERFACE_DESC_RE = re.compile(r'^\s+description\s+(.+?)\s*$')
+_INTERFACE_VLAN_RE = re.compile(r'^\s+switchport\s+access\s+vlan\s+(\d+)')
+_INTERFACE_LAG_RE = re.compile(r'^\s+channel-group\s+(\d+)\s+mode')
+_INTERFACE_POE_NEVER_RE = re.compile(r'^\s+power\s+inline\s+never')
+_INTERFACE_POE_AUTO_RE = re.compile(r'^\s+power\s+inline\s+(auto|static)(?:\s+max\s+(\d+))?')
+
+# Pre-compiled regex patterns for get_vlans() - performance optimization
+_VLAN_ID_RE = re.compile(r'^vlan\s+(\d+)\s*$')
+_VLAN_NAME_RE = re.compile(r'^\s+name\s+(.+?)\s*$')
+
+# Pre-compiled regex pattern for get_lags() - performance optimization
+_LAG_INTERFACE_RE = re.compile(r'^interface\s+(Port-channel\d+)', re.IGNORECASE)
+
+# Pre-compiled regex pattern for get_modules() - performance optimization
+# Note: _MODULE_SWITCH_RE is defined at the top of the file (shared with get_hostname_and_stack())
+_MODULE_SLOT_RE = re.compile(r'^\s+slot\s+(\d+)\s+slot-type\s+(\d+)\s+base-mac\s+(\S+)')
+
 def get_hostname_and_stack(config_file):
     """
     Read a Cisco config file and extract hostname and stack info.
@@ -61,23 +95,24 @@ def get_hostname_and_stack(config_file):
         with open(config_file, 'r', encoding='utf-8') as f:
             for line in f:
                 # Look for hostname line
-                hostname_match = re.match(r'^hostname\s+(\S+)', line)
+                hostname_match = _HOSTNAME_RE.match(line)
                 if hostname_match:
                     hostname = hostname_match.group(1)
 
                 # Pattern 1: Regular stack - "switch X provision <model>"
-                switch_match = re.match(r'^switch\s+(\d+)\s+provision', line)
+                switch_match = _STACK_PROVISION_RE.match(line)
                 if switch_match:
                     stack_switches.add(switch_match.group(1))
 
                 # Pattern 2: VSS (Virtual Switching System) - "module provision switch X"
-                vss_match = re.match(r'^module\s+provision\s+switch\s+(\d+)', line)
+                # Reuses _MODULE_SWITCH_RE pattern defined later in the file
+                vss_match = _MODULE_SWITCH_RE.match(line)
                 if vss_match:
                     stack_switches.add(vss_match.group(1))
                     is_vss = True
 
                 # Pattern 3: VSS indicator - "switch mode virtual"
-                if re.search(r'switch\s+mode\s+virtual', line):
+                if _VSS_MODE_RE.search(line):
                     is_vss = True
 
         # If we found a hostname, return the result
@@ -253,13 +288,13 @@ def get_modules(config_file):
         with open(config_file, 'r', encoding='utf-8') as f:
             for line in f:
                 # Match: "module provision switch X"
-                switch_match = re.match(r'^module\s+provision\s+switch\s+(\d+)', line)
+                switch_match = _MODULE_SWITCH_RE.match(line)
                 if switch_match:
                     current_switch = switch_match.group(1)
                     continue
 
                 # Match: " slot X slot-type YYY base-mac AA:BB:CC:DD:EE:FF"
-                slot_match = re.match(r'^\s+slot\s+(\d+)\s+slot-type\s+(\d+)\s+base-mac\s+(\S+)', line)
+                slot_match = _MODULE_SLOT_RE.match(line)
                 if slot_match and current_switch:
                     slot_num = slot_match.group(1)
                     slot_type_id = int(slot_match.group(2))
@@ -330,7 +365,7 @@ def get_lags(config_file):
         with open(config_file, 'r', encoding='utf-8') as f:
             for line in f:
                 # Match: "interface Port-channel<number>"
-                po_match = re.match(r'^interface\s+(Port-channel\d+)', line, re.IGNORECASE)
+                po_match = _LAG_INTERFACE_RE.match(line)
                 if po_match:
                     lag_name = po_match.group(1)
                     lags.append({'name': lag_name})
@@ -377,14 +412,14 @@ def get_vlans(config_file):
         with open(config_file, 'r', encoding='utf-8') as f:
             for line in f:
                 # Match: "vlan <ID>"
-                vlan_match = re.match(r'^vlan\s+(\d+)\s*$', line)
+                vlan_match = _VLAN_ID_RE.match(line)
                 if vlan_match:
                     current_vlan_id = vlan_match.group(1)
                     continue
 
                 # Match: " name <NAME>" (must have current_vlan_id set)
                 if current_vlan_id:
-                    name_match = re.match(r'^\s+name\s+(.+?)\s*$', line)
+                    name_match = _VLAN_NAME_RE.match(line)
                     if name_match:
                         vlan_name = name_match.group(1)
                         vlans.add((current_vlan_id, vlan_name))
@@ -394,7 +429,7 @@ def get_vlans(config_file):
 
                 # If we hit a line that's not indented and we had a vlan_id, reset it
                 # (VLAN without a name, or moved to next section)
-                if current_vlan_id and not line.startswith(' ') and not line.startswith('\t'):
+                if current_vlan_id and not line.startswith((' ', '\t')):
                     current_vlan_id = None
 
         if vlans:
@@ -407,6 +442,20 @@ def get_vlans(config_file):
     except Exception as e:
         logger.error(f"Error extracting VLANs from {config_file.name}: {e}")
         return set()
+
+def _build_interface_dict(interface_name, interface_data):
+    """
+    Helper function to build interface dictionary from parsed data.
+    Reduces code duplication in get_interfaces().
+    """
+    return {
+        'interface': interface_name,
+        'description': interface_data.get('description'),
+        'vlan_id': interface_data.get('vlan_id'),
+        'channel_group': interface_data.get('channel_group'),
+        'power_inline': interface_data.get('power_inline'),
+        'power_inline_max': interface_data.get('power_inline_max')
+    }
 
 def get_interfaces(config_file):
     """
@@ -451,19 +500,12 @@ def get_interfaces(config_file):
                 # Physical: GigabitEthernet, TenGigabitEthernet, TwentyFiveGigE, FortyGigE, HundredGigE
                 # Virtual: Vlan interfaces (SVIs - Switch Virtual Interfaces)
                 # Skip: Loopback, Port-channel, AppGigabit, FastEthernet0 (mgmt)
-                interface_match = re.match(r'^interface\s+((?:(?:TwentyFive|Forty|Hundred|Ten)?Gig(?:abit)?(?:Ethernet|E)\d+/\d+/\d+)|(?:Vlan\d+))(?:\s|$)', line)
+                interface_match = _INTERFACE_RE.match(line)
 
                 if interface_match:
                     # Save previous interface if exists
                     if current_interface:
-                        interfaces.append({
-                            'interface': current_interface,
-                            'description': current_data.get('description'),
-                            'vlan_id': current_data.get('vlan_id'),
-                            'channel_group': current_data.get('channel_group'),
-                            'power_inline': current_data.get('power_inline'),
-                            'power_inline_max': current_data.get('power_inline_max')
-                        })
+                        interfaces.append(_build_interface_dict(current_interface, current_data))
 
                     # Start new interface
                     current_interface = interface_match.group(1)
@@ -476,45 +518,38 @@ def get_interfaces(config_file):
                     # Check if we've left the interface block (non-indented line)
                     if line and not line.startswith((' ', '\t', '!')):
                         # Save current interface and reset
-                        interfaces.append({
-                            'interface': current_interface,
-                            'description': current_data.get('description'),
-                            'vlan_id': current_data.get('vlan_id'),
-                            'channel_group': current_data.get('channel_group'),
-                            'power_inline': current_data.get('power_inline'),
-                            'power_inline_max': current_data.get('power_inline_max')
-                        })
+                        interfaces.append(_build_interface_dict(current_interface, current_data))
                         current_interface = None
                         current_data = {}
                         continue
 
                     # Parse description
-                    desc_match = re.match(r'^\s+description\s+(.+?)\s*$', line)
+                    desc_match = _INTERFACE_DESC_RE.match(line)
                     if desc_match:
                         current_data['description'] = desc_match.group(1)
                         continue
 
                     # Parse access VLAN
-                    vlan_match = re.match(r'^\s+switchport\s+access\s+vlan\s+(\d+)', line)
+                    vlan_match = _INTERFACE_VLAN_RE.match(line)
                     if vlan_match:
                         current_data['vlan_id'] = vlan_match.group(1)
                         continue
 
                     # Parse channel-group (LAG membership)
-                    lag_match = re.match(r'^\s+channel-group\s+(\d+)\s+mode', line)
+                    lag_match = _INTERFACE_LAG_RE.match(line)
                     if lag_match:
                         current_data['channel_group'] = lag_match.group(1)
                         continue
 
                     # Parse power inline
                     # Pattern 1: "power inline never"
-                    poe_never_match = re.match(r'^\s+power\s+inline\s+never', line)
+                    poe_never_match = _INTERFACE_POE_NEVER_RE.match(line)
                     if poe_never_match:
                         current_data['power_inline'] = 'never'
                         continue
 
                     # Pattern 2: "power inline auto max <milliwatts>"
-                    poe_auto_match = re.match(r'^\s+power\s+inline\s+(auto|static)(?:\s+max\s+(\d+))?', line)
+                    poe_auto_match = _INTERFACE_POE_AUTO_RE.match(line)
                     if poe_auto_match:
                         current_data['power_inline'] = poe_auto_match.group(1)
                         if poe_auto_match.group(2):
@@ -523,14 +558,7 @@ def get_interfaces(config_file):
 
         # Don't forget the last interface
         if current_interface:
-            interfaces.append({
-                'interface': current_interface,
-                'description': current_data.get('description'),
-                'vlan_id': current_data.get('vlan_id'),
-                'channel_group': current_data.get('channel_group'),
-                'power_inline': current_data.get('power_inline'),
-                'power_inline_max': current_data.get('power_inline_max')
-            })
+            interfaces.append(_build_interface_dict(current_interface, current_data))
 
         if interfaces:
             logger.debug(f"Extracted {len(interfaces)} interfaces from {config_file.name}")
@@ -542,6 +570,35 @@ def get_interfaces(config_file):
     except Exception as e:
         logger.error(f"Error extracting interfaces from {config_file.name}: {e}")
         return []
+
+# Cache for common subnet masks - performance optimization
+_SUBNET_MASK_CACHE = {
+    '255.255.255.255': 32,
+    '255.255.255.254': 31,
+    '255.255.255.252': 30,
+    '255.255.255.248': 29,
+    '255.255.255.240': 28,
+    '255.255.255.224': 27,
+    '255.255.255.192': 26,
+    '255.255.255.128': 25,
+    '255.255.255.0': 24,
+    '255.255.254.0': 23,
+    '255.255.252.0': 22,
+    '255.255.248.0': 21,
+    '255.255.240.0': 20,
+    '255.255.224.0': 19,
+    '255.255.192.0': 18,
+    '255.255.128.0': 17,
+    '255.255.0.0': 16,
+    '255.254.0.0': 15,
+    '255.252.0.0': 14,
+    '255.248.0.0': 13,
+    '255.240.0.0': 12,
+    '255.224.0.0': 11,
+    '255.192.0.0': 10,
+    '255.128.0.0': 9,
+    '255.0.0.0': 8,
+}
 
 def subnet_mask_to_cidr(subnet_mask):
     """
@@ -560,6 +617,11 @@ def subnet_mask_to_cidr(subnet_mask):
         >>> subnet_mask_to_cidr('255.255.255.248')
         29
     """
+    # Check cache first for common subnet masks (fast path)
+    if subnet_mask in _SUBNET_MASK_CACHE:
+        return _SUBNET_MASK_CACHE[subnet_mask]
+
+    # Fall back to calculation for uncommon masks (slow path)
     try:
         # Convert subnet mask to binary and count 1s
         octets = subnet_mask.split('.')
@@ -579,15 +641,15 @@ def get_ip_addresses(config_file):
 
     Returns:
         list: List of dictionaries, each containing:
-            - interface: Interface name (e.g., 'Vlan802', 'Loopback0')
-            - ip: IP address with CIDR notation (e.g., '192.168.198.252/24')
+            - interface: Interface name (e.g., 'Vlan8', 'Loopback0')
+            - ip: IP address with CIDR notation (e.g., '192.168.100.100/24')
             - description: Interface description (str or None)
         Returns empty list if no IP addresses found or error occurs
 
     Example:
         >>> get_ip_addresses(Path('/path/to/config'))
-        [{'interface': 'Vlan802', 'ip': '192.168.198.2/24', 'description': 'NAS-VIR'},
-         {'interface': 'Vlan870', 'ip': '192.168.219.6/29', 'description': 'TF-VIR'}]
+        [{'interface': 'Vlan8', 'ip': '192.168.100.2/24', 'description': 'NAS'},
+         {'interface': 'Vlan70', 'ip': '192.168.200.6/29', 'description': 'VIR'}]
     """
     if not isinstance(config_file, Path):
         config_file = Path(config_file)
@@ -605,7 +667,7 @@ def get_ip_addresses(config_file):
             for line in f:
                 # Match: "interface <type><number>"
                 # Focus on VLAN interfaces (SVIs) and Loopback interfaces
-                interface_match = re.match(r'^interface\s+(Vlan\d+|Loopback\d+)(?:\s|$)', line)
+                interface_match = _IP_INTERFACE_RE.match(line)
 
                 if interface_match:
                     # Start new interface
@@ -623,13 +685,13 @@ def get_ip_addresses(config_file):
                         continue
 
                     # Parse description
-                    desc_match = re.match(r'^\s+description\s+(.+?)\s*$', line)
+                    desc_match = _IP_DESCRIPTION_RE.match(line)
                     if desc_match:
                         current_description = desc_match.group(1)
                         continue
 
                     # Parse IP address: "ip address 192.168.198.252 255.255.255.0"
-                    ip_match = re.match(r'^\s+ip\s+address\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)', line)
+                    ip_match = _IP_ADDRESS_RE.match(line)
                     if ip_match:
                         ip_addr = ip_match.group(1)
                         subnet_mask = ip_match.group(2)
@@ -692,15 +754,15 @@ def get_device_type(config_file):
         with open(config_file, 'r', encoding='utf-8') as f:
             for line in f:
                 # Pattern 1: Regular stack - "switch 1 provision <device-type>"
-                provision_match = re.match(r'^switch\s+\d+\s+provision\s+(\S+)', line)
+                provision_match = _DEVICE_TYPE_PROVISION_RE.match(line)
                 if provision_match:
-                    device_type = provision_match.group(1)
+                    device_type = provision_match.group(1).lower()
                     logger.debug(f"Found device type '{device_type}' via provision in {config_file.name}")
                     return device_type
 
                 # Pattern 2: VSS/older switches - extract from boot system command
                 # Example: "boot system flash bootflash:cat4500es8-universalk9.SPA.03.11.04.E.152-7.E4.bin"
-                boot_match = re.match(r'^boot\s+system\s+.*?:(cat\d+\w*|ws-c\d+\w*-\w+)', line, re.IGNORECASE)
+                boot_match = _DEVICE_TYPE_BOOT_RE.match(line)
                 if boot_match:
                     boot_system_type = boot_match.group(1).lower()
                     logger.debug(f"Found potential device type '{boot_system_type}' in boot system command")
@@ -709,8 +771,6 @@ def get_device_type(config_file):
         if boot_system_type:
             # Map boot system type to actual device type if mapping exists
             mapped_type = device_type_mapping.get(boot_system_type, boot_system_type)
-            if mapped_type != boot_system_type:
-                logger.debug(f"Mapped '{boot_system_type}' to '{mapped_type}' for {config_file.name}")
             logger.debug(f"Using device type '{mapped_type}' from boot system in {config_file.name}")
             return mapped_type
 
@@ -731,4 +791,4 @@ if __name__ == "__main__":
     if data_path.exists():
         for file_path in sorted(data_path.iterdir()):
             if file_path.is_file():
-                _debug(get_interfaces, file_path)
+                _debug(get_hostname_and_stack, file_path)
