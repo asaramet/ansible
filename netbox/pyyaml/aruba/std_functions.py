@@ -2,15 +2,13 @@
 
 # Standard reusable functions
 
-import re, sys, yaml, logging
+import re, sys, yaml
 from pathlib import Path
 from tabulate import tabulate
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from functions import recursive_section_search, campuses
-
-# Configure logging
-logger = logging.getLogger(__name__)
+from sort_data import get_switch_type
 
 # Pre-compiled regex patterns for convert_range() - performance optimization
 _RANGE_NON_DIGIT_RE = re.compile(r'[^\d]+')
@@ -60,11 +58,8 @@ device_type_slags = {
     'JL693A_stack': "hpe-aruba-2930f-12g-poep-2sfpp",
 
     'J9729A_stack': 'hpe-aruba-2920-48g-poep',
-
     'JL322A_module': "hpe-aruba-2930m-48g-poep",
-
     'JL322A_stack': 'hpe-aruba-2930m-48g-poep',
-
     'J9850A_stack': 'hpe-5406r-zl2', 
 
     'J9137A': 'hpe-procurve-2520-8-poe',
@@ -1126,6 +1121,67 @@ def modules_interfaces(model, stack_prefix="A"):
 
     return data
 
+def interfaces_types(config_file):
+    """
+    Extract interface types and PoE configurations for a switch.
+
+    Reads device type from config file and maps interface ranges to their
+    corresponding types (e.g., '1000base-t'), PoE modes (e.g., 'pse'), and
+    PoE types (e.g., 'type2-ieee802.3at') based on the interfaces.yaml mapping.
+
+    Args:
+        config_file: Path to config file (Path object or string)
+
+    Returns:
+        dict: Dictionary with three keys:
+              - 'type': {interface_nr: interface_type, ...}
+              - 'poe_mode': {interface_nr: poe_mode, ...}
+              - 'poe_type': {interface_nr: poe_type, ...}
+
+    Example:
+        interfaces_types('data/aruba-48-ports/rggw1004sp')
+        # Returns: {
+        #   'type': {'1': '1000base-t', '2': '1000base-t', ...},
+        #   'poe_mode': {'1': 'pse', '2': 'pse', ...},
+        #   'poe_type': {'1': 'type2-ieee802.3at', '2': 'type2-ieee802.3at', ...}
+        # }
+    """
+    # Convert to Path object if needed
+    file_path = Path(config_file) if not isinstance(config_file, Path) else config_file
+
+    data = {'type': {}, 'poe_type': {}, 'poe_mode': {}}
+
+    interfaces = interfaces_dict()
+    types = interfaces['types']
+    poe_modes = interfaces['poe_modes']
+    poe_types = interfaces['poe_types']
+
+    hostnames = get_hostname(file_path)
+    hostname = hostnames['0'] if '0' in hostnames else hostnames['1'][:-2]
+
+    d_type = get_switch_type(file_path)
+    if isinstance(d_type, dict):
+        d_type = d_type['1']
+
+    # Create interface type dictionary
+    if d_type in types:
+        for key, value in types[d_type].items():
+            for i_nr in convert_range(key):
+                data['type'][str(i_nr)] = value
+
+    # Create PoE interface dictionaries
+    if d_type in poe_types:
+        for key, value in poe_types[d_type].items():
+            for i_nr in convert_range(key):
+                data['poe_type'][str(i_nr)] = value
+
+    if d_type in poe_modes:
+        for key, value in poe_modes[d_type].items():
+            for i_nr in convert_range(key):
+                data['poe_mode'][str(i_nr)] = value
+
+    return data
+
 #----- Debugging -------
 def debug_config_files(data_folder):
     table = []
@@ -1324,7 +1380,6 @@ if __name__ == "__main__":
         #"aruba_6300"
     ]
 
-    data_folder = project_dir.joinpath('data')
     for folder in data_folders:
         print(data_folder)
         configs_folder = data_folder.joinpath(folder)
