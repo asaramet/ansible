@@ -16,53 +16,53 @@ raw_folder = data_folder.joinpath('raw')
 temp_folder = raw_folder.joinpath('temp')
 
 hw_folders = {
-    'JL258A': 'aruba-8-ports',
-    'JL693A': 'aruba-12-ports',
+    'JL258A': 'aruba_8_ports',
+    'JL693A': 'aruba_12_ports',
 
-    'JL255A': 'aruba-48-ports',
-    'JL256A': 'aruba-48-ports',
-    #'JL322A': 'aruba-48-ports',
-    'JL357A': 'aruba-48-ports',
+    'JL255A': 'aruba_48_ports',
+    'JL256A': 'aruba_48_ports',
+    #'JL322A': 'aruba_48_ports',
+    'JL357A': 'aruba_48_ports',
 
-    'JL322A': 'aruba-modular',
+    'JL322A': 'aruba_modular',
 
-    'JL075A_stack': 'aruba-stack',
-    'JL256A_stack': 'aruba-stack',
-    'JL693A_stack': 'aruba-stack',
-    'J9729A_stack': 'aruba-stack-2920',
-    'JL322A_stack': 'aruba-stack-2930',
-    'J9850A_stack': 'aruba-modular-stack',
+    'JL075A_stack': 'aruba_stack',
+    'JL256A_stack': 'aruba_stack',
+    'JL693A_stack': 'aruba_stack',
+    'J9729A_stack': 'aruba_stack_2920',
+    'JL322A_stack': 'aruba_stack_2930',
+    'J9850A_stack': 'aruba_modular_stack',
 
-    'J9137A': 'hpe-8-ports',
-    'J9562A': 'hpe-8-ports',
-    'J9565A': 'hpe-8-ports',
-    'J9774A': 'hpe-8-ports',
-    'J9780A': 'hpe-8-ports',
+    'J9137A': 'hpe_8_ports',
+    'J9562A': 'hpe_8_ports',
+    'J9565A': 'hpe_8_ports',
+    'J9774A': 'hpe_8_ports',
+    'J9780A': 'hpe_8_ports',
 
-    'J9145A': 'hpe-24-ports',
-    'J9623A': 'hpe-24-ports',
-    'J9772A': 'hpe-24-ports',
-    'J9776A': 'hpe-24-ports',
-    'J9779A': 'hpe-24-ports',
-    'J9853A': 'hpe-24-ports',
+    'J9145A': 'hpe_24_ports',
+    'J9623A': 'hpe_24_ports',
+    'J9772A': 'hpe_24_ports',
+    'J9776A': 'hpe_24_ports',
+    'J9779A': 'hpe_24_ports',
+    'J9853A': 'hpe_24_ports',
 
-    'J8697A': 'procurve-modular',
-    'J8698A': 'procurve-modular',
-    'J8702A': 'procurve-modular',
-    'J8705A': 'procurve-modular',
-    'J8765A': 'procurve-modular',
-    'J8768A': 'procurve-modular',
-    'J8773A': 'procurve-modular',
-    'J8770A': 'procurve-modular',
-    'J9534A': 'procurve-modular',
-    'J9550A': 'procurve-modular',
-    'J9729A': 'procurve-modular',
-    'J9850A': 'procurve-modular',
-    'J9851A': 'procurve-modular',
+    'J8697A': 'procurve_modular',
+    'J8698A': 'procurve_modular',
+    'J8702A': 'procurve_modular',
+    'J8705A': 'procurve_modular',
+    'J8765A': 'procurve_modular',
+    'J8768A': 'procurve_modular',
+    'J8773A': 'procurve_modular',
+    'J8770A': 'procurve_modular',
+    'J9534A': 'procurve_modular',
+    'J9550A': 'procurve_modular',
+    'J9729A': 'procurve_modular',
+    'J9850A': 'procurve_modular',
+    'J9851A': 'procurve_modular',
 
-    'J9085A': 'procurve-single',
-    'J9086A': 'procurve-single',
-    'J9089A': 'procurve-single',
+    'J9085A': 'procurve_single',
+    'J9086A': 'procurve_single',
+    'J9089A': 'procurve_single',
 
     'JL679A': 'aruba_6100',
     'JL658A': 'aruba_6300',
@@ -448,17 +448,17 @@ def debug_get_switch_type(files_list):
 def debug():
     debug_configs_dir = raw_folder
 
-    #debug_configs_dir = Path(data_folder) / 'aruba-modular'
-    #debug_configs_dir = Path(data_folder) / 'aruba-modular-stack'
-    #debug_configs_dir = Path(data_folder) / 'aruba-stack-2930'
-    #debug_configs_dir = Path(data_folder) / 'aruba-stack'
+    #debug_configs_dir = Path(data_folder) / 'aruba_modular'
+    #debug_configs_dir = Path(data_folder) / 'aruba_modular_stack'
+    #debug_configs_dir = Path(data_folder) / 'aruba_stack_2930'
+    #debug_configs_dir = Path(data_folder) / 'aruba_stack'
 
-    #debug_configs_dir = Path(data_folder) / 'aruba-48-ports'
+    #debug_configs_dir = Path(data_folder) / 'aruba_48_ports'
 
-    #debug_configs_dir = Path(data_folder) / 'hpe-24-ports'
+    #debug_configs_dir = Path(data_folder) / 'hpe_24_ports'
 
-    #debug_configs_dir = Path(data_folder) / 'procurve-single'
-    #debug_configs_dir = Path(data_folder) / 'procurve-modular'
+    #debug_configs_dir = Path(data_folder) / 'procurve_single'
+    #debug_configs_dir = Path(data_folder) / 'procurve_modular'
 
     debug_configs_dir = Path(data_folder) / 'aruba_6100'
     #debug_configs_dir = Path(data_folder) / 'aruba_6300'
