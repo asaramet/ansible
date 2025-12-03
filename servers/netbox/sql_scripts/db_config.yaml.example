@@ -1,0 +1,26 @@
+# Database Configuration File Example
+#
+# Copy this file to db_config.yaml and update with your credentials
+# IMPORTANT: Set restrictive permissions: chmod 600 db_config.yaml
+# IMPORTANT: Add db_config.yaml to .gitignore to prevent committing secrets
+#
+# Usage in Python:
+#   inv = NetworkInventory(
+#       password_from='config',
+#       config_file='sql_scripts/db_config.yaml'
+#   )
+
+database:
+  host: localhost
+  port: 5432
+  dbname: network_inventory
+  user: network_inventory
+  password: YOUR_PASSWORD_HERE
+
+# Example for remote connection:
+# database:
+#   host: netbox-server.example.com
+#   port: 5432
+#   dbname: network_inventory
+#   user: network_inventory
+#   password: YOUR_PASSWORD_HERE

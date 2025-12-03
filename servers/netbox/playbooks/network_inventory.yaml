@@ -1,0 +1,236 @@
+---
+# Create a netbox_inventory database on a NetBox PostgreSQL server
+#
+# RUN
+# - development server
+#   ansible-playbook playbooks/network_inventory.yaml
+#
+# - production server
+#    ansible-playbook playbooks/network_inventory.yaml -e production=true
+
+- name: Define global variables
+  hosts: localhost
+  gather_facts: false
+  tags: global
+  vars:
+    production: false
+    sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
+    sql_inventory_pass: &sql_inventory_pass "{{ vault_sql_inventory_pass }}" # password for network_inventory database user
+    allowed_network: &allowed_network "{{ vault_allowed_network }}" # Admins network set in vault
+  tasks:
+    - name: Set server 
+      set_fact:
+        server: "{{ 'hs_netbox' if  production else 'local' }}"
+
+    - name: "Running install on: "
+      debug:
+        msg: "{{ server }}"
+
+    - name: "Is it a production server?"
+      debug:
+        msg: "{{ production }}"
+
+- name: Configure PostgreSQL for Remote Connections
+  hosts: "{{ hostvars['localhost']['server'] }}"
+  gather_facts: false
+  become: true
+  become_method: su
+  become_user: postgres
+  vars:
+    # Set the path to the config files based on your Debian/PostgreSQL version
+    pg_conf_path: /etc/postgresql/15/main/postgresql.conf 
+    allowed_network: *allowed_network
+  tasks:
+    # 1. Allow PostgreSQL to listen on all interfaces
+    - name: Set listen_addresses to '*' in postgresql.conf
+      ansible.builtin.lineinfile:
+        path: "{{ pg_conf_path }}"
+        regexp: '^#?listen_addresses ='
+        line: "listen_addresses = '*'"
+        state: present
+      #notify: Restart postgresql
+
+#    # 2. Handle the firewall opening (needs become: true and standard user permissions)
+#    # This task should be run as root/standard become user, NOT 'postgres'
+#    - name: Ensure PostgreSQL port 5432 is open (on production server)
+#      become: true # Re-elevate to root if needed
+#      community.general.ufw:
+#        rule: allow
+#        port: '5432'
+#        proto: tcp
+#        src: "{{ allowed_network }}"
+#      when: production | bool
+
+  handlers:
+    - name: Restart postgresql
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted
+
+- name: Configure PostgreSQL network inventory database
+  hosts: "{{ hostvars['localhost']['server'] }}"
+  gather_facts: false
+  become: true # run as root
+  tags: postgresql
+  become_method: su
+  become_user: postgres # change to postgres user
+  vars:
+    sql_user_pass: *sql_user_pass
+    sql_inventory_pass: *sql_inventory_pass
+    allowed_network: *allowed_network
+    pg_hba_path: /etc/postgresql/15/main/pg_hba.conf
+  tasks:
+    - name: Create a new PostgreSQL database with the name 'network_inventory'
+      community.postgresql.postgresql_db:
+        login_user: postgres
+        name: network_inventory
+        comment: Network Inventory database for manual asset tracking
+
+    - name: Create PostgreSQL group role 'netzadmins'
+      community.postgresql.postgresql_user:
+        login_user: postgres
+        name: netzadmins
+        state: present
+        # This role is a group, not a user, so they cannot log in directly
+        #login: no
+        comment: Group role for network administrators
+
+    - name: Create a new user 'netzadmin' and add it to 'netzadmins' group
+      community.postgresql.postgresql_user:
+        login_user: postgres
+        name: netzadmin
+        password: "{{ sql_inventory_pass }}"
+        comment: Network Inventory database user
+
+    - name: Grant role (group) netzadmins to netzadmin user 
+      community.postgresql.postgresql_membership:
+        login_user: postgres
+        group: netzadmins
+        target_roles:
+          - netzadmin
+        state: present
+
+    - name: Grant all privileges on network_inventory database to netzadmins group
+      community.postgresql.postgresql_privs:
+        login_user: postgres
+        database: network_inventory
+        state: present
+        privs: ALL
+        type: database
+        roles: netzadmins
+
+    - name: Grant all privileges on all tables in network_inventory database
+      community.postgresql.postgresql_privs:
+        login_user: postgres
+        database: network_inventory
+        state: present
+        privs: ALL
+        type: table
+        objs: ALL_IN_SCHEMA
+        schema: public
+        roles: netzadmins
+
+    - name: Grant all privileges on all sequences in network_inventory database
+      community.postgresql.postgresql_privs:
+        login_user: postgres
+        database: network_inventory
+        state: present
+        privs: ALL
+        type: sequence
+        objs: ALL_IN_SCHEMA
+        schema: public
+        roles: netzadmins
+
+    # Allow connections for the new user/database
+    - name: Add pg_hba.conf entry for remote access to netzadmins group
+      community.postgresql.postgresql_pg_hba:
+        dest: "{{ pg_hba_path }}"
+        state: present
+        rules:
+          - contype: host # 'host' means connection over TCP/IP, not using SSL
+            database: network_inventory
+            user: netzadmins
+            address: "{{ allowed_network }}"
+            method: md5
+      #notify: Restart postgresql
+      
+    - name: Create devices table in network_inventory database
+      community.postgresql.postgresql_query:
+        login_user: postgres
+        db: network_inventory
+        query: |
+          CREATE TABLE IF NOT EXISTS devices (
+            id SERIAL PRIMARY KEY,
+            hostname VARCHAR(255) NOT NULL UNIQUE,
+            serial_number VARCHAR(100),
+            inventory_number VARCHAR(100),
+            active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_hostname ON devices(hostname);
+          CREATE INDEX IF NOT EXISTS idx_active ON devices(active);
+
+          COMMENT ON TABLE devices IS 'Manual network device inventory tracking';
+          COMMENT ON COLUMN devices.hostname IS 'Device hostname or FQDN';
+          COMMENT ON COLUMN devices.serial_number IS 'Manufacturer serial number';
+          COMMENT ON COLUMN devices.inventory_number IS 'Internal inventory tracking number';
+          COMMENT ON COLUMN devices.active IS 'Whether device is currently active in network';
+
+- name: Reboot the services
+  hosts: "{{ hostvars['localhost']['server'] }}"
+  gather_facts: false
+  become: true 
+  tags: reboot
+  tasks:
+    - name: Restart the postgresql service
+      service: 
+        name: postgresql
+        state: restarted
+        enabled: yes
+
+#  handlers:
+#    - name: Restart postgresql
+#      ansible.builtin.service:
+#        name: postgresql
+#        state: restarted
+
+#- name: Install and configure the HTTP server
+#  hosts: "{{ hostvars['localhost']['server'] }}"
+#  gather_facts: false
+#  become: true # run as root
+#  tags: http
+#  vars: 
+#    production: false
+#  tasks:
+#    - name: apt install nginx
+#      apt: 
+#        pkg: nginx
+#        state: latest
+#        update_cache: true
+
+#    - name: Copy web ui config file
+#      copy: 
+#        src: "{{ local_src_folder }}/network_inventory.conf" 
+#        dest: /etc/nginx/sites-available/network_inventory
+#        backup: yes
+#        owner: root
+#        mode: 0644
+
+#    - name: Remove default nginx configs
+#      file: 
+#        path: /etc/nginx/sites-enabled/default
+#        state: absent
+    
+#    - name: Link netbox configs to nginx
+#      file: 
+#        src: /etc/nginx/sites-available/netbox 
+#        dest: /etc/nginx/sites-enabled/default
+#        state: link
+
+#    - name: Restart the nginx service
+#      service: 
+#        name: nginx
+#        state: restarted
+#        enabled: yes

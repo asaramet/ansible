@@ -17,7 +17,7 @@
   tasks:
     - name: Set server 
       set_fact:
-        server: "{{ 'hs_netbox' if  production else 'debian' }}"
+        server: "{{ 'hs_netbox' if  production else 'local' }}"
 
     - name: "Running install on: "
       debug:
