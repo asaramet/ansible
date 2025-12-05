@@ -72,7 +72,7 @@
   gather_facts: false
   become: true # run as root
   tags: postgresql
-  become_method: su
+  #become_method: su
   become_user: postgres # change to postgres user
   vars:
     sql_user_pass: *sql_user_pass
@@ -152,7 +152,7 @@
             user: netzadmins
             address: "{{ allowed_network }}"
             method: md5
-      #notify: Restart postgresql
+      notify: Restart postgresql
       
     - name: Create devices table in network_inventory database
       community.postgresql.postgresql_query:
@@ -178,23 +178,24 @@
           COMMENT ON COLUMN devices.inventory_number IS 'Internal inventory tracking number';
           COMMENT ON COLUMN devices.active IS 'Whether device is currently active in network';
 
-- name: Reboot the services
-  hosts: "{{ hostvars['localhost']['server'] }}"
-  gather_facts: false
-  become: true 
-  tags: reboot
-  tasks:
-    - name: Restart the postgresql service
-      service: 
+  handlers:
+    - name: Restart postgresql
+      ansible.builtin.service:
         name: postgresql
         state: restarted
-        enabled: yes
+      become_user: root
 
-#  handlers:
-#    - name: Restart postgresql
-#      ansible.builtin.service:
+#- name: Reboot the services
+#  hosts: "{{ hostvars['localhost']['server'] }}"
+#  gather_facts: false
+#  become: true 
+#  tags: reboot
+#  tasks:
+#    - name: Restart the postgresql service
+#      service: 
 #        name: postgresql
 #        state: restarted
+#        enabled: yes
 
 #- name: Install and configure the HTTP server
 #  hosts: "{{ hostvars['localhost']['server'] }}"

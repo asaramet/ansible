@@ -1,4 +1,9 @@
 --- 
+# Debug variable
+# Examples to run
+# ansible-playbook playbooks/debug.yaml
+# ansible-playbook playbooks/debug.yaml -e production=true
+
 - name: Debugging first play
   hosts: local
   gather_facts: false
@@ -21,4 +26,43 @@
     - name: Display netbox version 
       ansible.builtin.debug:
         msg: "{{ version }}"
+
+- name: Define global variables
+  hosts: localhost
+  gather_facts: false
+  tags: global
+  vars:
+    production: false
+    sql_inventory_pass: &sql_inventory_pass "{{ vault_sql_inventory_pass }}" # password for network_inventory database user
+    allowed_network: &allowed_network "{{ vault_allowed_network }}" # Admins network set in vault
+  tasks:
+    - name: Set server 
+      set_fact:
+        server: "{{ 'hs_netbox' if  production else 'local' }}"
+
+    - name: "Running install on: "
+      debug:
+        msg: "{{ server }}"
+
+    - name: "Is it a production server?"
+      debug:
+        msg: "{{ production }}"
+
+
+- name: Configure PostgreSQL for Remote Connections
+  hosts: "{{ hostvars['localhost']['server'] }}"
+  gather_facts: false
+  become: true
+  become_method: su
+  become_user: postgres
+  vars:
+    allowed_network: *allowed_network
+    sql_inventory_pass: *sql_inventory_pass
+  tasks:
+    - name: "SQL inventory password"
+      debug:
+        msg: "{{ sql_inventory_pass }}"
+    - name: "Allowed networks"
+      debug:
+        msg: "{{ allowed_network }}"
 ... 
