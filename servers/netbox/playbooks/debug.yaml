@@ -49,12 +49,9 @@
         msg: "{{ production }}"
 
 
-- name: Configure PostgreSQL for Remote Connections
+- name: Debug PostgreSQL variables
   hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
-  become: true
-  become_method: su
-  become_user: postgres
   vars:
     allowed_network: *allowed_network
     sql_inventory_pass: *sql_inventory_pass
@@ -65,4 +62,20 @@
     - name: "Allowed networks"
       debug:
         msg: "{{ allowed_network }}"
+    
+- name: Get some remote server variables
+  hosts: "{{ hostvars['localhost']['server'] }}"
+  gather_facts: false
+  tasks:
+    - name: Read /etc/os-release to get Debian version codename
+      shell: ". /etc/os-release && echo $VERSION_CODENAME"
+      register: version_codename
+
+    - name: Save Debian codename to a variable
+      set_fact:
+        debian_codename: "{{ version_codename.stdout }}"
+
+    - name: Show what we captured
+      debug:
+        msg: "Debian release is {{ debian_codename }}"
 ... 
