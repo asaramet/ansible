@@ -129,6 +129,13 @@
         src: "{{ inventory_dir }}/pip_packages/packages"
         dest: /opt
 
+    - name: Ensure virtual environment exists
+      pip:
+        name: pip
+        virtualenv: /opt/netbox/venv/
+        virtualenv_python: python3
+        state: present
+
     - name: Install apps with pip from the local directory
       pip:
         requirements: /opt/netbox/requirements.txt
@@ -137,7 +144,7 @@
 
     - name: Create the NetBox documentation
       tags: mkdocs
-      shell: source venv/bin/activate && mkdocs build
+      shell: source /opt/netbox/venv/bin/activate && mkdocs build
       args:
         executable: /usr/bin/bash
         chdir: /opt/netbox

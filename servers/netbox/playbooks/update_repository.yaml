@@ -43,6 +43,7 @@
         path: "{{ requirements_txt }}"
         block: |
           setuptools
+          setuptools==80.3.1
           wheel
           netbox-documents
           netbox-plugin-dns
@@ -58,7 +59,7 @@
 
     - name: Create a new virtual environment
       ansible.builtin.shell:
-        cmd: "python3.11 -m venv {{ venv_path }}"
+        cmd: "python3.13 -m venv {{ venv_path }}"
         executable: /usr/bin/bash
 
     - name: Download required packages

@@ -112,6 +112,28 @@ Development server, i.e `debian`. For production server, add `-e production=true
     ansible-playbook playbooks/restore_sql.yaml - e from_local=true
     ```
 
+## Install and configure pgAdmin on the same server
+
+Install pgAdmin packages:
+
+```bash
+ansible-playbook playbooks/pgadmin_install.yaml # for the local, dev server
+ansible-playbook playbooks/pgadmin_install.yaml -e production=true
+```
+
+Configure and init pgAdmin service, database and admin user
+
+You will have to init the database, with the admin user credentials, manually:
+
+```bash
+sudo -u www-data HOME=/tmp /usr/pgadmin4/venv/bin/python3 /usr/pgadmin4/web/setup.py setup-db
+```
+
+```bash
+ansible-playbook playbooks/pgadmin_config.yaml # for the local, dev server
+ansible-playbook playbooks/pgadmin_config.yaml -e production=true
+```
+
 ## Update NetBox
 
 1. Download a new release and new Python packages locally
