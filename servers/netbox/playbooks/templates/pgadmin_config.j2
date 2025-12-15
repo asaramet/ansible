@@ -1,0 +1,27 @@
+import os
+
+# Data directory
+DATA_DIR = '{{ pgadmin_install_dir }}/data'
+LOG_FILE = '{{ pgadmin_install_dir }}/logs/pgadmin4.log'
+SQLITE_PATH = os.path.join(DATA_DIR, 'pgadmin4.db')
+SESSION_DB_PATH = os.path.join(DATA_DIR, 'sessions')
+STORAGE_DIR = os.path.join(DATA_DIR, 'storage')
+
+# Server settings
+DEFAULT_SERVER = '0.0.0.0'
+DEFAULT_SERVER_PORT = {{ pgadmin_port }}
+
+# Sub-path configuration
+SCRIPT_NAME = '{{ pgadmin_subpath }}'
+
+# Security
+CSRF_ENABLED = True
+SESSION_COOKIE_NAME = 'pgadmin4_session'
+
+# Logging
+CONSOLE_LOG_LEVEL = 30
+
+# Additional security settings
+SESSION_COOKIE_SECURE = {{ 'True' if production else 'False' }}
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'

@@ -1,0 +1,18 @@
+[Unit]
+Description=pgAdmin4
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+Environment="PYTHONPATH=/usr/pgadmin4/web"
+WorkingDirectory=/usr/pgadmin4/web
+ExecStart={{ python_exec }} /usr/pgadmin4/web/pgAdmin4.py {{ pgadmin_install_dir }}/config_local.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

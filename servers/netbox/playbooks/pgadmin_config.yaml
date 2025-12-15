@@ -14,15 +14,20 @@
   tags: global
   vars: 
     production: false
-    pgadmin_email: &pgadmin_email "{{ vault_pgadmin_email }}" 
-    pgadmin_password: &pgadmin_password "{{ vault_pgadmin_password }}"
+    #pgadmin_email: &pgadmin_email "{{ vault_pgadmin_email | default(omit) }}" 
+    #pgadmin_password: &pgadmin_password "{{ vault_pgadmin_password | default(omit) }}"
 
   tasks:
+    - name: Set production flag from environment if not defined
+      set_fact:
+        production: "{{ production | default(false) | bool }}"
+      when: production is not defined
+
     - name: Set server 
       set_fact:
-        server: "{{ 'hs_netbox' if  production else 'local' }}"
+        server: "{{ 'hs_netbox' if production else 'local' }}"
 
-    - name: "Running install on: "
+    - name: "Running install on: {{ server }}"
       debug:
         msg: "{{ server }}"
 
@@ -33,165 +38,130 @@
 - name: Configure pgAdmin 4 on Nginx sub-path
   hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
-  become: true # run as root
+  become: true
   tags: pgadmin_config
   vars: 
     production: false
     pgadmin_install_dir: /opt/pgadmin
     pgadmin_subpath: /pgadmin
-    pgadmin_admin_email: *pgadmin_email 
-    pgadmin_admin_password: *pgadmin_password 
     pgadmin_port: 5050
     nginx_domain: netbox
+    pgadmin_venv_path: /usr/pgadmin4/venv/bin/python3
 
   tasks:
-    - name: Create pgAdmin installation directory and sub-folders
-      ansible.builtin.file: 
-        path: "{{ item }}"
+    - name: Create pgAdmin installation directories
+      ansible.builtin.file:
+        path: "{{ item.path }}"
         state: directory
-        mode: '0755'
+        mode: "{{ item.mode | default('0755') }}"
         owner: www-data
         group: www-data
       loop:
-        - "{{ pgadmin_install_dir }}"
-        - "{{ pgadmin_install_dir }}/logs"
-
-    - name: Create pgAdmin data directory 
-      ansible.builtin.file: 
-        path: "{{ pgadmin_install_dir }}/data"
-        state: directory
-        mode: '0700'
-        owner: www-data
-        group: www-data
-
-    - name: Find pgAdmin Python virt
-      ansible.builtin.stat:
-        path: /usr/pgadmin4/venv/bin/python3
-      register: pgadmin_venv
+        - { path: "{{ pgadmin_install_dir }}", mode: '0755' }
+        - { path: "{{ pgadmin_install_dir }}/logs", mode: '0755' }
+        - { path: "{{ pgadmin_install_dir }}/data", mode: '0700' }
+      loop_control:
+        label: "{{ item.path }}"
 
     - name: Set Python executable path
       ansible.builtin.set_fact:
-        python_exec: "{{ '/usr/pgadmin4/venv/bin/python3' if pgadmin_venv.stat.exists else '/usr/bin/python3' }}"
+        python_exec: "{{ pgadmin_venv_path }}"
+      changed_when: false
 
     - name: Create pgAdmin configuration file
-      ansible.builtin.copy:
+      ansible.builtin.template:
         dest: "{{ pgadmin_install_dir }}/config_local.py"
         owner: www-data
         group: www-data
         mode: '0600'
-        content: |
-          import os
-          
-          # Data directory
-          DATA_DIR = '{{ pgadmin_install_dir }}/data'
-          LOG_FILE = '{{ pgadmin_install_dir }}/logs/pgadmin4.log'
-          SQLITE_PATH = os.path.join(DATA_DIR, 'pgadmin4.db')
-          SESSION_DB_PATH = os.path.join(DATA_DIR, 'sessions')
-          STORAGE_DIR = os.path.join(DATA_DIR, 'storage')
-          
-          # Server settings
-          DEFAULT_SERVER = '0.0.0.0'
-          DEFAULT_SERVER_PORT = {{ pgadmin_port }}
-          
-          # Sub-path configuration
-          SCRIPT_NAME = '{{ pgadmin_subpath }}'
-          
-          # Security
-          CSRF_ENABLED = True
-          SESSION_COOKIE_NAME = 'pgadmin4_session'
-          
-          # Disable console security for production
-          CONSOLE_LOG_LEVEL = 30
+        src: templates/pgadmin_config.j2
+      notify: restart pgadmin4
 
-    - name: Create symbolic link for config
+    - name: Create symbolic link for config (idempotent)
       ansible.builtin.file:
         src: "{{ pgadmin_install_dir }}/config_local.py"
         dest: /usr/pgadmin4/web/config_local.py
         state: link
         owner: www-data
         group: www-data
+        force: yes
 
-    - name: Create pgAdmin setup script
-      ansible.builtin.copy:
-        dest: "{{ pgadmin_install_dir }}/setup_pgadmin.py"
-        owner: www-data
-        group: www-data
-        mode: '0700'
-        content: |
-          #!/usr/bin/env python3
-          import os
-          import sys
-          
-          # Set config path
-          os.environ['PGADMIN_SETUP_EMAIL'] = '{{ pgadmin_admin_email }}'
-          os.environ['PGADMIN_SETUP_PASSWORD'] = '{{ pgadmin_admin_password }}'
-          
-          # Import pgAdmin setup
-          sys.path.insert(0, '/usr/pgadmin4/web')
-          from setup import create_app_data_directory, create_user
-          
-          if __name__ == '__main__':
-              create_app_data_directory('{{ pgadmin_install_dir }}/data')
-              create_user(
-                  email='{{ pgadmin_admin_email }}',
-                  password='{{ pgadmin_admin_password }}',
-                  admin=True
-              )
-              print("pgAdmin setup complete")
+#    - name: Ensure www-data home directory exists and has proper permissions
+#      ansible.builtin.file:
+#        path: /var/www
+#        state: directory
+#        owner: www-data
+#        group: www-data
+#        mode: '0755'
+#      become: true
 
-    - name: Run pgAdmin setup to create admin user
-      ansible.builtin.shell: |
-        {{ python_exec }} setup.py \
-          --user '{{ pgadmin_admin_email }}' \
-          --password '{{ pgadmin_admin_password }}'
-      args:
-        chdir: /usr/pgadmin4/web
-        creates: "{{ pgadmin_install_dir }}/data/pgadmin4.db"
-      become_user: www-data
-      environment:
-        HOME: /tmp
-        PYTHONPATH: /usr/pgadmin4/web
+#    - name: Install pexpect in the virtual environment
+#      ansible.builtin.pip:
+#        name: pexpect
+#        executable: "{{ pgadmin_venv_path }}"
+#        state: present
+#      become: true
+#      become_user: www-data
+#      environment:
+#        HOME: /var/www
+#      when: pgadmin_venv.stat.exists
 
-    - name: Create pgAdmin systemd service
-      ansible.builtin.copy:
+#    - name: Initialize pgAdmin database
+#      ansible.builtin.expect: 
+#        command: "{{ python_exec }} setup.py setup-db"
+#        chdir: /usr/pgadmin4/web
+#        responses:
+#          'Email address:': "{{ pgadmin_admin_email }}"
+#          'Password:': "{{ pgadmin_admin_password }}"
+#          'Retype password:': "{{ pgadmin_admin_password }}"
+#        timeout: 30
+#      become_user: www-data
+#      environment:
+#        HOME: /tmp
+#        PYTHONPATH: /usr/pgadmin4/web
+#      #no_log: true
+      #when: not pgadmin_db.stat exists
+
+    - name: Create pgAdmin systemd service (idempotent)
+      ansible.builtin.template:
         dest: /etc/systemd/system/pgadmin4.service
         mode: '0644'
-        content: |
-          [Unit]
-          Description=pgAdmin4
-          After=network.target
-          
-          [Service]
-          Type=simple
-          User=www-data
-          Group=www-data
-          Environment="PYTHONPATH=/usr/pgadmin4/web"
-          WorkingDirectory=/usr/pgadmin4/web
-          ExecStart={{ python_exec }} /usr/pgadmin4/web/pgAdmin4.py {{ pgadmin_install_dir }}/config_local.py
-          Restart=on-failure
-          RestartSec=10
-          StandardOutput=journal
-          StandardError=journal
-          
-          [Install]
-          WantedBy=multi-user.target
+        src: templates/pgadmin4.service.j2
       notify: restart pgadmin4
 
-    - name: Copy nginx config file
-      copy: 
-        src: "{{ local_src_folder }}/nginx.conf" 
+    - name: Ensure nginx configuration is present
+      ansible.builtin.template:
+        src: "{{ local_src_folder }}/nginx.conf"
         dest: /etc/nginx/sites-available/netbox
         backup: yes
         owner: root
         mode: 0644
       notify: reload nginx
+      when: local_src_folder is defined
 
-    - name: Enable and start pgAdmin4 service
+    - name: Ensure pgAdmin4 service is enabled and running
       ansible.builtin.systemd:
         name: pgadmin4
         enabled: true
         state: started
         daemon_reload: true
+      register: pgadmin_service_status
+      until: pgadmin_service_status is success
+      retries: 3
+      delay: 5
+      no_log: true
+
+    - name: Verify pgAdmin4 is listening on configured port
+      ansible.builtin.wait_for:
+        port: "{{ pgadmin_port }}"
+        timeout: 30
+        delay: 5
+      when: pgadmin_service_status is changed
+
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: "pgAdmin4 has been successfully configured and is running on port {{ pgadmin_port }}"
+      when: not production
 
   handlers:
     - name: restart pgadmin4
@@ -199,8 +169,16 @@
         name: pgadmin4
         state: restarted
         daemon_reload: true
+      listen: "restart pgadmin services"
+      no_log: true
 
     - name: reload nginx
       ansible.builtin.systemd:
         name: nginx
         state: reloaded
+      listen: "restart pgadmin services"
+      when: nginx_domain is defined
+
+    - name: verify pgadmin service
+      ansible.builtin.service_facts:
+      listen: "restart pgadmin services"
