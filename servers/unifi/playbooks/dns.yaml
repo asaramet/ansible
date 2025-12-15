@@ -1,0 +1,36 @@
+---
+- name: Update DNS resolver configuration
+  hosts: hs_unifi # You can override this with -l yourhost
+  become: true
+  gather_facts: false
+
+  vars:
+    dns_nameservers:
+      - 134.108.34.5
+      - 134.108.34.6
+    dns_search_domains:
+      - hs-esslingen.de
+
+  tasks:
+    - name: Backup existing resolv.conf
+      ansible.builtin.copy:
+        src: /etc/resolv.conf
+        dest: /etc/resolv.conf.backup
+        remote_src: true
+        backup: yes
+
+    - name: Update resolv.conf with new DNS settings
+      ansible.builtin.template:
+        src: "{{ inventory_dir }}/j2/dns.j2"
+        dest: /etc/resolv.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Verify new resolv.conf content
+      ansible.builtin.command: cat /etc/resolv.conf
+      register: resolv_contents
+
+    - name: Show resolv.conf
+      ansible.builtin.debug:
+        var: resolv_contents.stdout

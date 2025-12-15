@@ -2,7 +2,7 @@
 
 - `hs_netbox` - Production NetBox Server
 - `hs_checkmk` - Production Checkmk Server
-- `debian` - Development local server
+- `local` - Development local server
 
 ## Clean install requirements
 
