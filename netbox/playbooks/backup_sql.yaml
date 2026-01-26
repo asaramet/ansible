@@ -72,12 +72,12 @@
       community.postgresql.postgresql_db:
         name: netbox
         state: dump
-        target: "{{ dump_folder }}/netbox-{{ ansible_date_time.date }}.sql.gz"
+        target: "{{ dump_folder }}/netbox-{{ ansible_facts.date_time.date }}.sql.gz"
         dump_extra_args: --exclude-table-data extras_cachedvalue --exclude-table-data extras_objectchange
 
     - name: Backup remote data to "{{ local_backup_folder }}"
       fetch:
-        src: "{{ dump_folder }}/netbox-{{ ansible_date_time.date }}.sql.gz"
+        src: "{{ dump_folder }}/netbox-{{ ansible_facts.date_time.date }}.sql.gz"
         dest: "{{ local_backup_folder }}/"
         flat: true
 
@@ -96,7 +96,7 @@
         owner: asaramet
         group: asaramet
       loop: 
-        - "netbox-{{ ansible_date_time.date }}.sql.gz"
+        - "netbox-{{ ansible_facts.date_time.date }}.sql.gz"
         - "localdata.tgz"
       when: backup_to_99
 

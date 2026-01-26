@@ -4,11 +4,11 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
-Environment="PYTHONPATH=/usr/pgadmin4/web"
-WorkingDirectory=/usr/pgadmin4/web
-ExecStart={{ python_exec }} /usr/pgadmin4/web/pgAdmin4.py {{ pgadmin_install_dir }}/config_local.py
+User={{ pgadmin_user }}
+Group={{ pgadmin_user }}
+WorkingDirectory={{ pgadmin_workdir }}
+Environment="PYTHONPATH={{ pgadmin_workdir }}"
+ExecStart={{ pgadmin_venv_path }} {{ pgadmin_workdir }}/pgAdmin4.py
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal

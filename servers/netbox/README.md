@@ -46,12 +46,12 @@ The server is based on **Debian 12**, which comes with **Python 3.11.2** by defa
 
 To address this, we use **`pyenv`** to manage Python versions. This allows us to:  
 
-1. Install **Python 3.11** within a controlled environment.  
+1. Install **Python 3.13** within a controlled environment.  
 
     ```bash
     pyenv install -h 
     pyenv install -l # List all available versions to install
-    pyenv install 3.11.2
+    pyenv install 3.13
 
     pyenv versions # Lists all versions available on the system
     ```
@@ -65,10 +65,10 @@ To address this, we use **`pyenv`** to manage Python versions. This allows us to
 pyenv versions  
 
 # Set a specific Python version for the current shell session
-pyenv shell 3.11.2  
+pyenv shell 3.13
 
 # Set a specific Python version for the current project directory (creates a .python-version file)
-pyenv local 3.11.2  
+pyenv local 3.13
 ```
 
 By using **`pyenv local`**, the selected Python version will be automatically activated whenever you enter the designated project directory.  

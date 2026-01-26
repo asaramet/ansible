@@ -47,6 +47,10 @@
     pgadmin_port: 5050
     nginx_domain: netbox
     pgadmin_venv_path: /usr/pgadmin4/venv/bin/python3
+    pgadmin_user: www-data
+    pgadmin_workdir: /usr/pgadmin4/web
+    pgadmin_email: "{{ vault_pgadmin_email | default(omit) }}" 
+    pgadmin_password: "{{ vault_pgadmin_password | default(omit) }}"
 
   tasks:
     - name: Create pgAdmin installation directories
@@ -54,8 +58,8 @@
         path: "{{ item.path }}"
         state: directory
         mode: "{{ item.mode | default('0755') }}"
-        owner: www-data
-        group: www-data
+        owner: "{{ pgadmin_user }}"
+        group: "{{ pgadmin_user }}"
       loop:
         - { path: "{{ pgadmin_install_dir }}", mode: '0755' }
         - { path: "{{ pgadmin_install_dir }}/logs", mode: '0755' }
@@ -71,8 +75,8 @@
     - name: Create pgAdmin configuration file
       ansible.builtin.template:
         dest: "{{ pgadmin_install_dir }}/config_local.py"
-        owner: www-data
-        group: www-data
+        owner: "{{ pgadmin_user }}"
+        group: "{{ pgadmin_user }}"
         mode: '0600'
         src: templates/pgadmin_config.j2
       notify: restart pgadmin4
@@ -82,45 +86,29 @@
         src: "{{ pgadmin_install_dir }}/config_local.py"
         dest: /usr/pgadmin4/web/config_local.py
         state: link
-        owner: www-data
-        group: www-data
+        owner: "{{ pgadmin_user }}"
+        group: "{{ pgadmin_user }}"
         force: yes
 
-#    - name: Ensure www-data home directory exists and has proper permissions
-#      ansible.builtin.file:
-#        path: /var/www
-#        state: directory
-#        owner: www-data
-#        group: www-data
-#        mode: '0755'
-#      become: true
+    - name: Check if pgAdmin database exists 
+      stat: 
+        path: "{{ pgadmin_install_dir }}/data/pgadmin4.db"
+      register: pgadmin_db 
 
-#    - name: Install pexpect in the virtual environment
-#      ansible.builtin.pip:
-#        name: pexpect
-#        executable: "{{ pgadmin_venv_path }}"
-#        state: present
-#      become: true
-#      become_user: www-data
-#      environment:
-#        HOME: /var/www
-#      when: pgadmin_venv.stat.exists
-
-#    - name: Initialize pgAdmin database
-#      ansible.builtin.expect: 
-#        command: "{{ python_exec }} setup.py setup-db"
-#        chdir: /usr/pgadmin4/web
-#        responses:
-#          'Email address:': "{{ pgadmin_admin_email }}"
-#          'Password:': "{{ pgadmin_admin_password }}"
-#          'Retype password:': "{{ pgadmin_admin_password }}"
-#        timeout: 30
-#      become_user: www-data
-#      environment:
-#        HOME: /tmp
-#        PYTHONPATH: /usr/pgadmin4/web
-#      #no_log: true
-      #when: not pgadmin_db.stat exists
+    - name: Initialize pgAdmin database
+      ansible.builtin.expect: 
+        command: "{{ python_exec }} setup.py setup-db"
+        chdir: /usr/pgadmin4/web
+        responses:
+          'Email address:': "{{ pgadmin_email }}"
+          'Password:': "{{ pgadmin_password }}"
+          'Retype password:': "{{ pgadmin_password }}"
+        timeout: 30
+      become_user: "{{ pgadmin_user }}"
+      environment:
+        HOME: /tmp
+        PYTHONPATH: /usr/pgadmin4/web
+      when: not pgadmin_db.stat.exists
 
     - name: Create pgAdmin systemd service (idempotent)
       ansible.builtin.template:

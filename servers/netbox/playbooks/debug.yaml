@@ -78,4 +78,48 @@
     - name: Show what we captured
       debug:
         msg: "Debian release is {{ debian_codename }}"
-... 
+      
+- name: Debug deprecated variables
+  hosts: "{{ hostvars['localhost']['server'] }}"
+  gather_facts: true
+  tasks: 
+    - name: Depricated 'ansible_' vars
+      debug:
+        msg: "ansible_date_time.date: {{ ansible_date_time.date }}"
+
+    - name: ansible_facts.date_time.date variable
+      debug:
+        msg: "{{ ansible_facts.date_time.date }}"
+
+    - name: ansible_env.PATH variable
+      debug:
+        msg: "{{ ansible_facts.env.PATH }}"
+
+- name: Run only when on development server 
+  hosts: "{{ hostvars['localhost']['server'] }}"
+  gather_facts: false
+  vars:
+    production: false
+  pre_tasks:
+    - name: Don't run play on a production server
+      meta: end_play
+      when: production | bool
+  tasks:
+    - name: Development server
+      debug:
+        msg: "Server {{ hostvars.localhost.server }}"
+
+- name: Run only when on production server 
+  hosts: "{{ hostvars['localhost']['server'] }}"
+  gather_facts: false
+  vars:
+    production: false
+  pre_tasks:
+    - name: Don't run play not on a production server
+      meta: end_play
+      when: not production | bool
+  tasks:
+    - name: Production server
+      debug:
+        msg: "Server {{ hostvars.localhost.server }}"
+      when: production | bool
