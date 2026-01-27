@@ -15,6 +15,11 @@
   vars: 
     production: false
   tasks:
+    - name: Set production flag from environment if not defined
+      set_fact:
+        production: "{{ production | default(false) | bool }}"
+      when: production is not defined
+
     - name: Set server 
       set_fact:
         server: "{{ 'hs_netbox' if  production else 'local' }}"
@@ -72,6 +77,84 @@
         state: latest
         update_cache: true
 
+- name: Download pgAdmin4-web packages to a local temp folder
+  hosts: local
+  gather_facts: false
+  become: true # run as root
+  tags: pgadmin
+  vars: 
+    production: false
+    packages_dir: &packages_dir /tmp/pgadmin_packages
+    archive_name: &archive_name pgadmin4_packages.tar.gz
+  pre_tasks:
+    - name: Don't run the play for the development server
+      meta: end_play
+      when: not production | bool
+  tasks:
+  # On development server
+  - name: Download pgadmin4-web and all dependencies on the development server
+    shell: |
+      mkdir -p /tmp/pgadmin_packages
+      cd /tmp/pgadmin_packages
+      apt-get download pgadmin4-web
+      apt-cache depends --recurse --no-recommends --no-suggests --no-conflicts --no-breaks --no-replaces --no-enhances pgadmin4-web | grep "^\w" | xargs apt-get download
+
+  - name: Crate archive of downloaded packages
+    archive: 
+      path: "{{ packages_dir }}/*.deb"
+      dest: "{{ packages_dir }}/{{ archive_name }}"
+      format: gz
+
+  - name: Fetch archived directory to tmp folder on the localhost 
+    synchronize:
+      src: "{{ packages_dir }}/{{ archive_name }}"
+      dest: "/tmp/{{ archive_name }}"
+      mode: pull
+    become: false
+
+- name: Install pgAdmin 4 on the production server
+  hosts: hs_netbox
+  gather_facts: false
+  become: true # run as root
+  tags: pgadmin
+  vars: 
+    production: false
+    packages_dir: *packages_dir
+    archive_name: *archive_name
+  pre_tasks:
+    - name: Don't run the play for the development server
+      meta: end_play
+      when: not production | bool
+  tasks:
+    - name: Copy packages to production
+      copy: 
+        src: "/tmp/{{ archive_name }}"
+        dest: "/tmp/{{ archive_name }}"
+
+    - name: Create packages folder
+      file:
+        path: "{{ packages_dir }}"
+        state: directory
+
+    - name: Extract packages
+      unarchive:
+        src: "/tmp/{{ archive_name }}"
+        dest: "{{ packages_dir }}"
+        remote_src: yes
+
+    - name: Install deb packages
+      tags: install_deb
+      shell: "apt install -y {{ packages_dir }}/*.deb"
+      environment: 
+        DEBIAN_FRONTEND: noninteractive
+
+- name: Stop the apache service
+  hosts: "{{ hostvars['localhost']['server'] }}"
+  gather_facts: false
+  become: true
+  vars: 
+    production: false
+  tasks:
     - name: Stop the Apache2 service
       ansible.builtin.service:
         name: apache2
