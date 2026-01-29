@@ -14,9 +14,6 @@
   tags: global
   vars: 
     production: false
-    #pgadmin_email: &pgadmin_email "{{ vault_pgadmin_email | default(omit) }}" 
-    #pgadmin_password: &pgadmin_password "{{ vault_pgadmin_password | default(omit) }}"
-
   tasks:
     - name: Set production flag from environment if not defined
       set_fact:
@@ -47,7 +44,8 @@
     pgadmin_port: 5050
     nginx_domain: netbox
     pgadmin_venv_path: /usr/pgadmin4/venv/bin/python3
-    pgadmin_user: www-data
+    #pgadmin_user: www-data
+    pgadmin_user: postgres
     pgadmin_workdir: /usr/pgadmin4/web
     pgadmin_email: "{{ vault_pgadmin_email | default(omit) }}" 
     pgadmin_password: "{{ vault_pgadmin_password | default(omit) }}"

@@ -34,7 +34,11 @@ Packages:
 
 - `backup_sql.yaml` - dump the Postgresql database and back it up to local host.
 - `create_admin.yaml` - create a Django superuser on the remote server
+- `debug.yaml` - Some debugging and testing
+- `deploy_cert.yaml` - Deploy a TTL/SSL server certificate
 - `install.yaml` - install the required apps and start NetBox on the server
+- `pgadmin_config.yaml` - Configure installed pgAdmin 4 web server
+- `pgadmin_install.yaml` - Install pgAdmin 4 web server
 - `plugins.yaml` - install NetBox plugins on the remote server. You should then update the "PLUGINS" keyword in `configuration.py` and update NetBox by running the `install.yaml` playbook with `reboot: true` option.
 - `restore_sql.yaml` - Restore PostgreSQL database from a backup dump file and archived media.
 - `update_packages.yaml` - Update NetBox version and required Python packages locally.
