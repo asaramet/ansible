@@ -14,9 +14,9 @@
   tags: global
   vars:
     production: false
-    sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
-    sql_inventory_pass: &sql_inventory_pass "{{ vault_sql_inventory_pass }}" # password for network_inventory database user
-    allowed_network: &allowed_network "{{ vault_allowed_network }}" # Admins network set in vault
+    #sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
+    #sql_inventory_pass: &sql_inventory_pass "{{ vault_sql_inventory_pass }}" # password for network_inventory database user
+    #allowed_network: &allowed_network "{{ vault_allowed_network }}" # Admins network set in vault
   tasks:
     - name: Set server 
       set_fact:
@@ -39,7 +39,7 @@
   vars:
     # Set the path to the config files based on your Debian/PostgreSQL version
     pg_conf_path: /etc/postgresql/15/main/postgresql.conf 
-    allowed_network: *allowed_network
+    #allowed_network: *allowed_network
   tasks:
     # 1. Allow PostgreSQL to listen on all interfaces
     - name: Set listen_addresses to '*' in postgresql.conf
@@ -75,9 +75,9 @@
   #become_method: su
   become_user: postgres # change to postgres user
   vars:
-    sql_user_pass: *sql_user_pass
-    sql_inventory_pass: *sql_inventory_pass
-    allowed_network: *allowed_network
+    sql_user_pass: "{{ vault_sql_user_pass }}"
+    sql_inventory_pass: "{{ vault_sql_inventory_pass }}"
+    allowed_network: "{{ vault_allowed_network }}"
     pg_hba_path: /etc/postgresql/15/main/pg_hba.conf
   tasks:
     - name: Create a new PostgreSQL database with the name 'network_inventory'

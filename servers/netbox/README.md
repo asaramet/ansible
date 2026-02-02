@@ -37,6 +37,7 @@ Packages:
 - `debug.yaml` - Some debugging and testing
 - `deploy_cert.yaml` - Deploy a TTL/SSL server certificate
 - `install.yaml` - install the required apps and start NetBox on the server
+- `network_inventory.yaml` - create the NetBox inventory database used for managing manually inserted data
 - `pgadmin_config.yaml` - Configure installed pgAdmin 4 web server
 - `pgadmin_install.yaml` - Install pgAdmin 4 web server
 - `plugins.yaml` - install NetBox plugins on the remote server. You should then update the "PLUGINS" keyword in `configuration.py` and update NetBox by running the `install.yaml` playbook with `reboot: true` option.

@@ -17,18 +17,16 @@
   hosts: localhost
   gather_facts: false
   vars: 
-    dump_folder: &dump_folder "/opt/db_dumps"
-    dump_file_date: &dump_file_date 2025-04-15
-
-    from_local: &from_local false
-    #from_local: &from_local true
-
     production: false
+    dump_folder: &dump_folder "/opt/db_dumps"
+    dump_file_date: &dump_file_date 2026-02-02
 
+    #from_local: &from_local false
+    from_local: &from_local true
   tasks:
     - name: Set server 
       set_fact:
-        server: "{{ 'hs_netbox' if  production else 'debian' }}"
+        server: "{{ 'hs_netbox' if  production else 'local' }}"
 
     - name: "Running install on: "
       debug:
@@ -63,7 +61,7 @@
         state: directory
         owner: postgres
         group: postgres
-      when: from_local
+      when: from_local | bool
 
     - name: Copy local dump file to the remote "{{ dump_folder }}"
       copy:
@@ -71,7 +69,7 @@
         dest: "{{ dump_folder }}/"
         owner: postgres
         group: postgres
-      when: from_local
+      when: from_local | bool
 
 - name: Restore PostgreSQL database from a dump file
   hosts: "{{ hostvars['localhost']['server'] }}"
@@ -112,14 +110,14 @@
       unarchive:
         src: "{{ archived_data }}"
         dest: /opt
-      when: from_local
+      when: from_local | bool
 
     - name: Restore local data from a remote backup
       unarchive:
         src: /opt/db_dumps/localdata.tgz
         dest: /opt
         remote_src: true
-      when: not from_local
+      when: not from_local | bool
 
 - name: Start the services
   hosts: "{{ hostvars['localhost']['server'] }}"

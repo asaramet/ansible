@@ -55,7 +55,7 @@
         - libxml2-dev 
         - libxslt1-dev 
         - libffi-dev 
-        - libpq-dev 
+        #- libpq-dev 
         - libssl-dev 
         - zlib1g-dev
     
