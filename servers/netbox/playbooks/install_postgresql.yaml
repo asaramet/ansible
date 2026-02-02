@@ -1,0 +1,74 @@
+---
+# Install / update PostgreSQL for NetBox on a Debian Linux server
+#
+# RUN
+# - development server
+#   ansible-playbook playbooks/install_postgresql.yaml
+#
+# - production server
+#    ansible-playbook playbooks/install_postgresql.yaml -e production=true
+
+- name: Define global variables
+  hosts: localhost
+  gather_facts: false
+  tags: global
+  vars: 
+    production: false
+    sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
+    postgresql_version: &postgresql_version "17"
+
+  tasks:
+    - name: Set server 
+      set_fact:
+        server: "{{ 'hs_netbox' if  production else 'local' }}"
+
+    - name: "Running install on: "
+      debug:
+        msg: "{{ server }}"
+
+    - name: "Is it a production server?"
+      debug:
+        msg: "{{ production }}"
+
+- name: Configure PostgreSQL on Debian
+  hosts: "{{ hostvars['localhost']['server'] }}"
+  gather_facts: false
+  become: true # run as root
+  tags: postgresql
+  become_method: su
+  vars:
+    sql_user_pass: *sql_user_pass
+    postgresql_version: *postgresql_version 
+  tasks: 
+    - name: Install PostgreSQL
+      ansible.builtin.apt:
+        name: 
+          - postgresql
+        state: present
+        update_cache: true 
+
+    - name: Ensure PostgreSQL is started and enabled
+      ansible.builtin.systemd:
+        name: postgresql
+        state: started
+        enabled: true
+
+    - name: Ensure PostgreSQL 17 cluster exists
+      ansible.builtin.command:
+        cmd: pg_createcluster 17 main --start
+        creates: /etc/postgresql/17/main/postgresql.conf
+
+    - name: Create a new PostgreSQL database with the name 'netbox'
+      community.postgresql.postgresql_db:
+        name: netbox
+        comment: NetBox database
+      become_user: postgres # change to postgres user
+        
+    - name: Create a new user 'netbox' in the netbox database
+      community.postgresql.postgresql_user:
+        db: netbox
+        name: netbox
+        password: "{{ sql_user_pass }}"
+        role_attr_flags: SUPERUSER
+        comment: NetBox as a user
+      become_user: postgres # change to postgres user

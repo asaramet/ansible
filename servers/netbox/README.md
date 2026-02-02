@@ -36,6 +36,7 @@ Packages:
 - `create_admin.yaml` - create a Django superuser on the remote server
 - `debug.yaml` - Some debugging and testing
 - `deploy_cert.yaml` - Deploy a TTL/SSL server certificate
+- `install_postgresql.yaml` - install and init PostgreSQL on the server
 - `install.yaml` - install the required apps and start NetBox on the server
 - `network_inventory.yaml` - create the NetBox inventory database used for managing manually inserted data
 - `pgadmin_config.yaml` - Configure installed pgAdmin 4 web server
@@ -138,6 +139,89 @@ sudo -u www-data HOME=/tmp /usr/pgadmin4/venv/bin/python3 /usr/pgadmin4/web/setu
 ansible-playbook playbooks/pgadmin_config.yaml # for the local, dev server
 ansible-playbook playbooks/pgadmin_config.yaml -e production=true
 ```
+
+## Update to a new PostgreSQL version
+
+For example from 15 to 17. On the server both versions are already installed:
+
+```bash
+apt list -i | grep post
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+postgresql-15/now 15.14-0+deb12u1 amd64 [installed,local]
+postgresql-17/stable,now 17.7-0+deb13u1 amd64 [installed,automatic]
+postgresql-client-15/now 15.14-0+deb12u1 amd64 [installed,local]
+postgresql-client-17/stable,now 17.7-0+deb13u1 amd64 [installed,automatic]
+postgresql-client-common/stable,now 278 all [installed,automatic]
+postgresql-common-dev/stable,now 278 all [installed,automatic]
+postgresql-common/stable,now 278 all [installed,automatic]
+postgresql/stable,now 17+278 all [installed]
+```
+
+But only cluster v 15 is active:
+
+```bash
+pg_lsclusters
+Ver Cluster Port Status Owner    Data directory              Log file
+15  main    5432 online postgres /var/lib/postgresql/15/main /var/log/postgresql/postgresql-15-main.log
+```
+
+0. Stop the service
+
+    ```bash
+    systemctl status postgresql
+    systemctl stop postgresql
+    ```
+
+1. Upgrade the cluster from 15 to 17
+
+    ```bash
+    pg_upgradecluster 15 main
+    ```
+
+    This will:
+
+    - Create a new PostgreSQL 17 cluster
+    - Migrate all data, users, and databases from version 15 to 17
+    - The new cluster may use port 5433 by default (since 5432 is ocupied by the old cluster)
+    - Stop the old version 15 cluster
+
+2. Verify both clusters exist:
+
+    ```bash
+    pg_lsclusters 
+    Ver Cluster Port Status Owner    Data directory              Log file
+    15  main    5433 down   postgres /var/lib/postgresql/15/main /var/log/postgresql/postgresql-15-main.log
+    17  main    5432 online postgres /var/lib/postgresql/17/main /var/log/postgresql/postgresql-17-main.log
+    ```
+
+3. Drop the old version 15 cluster
+
+    ```bash
+    pg_dropcluster 15 main
+    ```
+
+4. Change PostgreSQL 17 to use port 5432
+
+    ```bash
+    pg_ctlcluster 17 main stop
+    sed -i 's/port = 5433/port = 5432/' /etc/postgresql/17/main/postgresql.conf
+    pg_ctlcluster 17 main start
+    ```
+
+5. Remove PostgreSQL 15 packages
+
+    ```bash
+    apt purge postgresql-15 postgresql-client-15
+    apt autoremove
+    ```
+
+6. Starte posgresql service
+
+    ```bash
+    systemctl start postgresql
+    ```
 
 ## Update NetBox
 

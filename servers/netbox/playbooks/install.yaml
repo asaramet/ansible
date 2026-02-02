@@ -15,6 +15,7 @@
   vars: 
     production: false
     sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
+    postgresql_version: &postgresql_version "17"
 
   tasks:
     - name: Set server 
@@ -28,29 +29,6 @@
     - name: "Is it a production server?"
       debug:
         msg: "{{ production }}"
-
-- name: Configure PostgreSQL on Debian
-  hosts: "{{ hostvars['localhost']['server'] }}"
-  gather_facts: false
-  become: true # run as root
-  tags: postgresql
-  become_method: su
-  become_user: postgres # change to postgres user
-  vars:
-    sql_user_pass: *sql_user_pass
-  tasks: 
-    - name: Create a new PostgreSQL database with the name 'netbox'
-      community.postgresql.postgresql_db:
-        name: netbox
-        comment: NetBox database
-      
-    - name: Create a new user 'netbox' in the netbox database
-      community.postgresql.postgresql_user:
-        db: netbox
-        name: netbox
-        password: "{{ sql_user_pass }}"
-        role_attr_flags: SUPERUSER
-        comment: NetBox as a user
 
 - name: Configure default apps
   hosts: "{{ hostvars['localhost']['server'] }}"
