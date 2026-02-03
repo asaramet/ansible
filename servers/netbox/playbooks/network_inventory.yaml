@@ -13,10 +13,9 @@
   gather_facts: false
   tags: global
   vars:
-    production: false
-    #sql_user_pass: &sql_user_pass "{{ vault_sql_user_pass }}" # have to be specified in the vault for every `server` group/host
-    #sql_inventory_pass: &sql_inventory_pass "{{ vault_sql_inventory_pass }}" # password for network_inventory database user
-    #allowed_network: &allowed_network "{{ vault_allowed_network }}" # Admins network set in vault
+    production: &production false
+    postgresql_version: &postgresql_version "17"
+    allowed_network: &allowed_network "{{ vault_allowed_network }}" # Admins network set in vault
   tasks:
     - name: Set server 
       set_fact:
@@ -37,29 +36,32 @@
   become_method: su
   become_user: postgres
   vars:
+    production: *production
+    postgresql_version: *postgresql_version
     # Set the path to the config files based on your Debian/PostgreSQL version
-    pg_conf_path: /etc/postgresql/15/main/postgresql.conf 
-    #allowed_network: *allowed_network
+    pg_conf_path: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
+    allowed_network: *allowed_network
   tasks:
-    # 1. Allow PostgreSQL to listen on all interfaces
+    # Handle the firewall opening (needs become: true and standard user permissions)
+    # This task should be run as root/standard become user, NOT 'postgres'
+    - name: Ensure PostgreSQL port 5432 is open (on production server)
+      community.general.ufw:
+        rule: allow
+        port: '5432'
+        proto: tcp
+        src: "{{ allowed_network }}"
+      become_user: root
+      when: production | bool
+
+    # Allow PostgreSQL to listen on all interfaces
     - name: Set listen_addresses to '*' in postgresql.conf
       ansible.builtin.lineinfile:
         path: "{{ pg_conf_path }}"
         regexp: '^#?listen_addresses ='
         line: "listen_addresses = '*'"
         state: present
-      #notify: Restart postgresql
-
-#    # 2. Handle the firewall opening (needs become: true and standard user permissions)
-#    # This task should be run as root/standard become user, NOT 'postgres'
-#    - name: Ensure PostgreSQL port 5432 is open (on production server)
-#      become: true # Re-elevate to root if needed
-#      community.general.ufw:
-#        rule: allow
-#        port: '5432'
-#        proto: tcp
-#        src: "{{ allowed_network }}"
-#      when: production | bool
+      become_user: postgres
+      notify: Restart postgresql
 
   handlers:
     - name: Restart postgresql
@@ -75,10 +77,10 @@
   #become_method: su
   become_user: postgres # change to postgres user
   vars:
-    sql_user_pass: "{{ vault_sql_user_pass }}"
     sql_inventory_pass: "{{ vault_sql_inventory_pass }}"
-    allowed_network: "{{ vault_allowed_network }}"
-    pg_hba_path: /etc/postgresql/15/main/pg_hba.conf
+    allowed_network: *allowed_network
+    postgresql_version: *postgresql_version
+    pg_hba_path: "/etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf"
   tasks:
     - name: Create a new PostgreSQL database with the name 'network_inventory'
       community.postgresql.postgresql_db:
@@ -92,7 +94,6 @@
         name: netzadmins
         state: present
         # This role is a group, not a user, so they cannot log in directly
-        #login: no
         comment: Group role for network administrators
 
     - name: Create a new user 'netzadmin' and add it to 'netzadmins' group
@@ -184,54 +185,3 @@
         name: postgresql
         state: restarted
       become_user: root
-
-#- name: Reboot the services
-#  hosts: "{{ hostvars['localhost']['server'] }}"
-#  gather_facts: false
-#  become: true 
-#  tags: reboot
-#  tasks:
-#    - name: Restart the postgresql service
-#      service: 
-#        name: postgresql
-#        state: restarted
-#        enabled: yes
-
-#- name: Install and configure the HTTP server
-#  hosts: "{{ hostvars['localhost']['server'] }}"
-#  gather_facts: false
-#  become: true # run as root
-#  tags: http
-#  vars: 
-#    production: false
-#  tasks:
-#    - name: apt install nginx
-#      apt: 
-#        pkg: nginx
-#        state: latest
-#        update_cache: true
-
-#    - name: Copy web ui config file
-#      copy: 
-#        src: "{{ local_src_folder }}/network_inventory.conf" 
-#        dest: /etc/nginx/sites-available/network_inventory
-#        backup: yes
-#        owner: root
-#        mode: 0644
-
-#    - name: Remove default nginx configs
-#      file: 
-#        path: /etc/nginx/sites-enabled/default
-#        state: absent
-    
-#    - name: Link netbox configs to nginx
-#      file: 
-#        src: /etc/nginx/sites-available/netbox 
-#        dest: /etc/nginx/sites-enabled/default
-#        state: link
-
-#    - name: Restart the nginx service
-#      service: 
-#        name: nginx
-#        state: restarted
-#        enabled: yes
