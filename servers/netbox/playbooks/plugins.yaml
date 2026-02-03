@@ -16,7 +16,7 @@
   vars_files:
     - "{{ inventory_dir }}/host_vars/localhost/plugins.yaml"
   vars:
-    - clear: *clear
+    clear: *clear
   tasks:
     - name: Copy pip packages from localhost to the remote server
       copy:
@@ -47,7 +47,7 @@
   vars_files:
     - "{{ inventory_dir }}/host_vars/localhost/plugins.yaml"
   vars:
-    - clear: *clear
+    clear: *clear
   tasks:
     - name: Remove the '/opt/plugins/' folder
       file: 
