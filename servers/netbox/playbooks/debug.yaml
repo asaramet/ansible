@@ -48,7 +48,6 @@
       debug:
         msg: "{{ production }}"
 
-
 - name: Debug PostgreSQL variables
   hosts: "{{ hostvars['localhost']['server'] }}"
   gather_facts: false
