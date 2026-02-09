@@ -5,7 +5,8 @@ Network Inventory Database Access Examples
 This script demonstrates how to interact with the network_inventory PostgreSQL database.
 
 Install required packages:
-    pip install psycopg2-binary pyyaml
+    - pip install psycopg-binary pyyaml
+    - sudo pacman -Sy python-psycopg
 
 Secure password options:
     1. Environment variable: DB_PASSWORD='pass' python script.py
@@ -18,8 +19,8 @@ import sys
 import subprocess
 import yaml
 from pathlib import Path
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
+from psycopg.rows import dict_row
 from typing import List, Dict, Optional
 
 
@@ -28,7 +29,7 @@ class NetworkInventory:
 
     def __init__(self, host: str = 'localhost', port: int = 5432,
                  dbname: str = 'network_inventory',
-                 user: str = 'network_inventory',
+                 user: str = 'netzadmin',
                  password: Optional[str] = None,
                  password_from: str = 'env',
                  vault_file: Optional[str] = None,
@@ -205,7 +206,7 @@ class NetworkInventory:
 
     def _get_connection(self):
         """Create database connection"""
-        return psycopg2.connect(**self.conn_params)
+        return psycopg.connect(**self.conn_params)
 
     def add_device(self, hostname: str, serial_number: Optional[str] = None,
                    inventory_number: Optional[str] = None,
@@ -242,7 +243,7 @@ class NetworkInventory:
                 cur.execute(query, (hostname, serial_number, inventory_number, active))
                 device_id = cur.fetchone()[0]
                 conn.commit()
-                print(f"✓ Added device: {hostname} (ID: {device_id})")
+                print(f"\u2713 Added device: {hostname} (ID: {device_id})")
                 return device_id
 
     def get_device(self, hostname: str) -> Optional[Dict]:
@@ -258,8 +259,26 @@ class NetworkInventory:
         query = "SELECT * FROM devices WHERE hostname = %s;"
 
         with self._get_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(query, (hostname,))
+                result = cur.fetchone()
+                return dict(result) if result else None
+
+    def get_device_by_id(self, id: int) -> Optional[Dict]:
+        """
+        Get device by ID
+
+        Args:
+            id: Device id to search for
+
+        Returns:
+            Device record as dictionary, or None if not found
+        """
+        query = "SELECT * FROM devices WHERE id = %s;"
+
+        with self._get_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(query, (id,))
                 result = cur.fetchone()
                 return dict(result) if result else None
 
@@ -279,7 +298,7 @@ class NetworkInventory:
         query += " ORDER BY hostname;"
 
         with self._get_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(query)
                 return [dict(row) for row in cur.fetchall()]
 
@@ -327,10 +346,10 @@ class NetworkInventory:
                 conn.commit()
 
                 if result:
-                    print(f"✓ Updated device: {hostname}")
+                    print(f"\u2713 Updated device: {hostname}")
                     return True
                 else:
-                    print(f"✗ Device not found: {hostname}")
+                    print(f"\u2717 Device not found: {hostname}")
                     return False
 
     def delete_device(self, hostname: str) -> bool:
@@ -352,10 +371,10 @@ class NetworkInventory:
                 conn.commit()
 
                 if result:
-                    print(f"✓ Deleted device: {hostname}")
+                    print(f"\u2713 Deleted device: {hostname}")
                     return True
                 else:
-                    print(f"✗ Device not found: {hostname}")
+                    print(f"\u2717 Device not found: {hostname}")
                     return False
 
     def mark_inactive(self, hostname: str) -> bool:
@@ -390,7 +409,7 @@ class NetworkInventory:
         search_pattern = f"%{search_term}%"
 
         with self._get_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(query, (search_pattern, search_pattern, search_pattern))
                 return [dict(row) for row in cur.fetchall()]
 
@@ -407,9 +426,9 @@ if __name__ == "__main__":
     print("Usage: DB_PASSWORD='pass' python script.py")
     try:
         inv = NetworkInventory(host='localhost')
-        print("✓ Connected using environment variable")
+        print("\u2713 Connected using environment variable")
     except ValueError as e:
-        print(f"✗ Error: {e}")
+        print(f"\u2717 Error: {e}")
         print("\nTrying other methods...\n")
 
     # METHOD 2: Ansible Vault (RECOMMENDED - Integrates with existing setup)
@@ -422,11 +441,11 @@ if __name__ == "__main__":
             vault_file='group_vars/local/vault',  # or group_vars/hs_netbox/vault
             vault_password_file='~/.ssh/vault_pass_netbox'  # Default
         )
-        print("✓ Connected using Ansible vault")
+        print("\u2713 Connected using Ansible vault")
     except ValueError as e:
-        print(f"✗ Error: {e}")
+        print(f"\u2717 Error: {e}")
     except Exception as e:
-        print(f"✗ Error: {e}")
+        print(f"\u2717 Error: {e}")
 
     # METHOD 3: Config File
     print("\n--- METHOD 3: Config File ---")
@@ -437,11 +456,11 @@ if __name__ == "__main__":
             password_from='config',
             config_file='sql_scripts/db_config.yaml'
         )
-        print("✓ Connected using config file")
+        print("\u2713 Connected using config file")
     except ValueError as e:
-        print(f"✗ Error: {e}")
+        print(f"\u2717 Error: {e}")
     except Exception as e:
-        print(f"✗ Error: {e}")
+        print(f"\u2717 Error: {e}")
 
     # METHOD 4: Direct Password (NOT RECOMMENDED - for testing only)
     print("\n--- METHOD 4: Direct Password (INSECURE) ---")
@@ -501,7 +520,7 @@ if __name__ == "__main__":
         print(f"Total active devices: {len(active_devices)}")
 
     except NameError:
-        print("\n✗ No successful connection established.")
+        print("\n\u2717 No successful connection established.")
         print("\nPlease use one of the secure password methods:")
         print("  1. DB_PASSWORD='pass' python script.py")
         print("  2. Configure Ansible vault path in the script")

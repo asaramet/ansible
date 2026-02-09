@@ -4,7 +4,7 @@
 
 # Configuration
 DB_NAME="network_inventory"
-DB_USER="network_inventory"
+DB_USER="netzadmin"
 #DB_HOST="localhost"
 DB_HOST="192.168.122.140"
 DB_PORT="5432"

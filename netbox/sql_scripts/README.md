@@ -7,7 +7,7 @@ Scripts to interact with the `network_inventory` PostgreSQL database on the NetB
 This database is **separate from NetBox's main database** and is used for manual tracking of network devices with additional inventory metadata.
 
 **Database**: `network_inventory`
-**User**: `network_inventory`
+**User**: `netzadmin`
 **Table**: `devices`
 
 ### Schema
@@ -31,7 +31,7 @@ This database is **separate from NetBox's main database** and is used for manual
 ### For Python Script
 
 ```bash
-pip install psycopg2-binary pyyaml
+pip install psycopg2-binary pyyaml typer
 ```
 
 ### For CLI Tool
