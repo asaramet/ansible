@@ -246,23 +246,63 @@ class NetworkInventory:
                 print(f"\u2713 Added device: {hostname} (ID: {device_id})")
                 return device_id
 
-    def get_device(self, hostname: str) -> Optional[Dict]:
+    def get_device(self, hostname: str, serial_number: Optional[str] = None, 
+                active_only: bool = True) -> Optional[Dict]:
         """
-        Get device by hostname
+        Get a specific device by hostname and optionally serial number
+        
+        Args:
+            hostname: Device hostname to search for
+            serial_number: Optional serial number for exact match
+            active_only: If True, only return active devices (default: True)
+        
+        Returns:
+            Device record as dictionary, or None if not found
+            
+        Note:
+            - If serial_number provided: returns exact match or None
+            - If serial_number not provided and active_only=True: returns active device with hostname
+            - If serial_number not provided and active_only=False: returns first match (unreliable if duplicates)
+        """
+        if serial_number:
+            # Exact match: hostname + serial number
+            query = "SELECT * FROM devices WHERE hostname = %s AND serial_number = %s"
+            params = (hostname, serial_number)
+        else:
+            # Just hostname, optionally filter by active status
+            query = "SELECT * FROM devices WHERE hostname = %s"
+            params = (hostname,)
+            if active_only:
+                query += " AND active = TRUE"
+        
+        query += " LIMIT 1;"
+        
+        with self._get_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(query, params)
+                result = cur.fetchone()
+                return dict(result) if result else None
+
+    def get_devices_by_hostname(self, hostname: str, active_only: bool = False) -> List[Dict]:
+        """
+        Get all devices with the given hostname
 
         Args:
             hostname: Device hostname to search for
+            active_only: If True, only return active devices
 
         Returns:
-            Device record as dictionary, or None if not found
+            List of device records as dictionaries, may be empty, may contain multiple
         """
-        query = "SELECT * FROM devices WHERE hostname = %s;"
+        query = "SELECT * FROM devices WHERE hostname = %s"
+        if active_only:
+            query += " AND active = TRUE"
+        query += " ORDER BY active DESC, created_at DESC;" # Active first, then newest
 
         with self._get_connection() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(query, (hostname,))
-                result = cur.fetchone()
-                return dict(result) if result else None
+                return [dict(row) for row in cur.fetchall()]
 
     def get_device_by_id(self, id: int) -> Optional[Dict]:
         """

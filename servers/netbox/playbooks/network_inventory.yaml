@@ -114,7 +114,7 @@
     - name: Grant all privileges on network_inventory database to netzadmins group
       community.postgresql.postgresql_privs:
         login_user: postgres
-        database: network_inventory
+        login_db: network_inventory
         state: present
         privs: ALL
         type: database
@@ -123,7 +123,7 @@
     - name: Grant all privileges on all tables in network_inventory database
       community.postgresql.postgresql_privs:
         login_user: postgres
-        database: network_inventory
+        login_db: network_inventory
         state: present
         privs: ALL
         type: table
@@ -134,7 +134,7 @@
     - name: Grant all privileges on all sequences in network_inventory database
       community.postgresql.postgresql_privs:
         login_user: postgres
-        database: network_inventory
+        login_db: network_inventory
         state: present
         privs: ALL
         type: sequence
@@ -158,11 +158,12 @@
     - name: Create devices table in network_inventory database
       community.postgresql.postgresql_query:
         login_user: postgres
-        db: network_inventory
+        login_db: network_inventory
         query: |
+          -- Create table if it doesn't exist (without UNIQUE constraint)
           CREATE TABLE IF NOT EXISTS devices (
             id SERIAL PRIMARY KEY,
-            hostname VARCHAR(255) NOT NULL UNIQUE,
+            hostname VARCHAR(255) NOT NULL,
             serial_number VARCHAR(100),
             inventory_number VARCHAR(100),
             active BOOLEAN DEFAULT TRUE,
@@ -170,11 +171,24 @@
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
 
+          -- Drop UNIQUE constraint if it exists (from old schema)
+          ALTER TABLE devices 
+          DROP CONSTRAINT IF EXISTS devices_hostname_key;
+
+          -- Create indexes (IF NOT EXISTS makes this idempotent)
           CREATE INDEX IF NOT EXISTS idx_hostname ON devices(hostname);
           CREATE INDEX IF NOT EXISTS idx_active ON devices(active);
+          CREATE INDEX IF NOT EXISTS idx_serial_number ON devices(serial_number);
 
+          -- Create a composite unique constraint for hostname + serial_number
+          -- This prevents exact duplicates while allowing same hostname with different serials
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_hostname_serial 
+          ON devices(hostname, serial_number) 
+          WHERE serial_number IS NOT NULL;
+
+          -- Comments
           COMMENT ON TABLE devices IS 'Manual network device inventory tracking';
-          COMMENT ON COLUMN devices.hostname IS 'Device hostname or FQDN';
+          COMMENT ON COLUMN devices.hostname IS 'Device hostname or FQDN (non-unique to allow inactive/replacement devices)';
           COMMENT ON COLUMN devices.serial_number IS 'Manufacturer serial number';
           COMMENT ON COLUMN devices.inventory_number IS 'Internal inventory tracking number';
           COMMENT ON COLUMN devices.active IS 'Whether device is currently active in network';
