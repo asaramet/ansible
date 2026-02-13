@@ -25,7 +25,7 @@ campuses = {
 }
 
 # Return a list of devices serial numbers from the yaml file
-def serial_numbers():
+def serial_numbers_yaml():
     yaml_file = src_dir.joinpath("serial_numbers.yaml")
     logger.debug(f"Serial numbers file: {yaml_file}")
 
@@ -36,6 +36,22 @@ def serial_numbers():
                 s_dict[key] = value
 
     return s_dict 
+
+def serial_numbers():
+    sql_folder = project_dir / 'sql_scripts'
+
+    if not sql_folder.exists():
+        raise FileNotFoundError(f"\u2717 Path doesn't exist: {sql_folder}")
+        
+    if not sql_folder.is_dir():
+        raise NotADirectoryError(f"\u2717 Path exist but is not a directory: {sql_folder}")
+
+    # import get_devices_serials function
+    from sys import path
+    path.insert(0, str(sql_folder))
+    from devices_db import get_devices_serials
+
+    return get_devices_serials()
 
 # return a tuple (section, value), ex: (interface, interface_name), recursively from a switch config
 def recursive_section_search(text, section, value):
@@ -172,4 +188,5 @@ def _debug(function: callable, *args, **kwargs) -> None:
     logger.debug(f"Function '{func_call}' returns: {repr(data)}")
 
 if __name__ == "__main__":
+    #_debug(serial_numbers_yaml)
     _debug(serial_numbers)
