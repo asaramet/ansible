@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-import typer
+import typer, yaml
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 
 from rich.console import Console
 from rich.table import Table
@@ -15,6 +15,9 @@ script_dir = Path(__file__).resolve().parent
 project_dir = script_dir.parent
 vault_file = script_dir / "vault"
 vault_password_file= project_dir / "src" / "keys" / "vault_pass_netbox"
+
+host = "192.168.122.140"
+yaml_db = project_dir / 'src' / 'serial_numbers.yaml'
 
 # Global variable to store the inventory instance
 inventory: Optional[NetworkInventory] = None
@@ -61,7 +64,7 @@ def devices_table(devices: List[Dist], title: str = "Network Inventory Devices")
 @app.callback()
 def initialize(
     ctx: typer.Context,
-    host: str = "192.168.122.140",
+    host: str = host,
     vault_file: str = vault_file,
     vault_password_file: str = vault_password_file
 ):
@@ -301,6 +304,118 @@ def delete(
     inventory.delete_device(device['id'])
     typer.secho(f"\n\u2713 Successfully deleted device '{hostname}' (ID: {device['id']})", 
                fg=typer.colors.GREEN)
+
+def load_yaml(file_path: Path = yaml_db) -> Union[Dict, List]:
+    """
+    Load a YAML file and return its content as a dict or list.
+    
+    Args:
+        file_path: Path to the YAML file
+        
+    Returns:
+        The parsed YAML content (dict or list)
+        
+    Raises:
+        FileNotFoundError: If the file doesn't exist
+        yaml.YAMLError: If the file is not valid YAML
+    """
+    path = Path(file_path)
+    
+    if not path.exists():
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    with open(path, 'r', encoding='utf-8') as file:
+        data = yaml.safe_load(file)
+    
+    return data
+
+def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
+    """
+    Add multiple devices from a list of {hostname: serial_number} dictionaries
+    
+    Args:
+        devices_list: List of dicts, each with one key-value pair {hostname: serial_number}
+    
+    Returns:
+        Dictionary with statistics: {added: int, skipped: int, errors: int, details: list}
+    """
+    results = {
+        'added': 0,
+        'skipped': 0,
+        'errors': 0,
+        'details': []
+    }
+    
+    for device_dict in devices_list:
+        # Extract hostname and serial from dict
+        if not device_dict:
+            continue
+            
+        hostname, serial_number = next(iter(device_dict.items()))
+        
+        try:
+            # Check if device already exists with this hostname and serial
+            existing = inventory.get_device(hostname, serial_number, active_only=False)
+            
+            if existing:
+                # Device exists - update to active if needed
+                if not existing['active']:
+                    inventory.update_device(existing['id'], active=True)
+                    results['details'].append({
+                        'hostname': hostname,
+                        'serial': serial_number,
+                        'status': 'reactivated',
+                        'id': existing['id']
+                    })
+                    typer.secho(f"  \u2713 Reactivated: {hostname} (Serial: {serial_number})", 
+                               fg=typer.colors.YELLOW)
+                else:
+                    results['skipped'] += 1
+                    results['details'].append({
+                        'hostname': hostname,
+                        'serial': serial_number,
+                        'status': 'already_exists',
+                        'id': existing['id']
+                    })
+                    typer.secho(f"  \u2022 Skipped: {hostname} (Serial: {serial_number}) - already exists", 
+                               fg=typer.colors.BLUE, dim=True)
+            else:
+                # Device doesn't exist - add it
+                device_id = inventory.add_device(
+                    hostname=hostname,
+                    serial_number=serial_number,
+                    active=True
+                )
+                results['added'] += 1
+                results['details'].append({
+                    'hostname': hostname,
+                    'serial': serial_number,
+                    'status': 'added',
+                    'id': device_id
+                })
+                typer.secho(f"  \u2713 Added: {hostname} (Serial: {serial_number}, ID: {device_id})", 
+                           fg=typer.colors.GREEN)
+                
+        except Exception as e:
+            results['errors'] += 1
+            results['details'].append({
+                'hostname': hostname,
+                'serial': serial_number,
+                'status': 'error',
+                'error': str(e)
+            })
+            typer.secho(f"  \u2717 Error adding {hostname}: {e}", 
+                       fg=typer.colors.RED, err=True)
+    
+    return results
+
+@app.command()
+def populate():
+    """Populate devices from a local yaml file"""
+    typer.secho(f"Populating devices database on {host}", fg = typer.colors.GREEN)
+
+    devices = load_yaml()
+    add_devices_from_list(devices)
 
 if __name__ == "__main__":
     app()
