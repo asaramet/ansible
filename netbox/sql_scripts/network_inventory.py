@@ -342,13 +342,13 @@ class NetworkInventory:
                 cur.execute(query)
                 return [dict(row) for row in cur.fetchall()]
 
-    def update_device(self, hostname: str, **kwargs) -> bool:
+    def update_device(self, device_id: int, **kwargs) -> bool:
         """
-        Update device fields
+        Update device fields by ID
 
         Args:
-            hostname: Device hostname to update
-            **kwargs: Fields to update (serial_number, inventory_number, active)
+            device_id: Device ID to update
+            **kwargs: Fields to update (hostname, serial_number, inventory_number, active)
 
         Returns:
             True if device was updated, False if not found
@@ -357,11 +357,10 @@ class NetworkInventory:
             Empty strings ('') for serial_number and inventory_number are
             automatically converted to NULL for consistency.
         """
-        allowed_fields = ['serial_number', 'inventory_number', 'active']
+        allowed_fields = ['hostname', 'serial_number', 'inventory_number', 'active']
         updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
 
         if not updates:
-            print("No valid fields to update")
             return False
 
         # Convert empty strings to None for serial_number and inventory_number
@@ -375,59 +374,37 @@ class NetworkInventory:
         query = f"""
             UPDATE devices
             SET {set_clause}, updated_at = CURRENT_TIMESTAMP
-            WHERE hostname = %s
+            WHERE id = %s
             RETURNING id;
         """
 
         with self._get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(query, list(updates.values()) + [hostname])
+                cur.execute(query, list(updates.values()) + [device_id])
                 result = cur.fetchone()
                 conn.commit()
 
-                if result:
-                    print(f"\u2713 Updated device: {hostname}")
-                    return True
-                else:
-                    print(f"\u2717 Device not found: {hostname}")
-                    return False
+                return result is not None
 
-    def delete_device(self, hostname: str) -> bool:
+    def delete_device(self, device_id: int) -> bool:
         """
-        Delete device from inventory
+        Delete device from inventory by ID
 
         Args:
-            hostname: Device hostname to delete
+            device_id: Device ID to delete
 
         Returns:
             True if device was deleted, False if not found
         """
-        query = "DELETE FROM devices WHERE hostname = %s RETURNING id;"
+        query = "DELETE FROM devices WHERE id = %s RETURNING id;"
 
         with self._get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(query, (hostname,))
+                cur.execute(query, (device_id,))
                 result = cur.fetchone()
                 conn.commit()
 
-                if result:
-                    print(f"\u2713 Deleted device: {hostname}")
-                    return True
-                else:
-                    print(f"\u2717 Device not found: {hostname}")
-                    return False
-
-    def mark_inactive(self, hostname: str) -> bool:
-        """
-        Mark device as inactive (soft delete)
-
-        Args:
-            hostname: Device hostname to mark inactive
-
-        Returns:
-            True if device was marked inactive, False if not found
-        """
-        return self.update_device(hostname, active=False)
+                return result is not None
 
     def search_devices(self, search_term: str) -> List[Dict]:
         """
@@ -519,40 +496,12 @@ if __name__ == "__main__":
         print("Database Operations Example")
         print("=" * 70)
 
-        # Add devices
-        print("\n=== Adding Devices ===")
-        inv.add_device('switch01.example.com', serial_number='SN12345',
-                       inventory_number='INV-001', active=True)
-        inv.add_device('router01.example.com', serial_number='SN67890',
-                       inventory_number='INV-002', active=True)
-        inv.add_device('firewall01.example.com', serial_number='SN11111',
-                       inventory_number='INV-003', active=True)
-
         # Get all devices
         print("\n=== All Active Devices ===")
         devices = inv.get_all_devices(active_only=True)
         for device in devices:
             print(f"- {device['hostname']}: {device['serial_number']} "
                   f"(Inv: {device['inventory_number']}, Active: {device['active']})")
-
-        # Get specific device
-        print("\n=== Get Specific Device ===")
-        device = inv.get_device('switch01.example.com')
-        if device:
-            print(f"Found: {device['hostname']} - Serial: {device['serial_number']}")
-
-        # Update device
-        print("\n=== Update Device ===")
-        inv.update_device('router01.example.com', inventory_number='INV-002-UPDATED')
-
-        # Search devices
-        print("\n=== Search Devices ===")
-        results = inv.search_devices('switch')
-        print(f"Found {len(results)} device(s) matching 'switch'")
-
-        # Mark device inactive
-        print("\n=== Mark Device Inactive ===")
-        inv.mark_inactive('firewall01.example.com')
 
         # Show only active devices
         print("\n=== Active Devices Only ===")

@@ -173,8 +173,12 @@ def get(hostname: str):
 def update(
     hostname: str,
     serial_number: Optional[str] = None,
+    new_hostname: Optional[str] = None,
     new_serial: Optional[str] = None,
-    new_inventory: Optional[str] = None
+    new_inventory: Optional[str] = None,
+    set_inactive: bool = False,
+    set_active: bool = False,
+    force: bool = False
 ):
     """Update device information"""
     
@@ -182,7 +186,6 @@ def update(
     device = inventory.get_device(hostname, serial_number, active_only=False)
     
     if not device:
-        # Show all devices with this hostname
         all_devices = inventory.get_devices_by_hostname(hostname, active_only=False)
         
         if not all_devices:
@@ -195,13 +198,65 @@ def update(
         console.print(devices_table(all_devices, "Devices with Same Hostname"))
         return
     
-    # Update the device
-    # ... update logic here
+    # Show current device
+    typer.echo("\nCurrent device:")
+    console.print(devices_table([device], "Device to Update"))
 
-@app.command()
-def deactivate(device_id: str):
-    """Mark device as inactive"""
-    typer.secho(f"\u2713 Device ID: {device_id}")
+    # Build updates dictionary
+    updates = {}
+    changes = []
+
+    if new_hostname:
+        updates['hostname'] = new_hostname
+        changes.append(f"hostname: '{device['hostname']}' -> {hew_hostname}")
+
+    if new_serial is not None: # don't ignore empty string
+        updates['serial_number'] = new_serial
+        old_val = device['serial_number'] or 'NULL'
+        new_val = new_serial if new_serial else 'NULL'
+        changes.append(f"serial_number: '{old_val}' -> '{new_val}'")
+
+    if new_inventory is not None: # don't ignore empty string
+        updates['inventory_number'] = new_inventory
+        old_val = device['inventory_number'] or 'NULL'
+        new_val = new_inventory if new_inventory else 'NULL'
+        changes.append(f"inventory_number: '{old_val}' -> '{new_val}'")
+
+    if set_inactive:
+        updates['active'] = False
+        changes.append(f"active: {device['active']} -> False")
+    elif set_active:
+        updates['active'] = True
+        changes.append(f"active: {device['active']} -> True")
+
+    if not updates:
+        types.secho("\u2717 No updates specified", fg=typer.colors.YELLOW)
+        return
+    
+    # Show planned changes
+    typer.secho("\nPlanned changes:", fg=typer.colors.CYAN)
+    for change in changes:
+        typer.echo(f" \u2022 {change}")
+
+    # Confirm unless --force
+    if not force:
+        if not typer.confirm("\nProceed with update?"):
+            typer.secho("\u2717 Update cancelled", fg=typer.colors.YELLOW)
+            return
+    
+    # Perform updates
+    success = inventory.update_device(device['id'], **updates)
+
+    if success:
+        updated_device = inventory.get_device_by_id(device['id'])
+        typer.secho(f"\n\u2713 Successfully updated device with ID {device['id']}",
+                    fg=typer.colors.GREEN)
+        if updated_device:
+            typer.echo("\nUpdated device:")
+            console.print(devices_table([updated_device], "After Update"))
+
+    else:
+        typer.secho(f"\u2717 Failed to update device", fg=typer.colors.RED, err=True)
 
 @app.command()
 def delete(
