@@ -75,12 +75,14 @@ def initialize(
             vault_file = vault_file,
             vault_password_file = vault_password_file
         )
-        typer.secho(f"\u2713 Connected to database on {host} using Ansible vault", fg = typer.colors.GREEN, dim = True)
+        typer.secho(f"\u2713 Connected to database on {host} using Ansible vault", 
+                    fg = typer.colors.GREEN, dim = True)
+    except ConnectionError as e:
+        # Clean error from NetworkInventory class
+        typer.secho(f"\u2717 {e}", fg = typer.colors.RED, err = True)
+        raise typer.Exit(code = 1)
     except ValueError as e:
         typer.secho(f"\u2717 Configuration Error: {e}", fg = typer.colors.RED, err = True)
-        raise typer.Exit(code = 1)
-    except Exception as e:
-        typer.secho(f"\u2717 Connection Error: {e}", fg = typer.colors.RED, err = True)
         raise typer.Exit(code = 1)
 
 @app.command()

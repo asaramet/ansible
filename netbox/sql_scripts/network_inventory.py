@@ -20,6 +20,7 @@ import subprocess
 import yaml
 from pathlib import Path
 import psycopg
+from psycopg import OperationalError
 from psycopg.rows import dict_row
 from typing import List, Dict, Optional
 
@@ -68,6 +69,19 @@ class NetworkInventory:
             'user': user,
             'password': retrieved_password
         }
+
+        # Test connection
+        try: 
+            with self._get_connection() as conn:
+                pass # Connection successful
+        except OperationalError as e:
+            # Re-raise with cleaner message
+            if "failed to resolve host" in str(e):
+                raise ConnectionError(f"Cannot reach host '{host}' - hostname not found") from e
+            elif "Connection refused" in str(e):
+                raise ConnectionError(f"Connection refused by host '{host}' - is PostgreSQL running?") from e
+            else:
+                raise
 
     def _get_password(self, password: Optional[str], password_from: str,
                      vault_file: Optional[str], vault_password_file: str,
