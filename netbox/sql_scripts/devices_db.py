@@ -165,15 +165,42 @@ def add(
     """    
 
 @app.command()
-def get(hostname: str):
-    """Get device by hostname"""
-    devices = inventory.get_devices_by_hostname(hostname)
-
-    if devices:
-        console.print(devices_table(devices, f"Found {hostname}"))
-        return
-
-    typer.secho(f"\u2717 No devices with hostname {hostname} found")
+def get(
+    hostname: str,
+    regex: bool = False,
+    active_only: bool = False
+):
+    """
+    Get device(s) by hostname or pattern
+    
+    Examples:
+        get rsgw0001-1              # Exact match
+        get "rsgw0001*"             # Wildcard: rsgw0001-1, rsgw0001-2, rsgw00011, etc.
+        get "rsgw0001_"             # Single char: rsgw0001-1, rsgw0001-2 (not rsgw00011)
+        get "^rsgw[0-9]+$" --regex  # Regex pattern
+    """
+    
+    # Check if pattern contains wildcards
+    if '*' in hostname or '_' in hostname or regex:
+        # Pattern search
+        devices = inventory.search_devices_by_pattern(hostname, active_only, use_regex=regex)
+        
+        if devices:
+            typer.secho(f"Found {len(devices)} device(s) matching pattern '{hostname}'", 
+                       fg=typer.colors.CYAN)
+            console.print(devices_table(devices, f"Matching '{hostname}'"))
+        else:
+            typer.secho(f"\u2717 No devices matching pattern '{hostname}'", 
+                       fg=typer.colors.YELLOW)
+    else:
+        # Exact hostname search
+        devices = inventory.get_devices_by_hostname(hostname, active_only)
+        
+        if devices:
+            console.print(devices_table(devices, f"Found '{hostname}'"))
+        else:
+            typer.secho(f"\u2717 No devices with hostname '{hostname}' found", 
+                       fg=typer.colors.YELLOW)
 
 @app.command()
 def update(

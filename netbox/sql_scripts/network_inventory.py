@@ -356,6 +356,37 @@ class NetworkInventory:
                 cur.execute(query)
                 return [dict(row) for row in cur.fetchall()]
 
+    def search_devices_by_pattern(self, pattern: str, active_only: bool = False, 
+                                use_regex: bool = False) -> List[Dict]:
+        """
+        Search devices by hostname pattern
+        
+        Args:
+            pattern: Hostname pattern
+                    If use_regex=False: Shell wildcards (* = any chars, _ = single char)
+                    If use_regex=True: PostgreSQL regex pattern
+            active_only: If True, return only active devices
+            use_regex: If True, use PostgreSQL regex matching
+        
+        Returns:
+            List of device records matching the pattern
+        """
+        if use_regex:
+            query = "SELECT * FROM devices WHERE hostname ~ %s"
+        else:
+            # Convert shell wildcards to SQL LIKE pattern
+            pattern = pattern.replace('*', '%')
+            query = "SELECT * FROM devices WHERE hostname LIKE %s"
+        
+        if active_only:
+            query += " AND active = TRUE"
+        query += " ORDER BY hostname;"
+        
+        with self._get_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(query, (pattern,))
+                return [dict(row) for row in cur.fetchall()]
+
     def update_device(self, device_id: int, **kwargs) -> bool:
         """
         Update device fields by ID
