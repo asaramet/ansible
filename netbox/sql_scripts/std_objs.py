@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Pre defined standard objects for brighter usages
+Pre defined standard objects
 """
 
 import typer

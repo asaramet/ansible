@@ -7,7 +7,7 @@ import yaml, typer
 from pathlib import Path
 from typing import Optional, List, Dict, Union
 
-from std_app import initialize_inventory
+from std_objs import initialize_inventory
 
 app = typer.Typer(help = "Automatically manage 'devices' table in 'network_inventory' database")
 inventory = initialize_inventory()
