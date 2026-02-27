@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Network Inventory Database Access Examples
+Network Inventory Database Access Class
 
-This script demonstrates how to interact with the network_inventory PostgreSQL database.
+Interact with the network_inventory PostgreSQL database over NetworkInventory class.
 
 Install required packages:
     - pip install psycopg-binary pyyaml

@@ -1,4 +1,21 @@
 #!/usr/bin/env python3
+"""
+Interact with 'devices' table in the postgres database, over CLI
+
+Usage:
+
+- show the help menu:
+    ./devices_db.py --help
+
+- show help for a specific command, like `list`
+    ./devices_db.py [command] --help
+
+    Example:
+    ./devices_db.py list --help
+
+- run a command
+    ./devices_db.py [command]
+"""
 
 import typer, yaml
 from pathlib import Path
@@ -7,21 +24,15 @@ from typing import Optional, List, Dict, Union
 from rich.console import Console
 from rich.table import Table
 
-from network_inventory import NetworkInventory
-
-app = typer.Typer(help = "Devices table management in 'network_inventory' database over CLI")
+from std_app import initialize_inventory, get_inventory_connection, get_devices_serials
 
 script_dir = Path(__file__).resolve().parent
 project_dir = script_dir.parent
-vault_file = script_dir / "vault"
-vault_password_file = project_dir / "src" / "keys" / "vault_pass_netbox"
-
-#host = "192.168.122.140"
-host = "netbox-bb"
 yaml_db = project_dir / 'src' / 'serial_numbers.yaml'
 
 # Global variable to store the inventory instance
-inventory: Optional[NetworkInventory] = None
+app = typer.Typer(help = "Devices table management in 'network_inventory' database over CLI")
+inventory = initialize_inventory()
 
 # Console instance to reuse
 console = Console()
@@ -60,34 +71,6 @@ def devices_table(devices: List[Dist], title: str = "Network Inventory Devices")
         )
 
     return table 
-
-# Callback to initialize once before any command runs
-@app.callback()
-def initialize(
-    ctx: typer.Context,
-    host: str = host,
-    vault_file: str = vault_file,
-    vault_password_file: str = vault_password_file
-):
-    """Initialize database connection before running any command"""
-    global inventory
-
-    try:
-        inventory = NetworkInventory(
-            host = host,
-            password_from = 'vault',
-            vault_file = vault_file,
-            vault_password_file = vault_password_file
-        )
-        typer.secho(f"\u2713 Connected to database on {host} using Ansible vault", 
-                    fg = typer.colors.GREEN, dim = True)
-    except ConnectionError as e:
-        # Clean error from NetworkInventory class
-        typer.secho(f"\u2717 {e}", fg = typer.colors.RED, err = True)
-        raise typer.Exit(code = 1)
-    except ValueError as e:
-        typer.secho(f"\u2717 Configuration Error: {e}", fg = typer.colors.RED, err = True)
-        raise typer.Exit(code = 1)
 
 @app.command()
 def list(active_only: bool = False):
@@ -440,55 +423,10 @@ def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
 @app.command()
 def populate():
     """Populate devices from a local yaml file"""
-    typer.secho(f"Populating devices database on {host}", fg = typer.colors.GREEN)
+    typer.secho(f"Populating devices database", fg = typer.colors.GREEN)
 
     devices = load_yaml()
     add_devices_from_list(devices)
-
-def get_inventory_connection(
-    host: str = host,
-    vault_file: str = vault_file,
-    vault_password_file: str = vault_password_file
-) -> NetworkInventory:
-    """
-    Create and return a NetworkInventory connection
-    
-    Returns:
-        Initialized NetworkInventory instance
-    """
-    return NetworkInventory(
-        host = host,
-        password_from = 'vault',
-        vault_file = vault_file,
-        vault_password_file = vault_password_file
-    )
-
-def get_devices_serials(
-        active_only: bool = True,
-        host: str = host,
-        vault_file: str = vault_file,
-        vault_password_file: str = vault_password_file
-) -> List[Dict[str, str]]:
-    """
-    Get devices as a list of {hostname: serial_number} dictionaries
-    
-    Args:
-        active_only: If True, return only active devices (default: True)
-        host: Database host
-        vault_file: Ansible vault file path
-        vault_password_file: Vault password file path
-    
-    Returns:
-        Dictionary in format {hostname: serial_number, ...}
-    
-    Note:
-        Devices without serial numbers will have None as the value
-    """
-    inventory = get_inventory_connection(host, vault_file, vault_password_file)
-    devices = inventory.get_all_devices(active_only = active_only)
-    
-    # Convert to {hostname: serial_number} format
-    return {device['hostname']: device['serial_number'] for device in devices}
 
 if __name__ == "__main__":
     app()
