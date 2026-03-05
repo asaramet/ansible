@@ -3,7 +3,7 @@
 Pre defined standard objects
 """
 
-import typer
+import typer, yaml
 from pathlib import Path
 from typing import Optional
 
@@ -94,6 +94,30 @@ def get_devices_serials(
     
     # Convert to {hostname: serial_number} format
     return {device['hostname']: device['serial_number'] for device in devices}
+
+def load_yaml(file_path: Path) -> Union[Dict, List]:
+    """
+    Load a YAML file and return its content as a dict or list.
+    
+    Args:
+        file_path: Path to the YAML file
+        
+    Returns:
+        The parsed YAML content (dict or list)
+        
+    Raises:
+        FileNotFoundError: If the file doesn't exist
+        yaml.YAMLError: If the file is not valid YAML
+    """
+    path = Path(file_path)
+    
+    if not path.exists():
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    with open(path, 'r', encoding='utf-8') as file:
+        data = yaml.safe_load(file)
+    
+    return data
 
 if __name__ == "__main__":
     app()
