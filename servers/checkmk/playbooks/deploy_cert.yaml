@@ -6,7 +6,7 @@
   become: true
   vars:
     domain: checkmk.hs-esslingen.de
-    local_cert: "{{ playbook_dir }}/../src/certs/Cert_bundle-2025-05-23.pem"
+    local_cert: "{{ playbook_dir }}/../src/certs/Cert_bundle-2026-03-05.pem"
     remote_cert: /opt/certs/harica/harica_bundle.pem
     install_script: /opt/certs/install_harica_certs_apache.sh
   tasks:
