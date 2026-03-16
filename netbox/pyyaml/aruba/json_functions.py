@@ -115,6 +115,7 @@ def devices_json(config_files, device_type_slags, tags):
     """
     data = {'devices': [], 'chassis': []}
     serials = serial_numbers()
+    asset_tags = serial_numbers('inventory_number')
 
     for t_file in config_files:
         hostname = get_hostname(t_file)
@@ -132,6 +133,7 @@ def devices_json(config_files, device_type_slags, tags):
             hostname = hostname['0']
             d_label = device_type_slags[get_switch_type(t_file)]
             serial = serials.get(hostname)
+            asset_tag = asset_tags.get(hostname):
 
             data['devices'].append({
                 'name': hostname,
@@ -139,7 +141,8 @@ def devices_json(config_files, device_type_slags, tags):
                 'device_type': d_label,
                 'site': site,
                 'tags': tags,
-                'serial': serial
+                'serial': serial,
+                'asset_tag': asset_tag
             })
             continue
 
