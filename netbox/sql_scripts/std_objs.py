@@ -68,32 +68,37 @@ def get_inventory_connection(
         vault_password_file = vault_password_file
     )
 
-def get_devices_serials(
+def get_devices_numbers(
+        number = "serial_number",
         active_only: bool = True,
         host: str = host,
         vault_file: str = vault_file,
         vault_password_file: str = vault_password_file
 ) -> List[Dict[str, str]]:
     """
-    Get devices as a list of {hostname: serial_number} dictionaries
+    Get devices as a list of {hostname: number} dictionaries
     
     Args:
+        number: The number type string,  available:
+            - serial_number
+            - inventory_number
         active_only: If True, return only active devices (default: True)
         host: Database host
         vault_file: Ansible vault file path
         vault_password_file: Vault password file path
     
     Returns:
-        Dictionary in format {hostname: serial_number, ...}
+        Dictionary in format {hostname: number, ...}
     
     Note:
-        Devices without serial numbers will have None as the value
+        Devices without numbers will have None as the value
     """
+
     inventory = get_inventory_connection(host, vault_file, vault_password_file)
     devices = inventory.get_all_devices(active_only = active_only)
     
     # Convert to {hostname: serial_number} format
-    return {device['hostname']: device['serial_number'] for device in devices}
+    return {device['hostname']: device[number] for device in devices}
 
 def load_yaml(file_path: Path) -> Union[Dict, List]:
     """

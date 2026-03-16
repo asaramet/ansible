@@ -24,7 +24,7 @@ from typing import Optional, List, Dict, Union
 from rich.console import Console
 from rich.table import Table
 
-from std_objs import initialize_inventory, get_inventory_connection, get_devices_serials
+from std_objs import initialize_inventory, get_inventory_connection
 from std_objs import load_yaml, project_dir
 
 # Global variable to store the inventory instance
