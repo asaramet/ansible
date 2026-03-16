@@ -21,8 +21,22 @@ ansible-galaxy collection list | awk 'BEGIN{print "collections:"} NR>2 && NF==2 
 
 - Manually clean some redundant lines it creates.
 
-- Install collections and dependencies
+Also check the collections path with:
 
 ```bash
-ansible-galaxy collection install -r requirements.yml --upgrade && rm requirements.yml
+ansible-galaxy collection list
+```
+
+It may be: `/opt/ansible/lib/python3.9/site-packages/ansible_collections`
+
+Add it to a temporary variable `$a_path`
+
+```bash
+a_path='/opt/ansible/lib/python3.9/site-packages/ansible_collections'
+```
+
+- Install collections and dependencies to the right folder
+
+```bash
+ansible-galaxy collection install -r requirements.yml --upgrade -p $a_path && rm requirements.yml
 ```

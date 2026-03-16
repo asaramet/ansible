@@ -133,7 +133,7 @@ def devices_json(config_files, device_type_slags, tags):
             hostname = hostname['0']
             d_label = device_type_slags[get_switch_type(t_file)]
             serial = serials.get(hostname)
-            asset_tag = asset_tags.get(hostname):
+            asset_tag = asset_tags.get(hostname)
 
             data['devices'].append({
                 'name': hostname,
