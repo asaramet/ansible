@@ -12,6 +12,7 @@ host_vars
 group_vars
 cronjobs
 src
+sql_scripts
 "
 
 rsync -uav --delete-excluded ${sync_objs} ${remote_srv}

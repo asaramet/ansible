@@ -755,11 +755,11 @@ if __name__ == "__main__":
     print("\n=== Debuging ===")
 
     data_folders = [
-        "aruba-8-ports",
+        "aruba_8_ports",
         #"aruba-12-ports",
         #"aruba-48-ports",
         #"hpe-8-ports",
-        "aruba-stack",
+        "aruba_stack",
         #"aruba-stack-2920",
         #"aruba-stack-2930",
         #"aruba-modular",
@@ -778,16 +778,16 @@ if __name__ == "__main__":
         print("\n Folder: ", data_folder)
 
 
-        debug_locations_json(data_folder)
+        #debug_locations_json(data_folder)
         debug_devices_json(data_folder)
-        debug_device_interfaces_json(data_folder)
-        debug_lags_json(data_folder)
+        #debug_device_interfaces_json(data_folder)
+        #debug_lags_json(data_folder)
 
-        debug_vlans_json(data_folder)
-        debug_untagged_vlans(data_folder)
-        debug_tagged_vlans_json(data_folder)
+        #debug_vlans_json(data_folder)
+        #debug_untagged_vlans(data_folder)
+        #debug_tagged_vlans_json(data_folder)
 
 
-        debug_ip_addresses_json(data_folder)
+        #debug_ip_addresses_json(data_folder)
 
-        debug_modules_json(data_folder)
+        #debug_modules_json(data_folder)

@@ -5,7 +5,7 @@ Pre defined standard objects
 
 import typer, yaml
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Union
 
 from network_inventory import NetworkInventory
 
@@ -16,8 +16,8 @@ project_dir = script_dir.parent
 vault_file = script_dir / "vault"
 vault_password_file = project_dir / "src" / "keys" / "vault_pass_netbox"
 
-host = "192.168.122.140"
-#host = "netbox-bb"
+#host = "192.168.122.140"
+host = "netbox-bb"
 
 # Global variable to store the inventory instance
 inventory: Optional[NetworkInventory] = None
