@@ -118,7 +118,7 @@ def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
             field_type = "Serial"
         else:
             serial_number = None
-            inventory_number = value
+            inventory_number = str(value)
             field_type = "Inventory"
         
         try:
@@ -159,7 +159,7 @@ def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
                         'status': status,
                         'id': existing['id']
                     })
-                    typer.secho(f"  ✓ Updated: {hostname} ({field_type}: {value})", 
+                    typer.secho(f"  \u2713 Updated: {hostname} ({field_type}: {value})", 
                                fg=typer.colors.YELLOW)
                 else:
                     results['skipped'] += 1
@@ -169,7 +169,7 @@ def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
                         'status': 'already_exists',
                         'id': existing['id']
                     })
-                    typer.secho(f"  • Skipped: {hostname} ({field_type}: {value}) - already exists", 
+                    typer.secho(f"  \u2022 Skipped: {hostname} ({field_type}: {value}) - already exists", 
                                fg=typer.colors.BLUE, dim=True)
             else:
                 # Device doesn't exist - add it
@@ -186,7 +186,7 @@ def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
                     'status': 'added',
                     'id': device_id
                 })
-                typer.secho(f"  ✓ Added: {hostname} ({field_type}: {value}, ID: {device_id})", 
+                typer.secho(f"  \u2713 Added: {hostname} ({field_type}: {value}, ID: {device_id})", 
                            fg=typer.colors.GREEN)
                 
         except Exception as e:
@@ -197,7 +197,7 @@ def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
                 'status': 'error',
                 'error': str(e)
             })
-            typer.secho(f"  ✗ Error adding {hostname}: {e}", 
+            typer.secho(f"  \u2717 Error adding {hostname}: {e}", 
                        fg=typer.colors.RED, err=True)
     
     return results
