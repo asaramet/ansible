@@ -755,20 +755,20 @@ if __name__ == "__main__":
     print("\n=== Debuging ===")
 
     data_folders = [
-        "aruba_8_ports",
+        #"aruba_8_ports",
         #"aruba-12-ports",
         #"aruba-48-ports",
-        #"hpe-8-ports",
-        "aruba_stack",
+        "hpe_8_ports",
+        #"aruba_stack",
         #"aruba-stack-2920",
         #"aruba-stack-2930",
         #"aruba-modular",
         #"aruba-modular-stack",
-        #"procurve-single",
+        #"procurve_single",
         #"procurve-modular",
 
         #"aruba_6100",
-        "aruba_6300",
+        #"aruba_6300",
     ]
 
     from std_functions import project_dir

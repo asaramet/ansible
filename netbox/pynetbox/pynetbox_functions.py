@@ -315,6 +315,11 @@ def _bulk_update(endpoint: Endpoint, payloads: list[dict], kind: str) -> list:
         try:
             # Attempt bulk update
             logger.debug(f"Attempting bulk update of {len(payloads)} {kind} object(s)")
+
+            # Temp: dump the full payload to see what's being sent
+            #for p in payloads:
+            #    logger.debug(f" \u2230 Payload: {p}")
+
             updated = endpoint.update(payloads)
             logger.info(f"Bulk-updated {len(updated)} {kind}(s).")
             return updated
@@ -579,34 +584,6 @@ def _format_value_for_log(value) -> str:
         return f"{value[:47]}..."
     
     return str(value)
-'''
-def _delete_netbox_obj(obj: Record) -> bool:
-    """
-    Delete a provided NetBox object (obj)
-    Args:
-        obj: pynetbox response.Response Object to delete from the NetBox platform
-    """
-    if not obj: return False
-
-    try: 
-        obj.delete()
-        logger.info(f"Removed {obj.name}, with id {obj.id}")
-        return True
-    except pynetbox.core.query.RequestError as e:
-        # safe access to underlying HTTP response status code
-        status = getattr(getattr(e, "req", None), "status_code", None)
-        # try to get the server-provided error detail if present
-        detail = getattr(e, "error", None) or getattr(e, "args", None)
-
-        if status == 409:
-            logger.info(f"Skipped {obj.name} (has dependencies). Detail: {detail}")
-        else:
-            logger.error(f"Failed to delete {obj.name}: {detail or e}", exc_info = True)
-        return False
-    except Exception as exc:
-        logger.error(f"Unexpected error deleting {getattr(obj, 'name', obj)}: {exc}", exc_info = True)
-        return False
-'''
 
 def _delete_netbox_obj(obj: Record) -> bool:
     """
@@ -904,7 +881,9 @@ def _debug(description: str, function: callable, **kwargs) -> None:
     nb.http_session.verify = False # Disable SSL verification
 
     files_yaml = [
-        "procurve_modular.yaml",
+        #"procurve_modular.yaml",
+        #"procurve_single.yaml",
+        "hpe_8_ports.yaml",
     ]
 
     for file_name in files_yaml:

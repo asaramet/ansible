@@ -237,7 +237,6 @@ def _build_switch_payload(
                 logger.warning(
                     f"{switch_dict.get('name')}: Failed to resolve virtual chassis '{vc_name}'"
                 )
-        
         return payload
         
     except Exception as e:
@@ -266,6 +265,7 @@ def _build_update_payload(
     Returns:
         Update payload with only changed fields, or None if no changes needed
     """
+        #logger.debug(f"\n\u2317 Switch Dict: {switch_dict}\n\u2318 New: {new_inventory}\n\u2319 Old: {old_inventory}")
     try:
         changes = {'id': existing_switch.id}
         has_changes = False
@@ -281,7 +281,16 @@ def _build_update_payload(
                 has_changes = True
                 logger.debug(f"{existing_switch.name}: Serial changed: '{old_serial}' -> '{new_serial}'")
         # If new_serial is None/empty, skip serial update (preserve existing)
-        
+
+        # Check inventory number (asset tag)
+        new_inventory = (switch_dict.get('asset_tag') or '').strip()
+        old_inventory = str(getattr(existing_switch, 'asset_tag', '') or '').strip()
+
+        if new_inventory and new_inventory != old_inventory:
+            changes['asset_tag'] = new_inventory
+            has_changes = True
+            logger.debug(f"{existing_switch.name}: Asset tag changed: '{old_inventory}' -> '{new_inventory}'")
+
         # Check device role
         if dependencies.get('role') != getattr(existing_switch.role, 'id', None):
             changes['role'] = dependencies['role']
@@ -504,5 +513,8 @@ def switches(nb_session: NetBoxApi, data: dict) -> list:
 
 if __name__ == '__main__':
     from pynetbox_functions import _main
-    
     _main("Add or update switches on a NetBox server", switches)
+
+    #from pynetbox_functions import _debug
+    #_debug("Add or update switches on a NetBox server", switches)
+

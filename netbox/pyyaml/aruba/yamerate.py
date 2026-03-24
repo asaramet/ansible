@@ -146,7 +146,7 @@ def main():
 def debug_single():
     """Debug single switch processing with stdout output."""
     #data_folder = project_dir / "data" / "aruba-12-ports"
-    data_folder = project_dir / "data" / "hpe-8-ports"
+    data_folder = project_dir / "data" / "hpe_8_ports"
 
     print('---Debugging ', data_folder)
     single(data_folder, sys.stdout, ["switch"])
@@ -210,4 +210,5 @@ if __name__ == "__main__":
 
     ## ------ Debug ----------##
     #debug_multiple()
+    #debug_single()
 
