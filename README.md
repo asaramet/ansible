@@ -11,6 +11,25 @@ A collection of Ansible inventories, playbooks, and tools designed to simplify n
 - `wiki` - instructions and how-to guides on various topics related to network administration with Ansible
 - `yaml` - Testing YAML
 
+## Update python virtual environment
+
+```bash
+sudo apt install python3.10-venv
+cd /opt/ansible/
+rm bin/ lib*
+python3 -m venv /opt/ansible
+ansible-init
+```
+
+## Update Ansible over pip
+
+```bash
+pip freeze | sed 's/==.*//' > requirements.txt
+pip uninstall -r requirements.txt -y
+pip cache purge
+pip install -r requirements.txt --upgrade #&& rm requirements.txt
+```
+
 ## Update Ansible collections with `ansible-galaxy`
 
 - First generate the `requirements.yaml` file, by listing installed collections:
@@ -27,12 +46,12 @@ Also check the collections path with:
 ansible-galaxy collection list
 ```
 
-It may be: `/opt/ansible/lib/python3.9/site-packages/ansible_collections`
+It may be: `/opt/ansible/lib/python3.10/site-packages/ansible_collections`
 
 Add it to a temporary variable `$a_path`
 
 ```bash
-a_path='/opt/ansible/lib/python3.9/site-packages/ansible_collections'
+a_path='/opt/ansible/lib/python3.10/site-packages/ansible_collections'
 ```
 
 - Install collections and dependencies to the right folder
