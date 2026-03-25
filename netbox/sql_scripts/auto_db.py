@@ -62,7 +62,12 @@ def is_likely_serial_number(value: str) -> bool:
     # Pure numbers under 7 digits are likely inventory numbers
     if value.isdigit() and len(value) <= 6:
         return False
-    
+
+    # Starts with 'CU-' are likely inventory numbers
+    inventory_prefixes = ['CU-', 'CV-']
+    if any(value.upper().startswith(prefix) for prefix in inventory_prefixes):
+        return False
+
     # Common serial number prefixes
     serial_prefixes = ['FOC', 'SPE', 'CN', 'FDO', 'FCH', 'JAE', 'SAD']
     if any(value.upper().startswith(prefix) for prefix in serial_prefixes):
