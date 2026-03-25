@@ -157,6 +157,7 @@ def devices_json(config_files, device_type_slags, tags):
             vc_position = int(h_name[-1])
             vc_priority = 255 if vc_position == 1 else 128 if vc_position == 2 else 64
             serial = serials.get(h_name)
+            asset_tag = asset_tags.get(h_name)
 
             data['devices'].append({
                 'name': h_name,
@@ -165,6 +166,7 @@ def devices_json(config_files, device_type_slags, tags):
                 'site': site,
                 'tags': tags,
                 'serial': serial,
+                'asset_tag': asset_tag,
                 'virtual_chassis': clean_name,
                 'vc_position': vc_position,
                 'vc_priority': vc_priority
@@ -758,11 +760,11 @@ if __name__ == "__main__":
         #"aruba_8_ports",
         #"aruba-12-ports",
         #"aruba-48-ports",
-        "hpe_8_ports",
-        #"aruba_stack",
+        #"hpe_8_ports",
+        "aruba_stack",
         #"aruba-stack-2920",
         #"aruba-stack-2930",
-        #"aruba-modular",
+        #"aruba_modular",
         #"aruba-modular-stack",
         #"procurve_single",
         #"procurve-modular",
