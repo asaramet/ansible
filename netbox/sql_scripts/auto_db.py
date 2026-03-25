@@ -30,6 +30,11 @@ def invs():
     devices = load_yaml(yaml_invs)
     add_devices_from_list(devices)
 
+@app.command()
+def merge():
+    """Merge duplicate entries"""
+    merge_duplicate_hostnames()
+
 def is_likely_serial_number(value: str) -> bool:
     """
     Determine if a value is likely a serial number vs inventory number
@@ -123,14 +128,8 @@ def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
         
         try:
             # Check if device already exists
-            # For serial numbers, check by hostname + serial
-            # For inventory numbers, check by hostname only (since inventory might change)
-            if is_serial:
-                existing = inventory.get_device(hostname, serial_number, active_only=False)
-            else:
-                # For inventory numbers, just check hostname
-                devices = inventory.get_devices_by_hostname(hostname, active_only=False)
-                existing = devices[0] if devices else None
+            devices = inventory.get_devices_by_hostname(hostname, active_only=False)
+            existing = devices[0] if devices else None
             
             if existing:
                 # Device exists - check if we need to update it
@@ -201,6 +200,63 @@ def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
                        fg=typer.colors.RED, err=True)
     
     return results
+
+def merge_duplicate_hostnames() -> None:
+    """
+    Find hostname with multiple DB entries, merge onto the entry that has a 
+    serial number (to avoid unique constraint violations), then delete the duplicates.
+    """
+
+    all_devices = inventory.get_all_devices(active_only = False)
+
+    # Group by hostname
+    by_hostname: dict[str, list] = {}
+    for device in all_devices:
+        by_hostname.setdefault(device['hostname'], []).append(device)
+
+    for hostname, entries in by_hostname.items():
+        if len(entries) < 2:
+            continue
+
+        # Prefer the entry with a serial number as canonical,
+        # fall back to the oldest (lowest ID) if none have a serial
+        entries_with_serial = [e for e in entries if e.get('serial_number')]
+        if entries_with_serial:
+            canonical = entries_with_serial[0]
+        else:
+            canonical = min(entries, key = lambda d: d['id'])
+
+        duplicates = [e for e in entries if e['id'] != canonical['id']]
+
+        # Merge all non-empty fields onto canonical
+        updates = {}
+        for dup in duplicates:
+            if not canonical.get('serial_number') and dup.get('serial_number'):
+                updates['serial_number'] = dup['serial_number']
+            if not canonical.get('inventory_number') and dup.get('inventory_number'):
+                updates['inventory_number'] = dup['inventory_number']
+
+        if updates:
+            inventory.update_device(canonical['id'], **updates)
+            typer.secho(
+                f"  \u2713 Merged into ID {canonical['id']} ({hostname}): {updates}",
+                fg=typer.colors.GREEN
+            )
+        else:
+            typer.secho(
+                f"  \u2022 No missing fields to merge for {hostname} (ID {canonical['id']})",
+                fg=typer.colors.BLUE, dim=True
+            )
+
+        # Delete duplicates
+        for dup in duplicates:
+            inventory.delete_device(dup['id'])
+            typer.secho(
+                f"  \u2717 Deleted duplicate ID {dup['id']} ({hostname}) "
+                f"serial = {dup.get('serial_number') or '-'}, "
+                f"inv = {dup.get('inventory_number') or '-'}",
+                fg=typer.colors.YELLOW
+            )
 
 if __name__ == "__main__":
     app()
