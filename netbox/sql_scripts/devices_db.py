@@ -70,9 +70,9 @@ def devices_table(devices: List[Dist], title: str = "Network Inventory Devices")
     return table 
 
 @app.command()
-def list(active_only: bool = False):
+def list(active_only: bool = False, inactive_only: bool = False):
     """List all devices"""
-    devices = inventory.get_all_devices(active_only = active_only)
+    devices = inventory.get_all_devices(active_only = active_only, inactive_only = inactive_only)
 
     if not devices:
         typer.secho(f"\u2717 No devices found", fg = typer.colors.YELLOW)

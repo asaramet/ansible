@@ -298,7 +298,7 @@ class NetworkInventory:
                 result = cur.fetchone()
                 return dict(result) if result else None
 
-    def get_all_devices(self, active_only: bool = False) -> List[Dict]:
+    def get_all_devices(self, active_only: bool = False, inactive_only: bool = False) -> List[Dict]:
         """
         Get all devices from inventory
 
@@ -311,6 +311,9 @@ class NetworkInventory:
         query = "SELECT * FROM devices"
         if active_only:
             query += " WHERE active = TRUE"
+
+        if inactive_only:
+            query += " WHERE active = FALSE"
         query += " ORDER BY hostname;"
 
         with self._get_connection() as conn:
