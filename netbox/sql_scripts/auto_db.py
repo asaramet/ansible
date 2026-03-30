@@ -227,11 +227,17 @@ def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
 
 def merge_duplicate_hostnames() -> None:
     """
-    Find hostname with multiple DB entries, merge onto the entry that has a 
-    serial number (to avoid unique constraint violations), then delete the duplicates.
+    Find hostnames with multiple DB entries and merge or separate them.
+
+    Rules when an active and inactive entry share a hostname:
+    - Inactive SN matches active SN (or inactive has no SN) → merge into active, keep active
+    - Active has no SN, inactive has SN → merge SN onto active, set active = False
+    - Both have different SNs → keep active as-is, rename inactive hostname to its serial number
+
+    For duplicate entries with no active/inactive conflict → standard merge onto canonical.
     """
 
-    all_devices = inventory.get_all_devices(active_only = False)
+    all_devices = inventory.get_all_devices(active_only=False)
 
     # Group by hostname
     by_hostname: dict[str, list] = {}
@@ -242,17 +248,70 @@ def merge_duplicate_hostnames() -> None:
         if len(entries) < 2:
             continue
 
-        # Prefer the entry with a serial number as canonical,
-        # fall back to the oldest (lowest ID) if none have a serial
-        entries_with_serial = [e for e in entries if e.get('serial_number')]
-        if entries_with_serial:
-            canonical = entries_with_serial[0]
-        else:
-            canonical = min(entries, key = lambda d: d['id'])
+        active_entries   = [e for e in entries if e.get('active')]
+        inactive_entries = [e for e in entries if not e.get('active')]
 
+        # --- Case: one active, one or more inactive → apply conflict rules ---
+        if active_entries and inactive_entries:
+            active = active_entries[0]  # there should only ever be one active per hostname
+
+            for inactive in inactive_entries:
+                active_sn   = active.get('serial_number')
+                inactive_sn = inactive.get('serial_number')
+
+                if active_sn and inactive_sn and active_sn != inactive_sn:
+                    # Different SNs → genuine replacement, rename inactive to its serial number
+                    new_hostname = inactive_sn
+                    inventory.update_device(inactive['id'], hostname=new_hostname)
+                    typer.secho(
+                        f"  ↷ Renamed inactive ID {inactive['id']} hostname "
+                        f"{hostname!r} → {new_hostname!r} (different SN, likely replaced device)",
+                        fg=typer.colors.CYAN
+                    )
+
+                elif not active_sn and inactive_sn:
+                    # Active missing SN, inactive has one → merge SN onto active, set inactive
+                    updates = {'serial_number': inactive_sn, 'active': False}
+                    if not active.get('inventory_number') and inactive.get('inventory_number'):
+                        updates['inventory_number'] = inactive['inventory_number']
+                    inventory.update_device(active['id'], **updates)
+                    inventory.delete_device(inactive['id'])
+                    typer.secho(
+                        f"  ✓ Merged SN {inactive_sn!r} onto active ID {active['id']} "
+                        f"({hostname}), set to inactive, deleted duplicate ID {inactive['id']}",
+                        fg=typer.colors.GREEN
+                    )
+
+                else:
+                    # Inactive SN matches active SN, or inactive has no SN → simple merge
+                    updates = {}
+                    if not active.get('inventory_number') and inactive.get('inventory_number'):
+                        updates['inventory_number'] = inactive['inventory_number']
+                    if updates:
+                        inventory.update_device(active['id'], **updates)
+                        typer.secho(
+                            f"  ✓ Merged fields into active ID {active['id']} ({hostname}): {updates}",
+                            fg=typer.colors.GREEN
+                        )
+                    else:
+                        typer.secho(
+                            f"  • No missing fields to merge for {hostname} (ID {active['id']})",
+                            fg=typer.colors.BLUE, dim=True
+                        )
+                    inventory.delete_device(inactive['id'])
+                    typer.secho(
+                        f"  ✗ Deleted duplicate ID {inactive['id']} ({hostname}) "
+                        f"serial = {inactive_sn or '-'}, "
+                        f"inv = {inactive.get('inventory_number') or '-'}",
+                        fg=typer.colors.YELLOW
+                    )
+            continue
+
+        # --- Case: all same active status → standard merge onto canonical ---
+        entries_with_serial = [e for e in entries if e.get('serial_number')]
+        canonical = entries_with_serial[0] if entries_with_serial else min(entries, key=lambda d: d['id'])
         duplicates = [e for e in entries if e['id'] != canonical['id']]
 
-        # Merge all non-empty fields onto canonical
         updates = {}
         for dup in duplicates:
             if not canonical.get('serial_number') and dup.get('serial_number'):
@@ -263,20 +322,19 @@ def merge_duplicate_hostnames() -> None:
         if updates:
             inventory.update_device(canonical['id'], **updates)
             typer.secho(
-                f"  \u2713 Merged into ID {canonical['id']} ({hostname}): {updates}",
+                f"  ✓ Merged into ID {canonical['id']} ({hostname}): {updates}",
                 fg=typer.colors.GREEN
             )
         else:
             typer.secho(
-                f"  \u2022 No missing fields to merge for {hostname} (ID {canonical['id']})",
+                f"  • No missing fields to merge for {hostname} (ID {canonical['id']})",
                 fg=typer.colors.BLUE, dim=True
             )
 
-        # Delete duplicates
         for dup in duplicates:
             inventory.delete_device(dup['id'])
             typer.secho(
-                f"  \u2717 Deleted duplicate ID {dup['id']} ({hostname}) "
+                f"  ✗ Deleted duplicate ID {dup['id']} ({hostname}) "
                 f"serial = {dup.get('serial_number') or '-'}, "
                 f"inv = {dup.get('inventory_number') or '-'}",
                 fg=typer.colors.YELLOW
@@ -335,7 +393,7 @@ def sync_devices(device_list: List[Dict], active: bool = False) -> Dict[str, int
                 typer.secho(f"\u2717 Error processing entry {entry}: {e}", fg=typer.colors.RED, err=True)
                 summary['errors'] += 1
 
-    typer.secho(f"\n\u2713Sync complete → updated: {summary['updated']}, "
+    typer.secho(f"\n\u2713 Sync complete → updated: {summary['updated']}, "
           f"added: {summary['added']}, errors: {summary['errors']}", fg=typer.colors.GREEN)
     return summary
 
