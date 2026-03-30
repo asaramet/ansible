@@ -17,7 +17,7 @@ def serials():
     """Populate devices with serial numbers from a local yaml file"""
     typer.secho(f"Populating devices database", fg = typer.colors.GREEN)
 
-    yaml_serials = project_dir / 'src' / 'serial_numbers.yaml'
+    yaml_serials = project_dir / 'src' / 'numbers' /'serial_numbers.yaml'
     devices = load_yaml(yaml_serials)
     add_devices_from_list(devices)
 
@@ -26,9 +26,20 @@ def invs():
     """Populate devices inventory numbers from a local yaml file"""
     typer.secho(f"Populating devices database", fg = typer.colors.GREEN)
 
-    yaml_invs = project_dir / 'src' / 'inv_numbers.yaml'
+    yaml_invs = project_dir / 'src' / 'numbers' / 'inv_numbers.yaml'
     devices = load_yaml(yaml_invs)
     add_devices_from_list(devices)
+
+@app.command()
+def deinv():
+    """Populate devices that aren't inventory tracked from a local yaml file"""
+    typer.secho(f"Populating devices database", fg = typer.colors.GREEN)
+
+    yaml_deinv = project_dir / 'src' / 'numbers' / 'deinventars.yaml'
+    devices = load_yaml(yaml_deinv)
+    #typer.secho(f"Devices: {devices}")
+    sync_devices(devices)
+
 
 @app.command()
 def merge():
@@ -262,6 +273,63 @@ def merge_duplicate_hostnames() -> None:
                 f"inv = {dup.get('inventory_number') or '-'}",
                 fg=typer.colors.YELLOW
             )
+
+def sync_devices(device_list: List[Dict], active: bool = False) -> Dict[str, int]:
+    """
+    Sync a list of devices into the inventory, setting their active status.
+
+    For each device:
+    - If serial number exists in DB → update active flag
+    - If not found → insert new record with given active flag
+
+    Args:
+        device_list: List of dicts like [{'SERIAL': [inventory_number_or_str, hostname_or_str]}, ...]
+                     'None' strings are treated as NULL.
+        active:      Active flag to set for all devices (default: False)
+
+    Returns:
+        Summary dict with counts: {'updated': n, 'added': n, 'errors': n}
+    """
+    summary = {'updated': 0, 'added': 0, 'errors': 0}
+
+    for entry in device_list:
+        for serial, (inv_raw, host_raw) in entry.items():
+            try:
+                def normalize(val) -> Optional[str]:
+                    if val is None:
+                        return None
+                    s = str(val).strip()
+                    return None if s.lower() == 'none' else s
+
+                serial_norm    = normalize(serial)
+                inventory_norm = normalize(inv_raw)
+                hostname_norm  = normalize(host_raw)
+
+                results = inventory.search_devices(serial_norm)
+                match = next(
+                    (d for d in results if d.get('serial_number') == serial_norm),
+                    None
+                )
+
+                if match:
+                    inventory.update_device(match['id'], active=active)
+                    summary['updated'] += 1
+                else:
+                    inventory.add_device(
+                        hostname=hostname_norm or serial_norm,
+                        serial_number=serial_norm,
+                        inventory_number=inventory_norm,
+                        active=active
+                    )
+                    summary['added'] += 1
+
+            except Exception as e:
+                typer.secho(f"\u2717 Error processing entry {entry}: {e}", fg=typer.colors.RED, err=True)
+                summary['errors'] += 1
+
+    typer.secho(f"\n\u2713Sync complete → updated: {summary['updated']}, "
+          f"added: {summary['added']}, errors: {summary['errors']}", fg=typer.colors.GREEN)
+    return summary
 
 if __name__ == "__main__":
     app()

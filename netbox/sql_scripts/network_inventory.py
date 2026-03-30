@@ -222,44 +222,6 @@ class NetworkInventory:
         """Create database connection"""
         return psycopg.connect(**self.conn_params)
 
-    def add_device(self, hostname: str, serial_number: Optional[str] = None,
-                   inventory_number: Optional[str] = None,
-                   active: bool = True) -> int:
-        """
-        Add a new device to inventory
-
-        Args:
-            hostname: Device hostname (required, unique)
-            serial_number: Manufacturer serial number (empty strings converted to NULL)
-            inventory_number: Internal inventory tracking number (empty strings converted to NULL)
-            active: Whether device is active (default: True)
-
-        Returns:
-            Device ID of the newly created record
-
-        Note:
-            Empty strings ('') are automatically converted to NULL for serial_number
-            and inventory_number to maintain data quality. Use NULL/None to indicate
-            missing or unknown values.
-        """
-        # Convert empty strings to None (NULL in database)
-        serial_number = serial_number if serial_number and serial_number.strip() else None
-        inventory_number = inventory_number if inventory_number and inventory_number.strip() else None
-
-        query = """
-            INSERT INTO devices (hostname, serial_number, inventory_number, active)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id;
-        """
-
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, (hostname, serial_number, inventory_number, active))
-                device_id = cur.fetchone()[0]
-                conn.commit()
-                print(f"\u2713 Added device: {hostname} (ID: {device_id})")
-                return device_id
-
     def get_device(self, hostname: str, serial_number: Optional[str] = None, 
                 active_only: bool = True) -> Optional[Dict]:
         """
@@ -386,6 +348,44 @@ class NetworkInventory:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(query, (pattern,))
                 return [dict(row) for row in cur.fetchall()]
+
+    def add_device(self, hostname: str, serial_number: Optional[str] = None,
+                   inventory_number: Optional[str] = None,
+                   active: bool = True) -> int:
+        """
+        Add a new device to inventory
+
+        Args:
+            hostname: Device hostname (required, unique)
+            serial_number: Manufacturer serial number (empty strings converted to NULL)
+            inventory_number: Internal inventory tracking number (empty strings converted to NULL)
+            active: Whether device is active (default: True)
+
+        Returns:
+            Device ID of the newly created record
+
+        Note:
+            Empty strings ('') are automatically converted to NULL for serial_number
+            and inventory_number to maintain data quality. Use NULL/None to indicate
+            missing or unknown values.
+        """
+        # Convert empty strings to None (NULL in database)
+        serial_number = serial_number if serial_number and serial_number.strip() else None
+        inventory_number = inventory_number if inventory_number and inventory_number.strip() else None
+
+        query = """
+            INSERT INTO devices (hostname, serial_number, inventory_number, active)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id;
+        """
+
+        with self._get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (hostname, serial_number, inventory_number, active))
+                device_id = cur.fetchone()[0]
+                conn.commit()
+                print(f"\u2713 Added device: {hostname} (ID: {device_id})")
+                return device_id
 
     def update_device(self, device_id: int, **kwargs) -> bool:
         """
