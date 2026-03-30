@@ -31,15 +31,23 @@ def invs():
     add_devices_from_list(devices)
 
 @app.command()
-def deinv():
-    """Populate devices that aren't inventory tracked from a local yaml file"""
+def delist():
+    """Synchronize inventory delisted devices from a local yaml file"""
     typer.secho(f"Populating devices database", fg = typer.colors.GREEN)
 
-    yaml_deinv = project_dir / 'src' / 'numbers' / 'deinventars.yaml'
-    devices = load_yaml(yaml_deinv)
-    #typer.secho(f"Devices: {devices}")
+    yaml_data = project_dir / 'src' / 'numbers' / 'delisted.yaml'
+    devices = load_yaml(yaml_data)
     sync_devices(devices)
 
+@app.command()
+def extra():
+    """Add extra/unknown active devices from a local yaml file"""
+    typer.secho(f"Populating devices database", fg = typer.colors.GREEN)
+
+    yaml_data = project_dir / 'src' / 'numbers' / 'extra.yaml'
+    devices = load_yaml(yaml_data)
+    #typer.secho(f"Devices: {devices}")
+    sync_devices(devices, True)
 
 @app.command()
 def merge():
