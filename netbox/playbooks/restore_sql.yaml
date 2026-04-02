@@ -1,0 +1,118 @@
+---
+# Restore the NetBoxes Postgres database 
+#
+# RUN
+# - development server
+#   ansible-playbook playbooks/restore_sql.yaml -e dump_file=netbox-2026-04-02.sql.gz
+#
+# - production server
+#   ansible-playbook playbooks/restore_sql.yaml -e production=true -e dump_file=netbox-2026-04-02.sql.gz
+
+- name: Restore PostgreSQL database from dump
+  hosts: "{{ 'hs_netbox' if production | default(false) else 'local' }}"
+  gather_facts: true
+  become: true
+  become_method: sudo
+  become_user: postgres
+  tags: postgresql
+  vars:
+    dump_folder: /opt/db_dumps
+    local_backup_folder: "{{ inventory_dir }}/data/db_dumps"
+    # Override via -e dump_file=netbox-20250402T120000.sql.gz
+    dump_file: ""
+
+  tasks:
+    - name: Fail early if no dump file specified
+      fail:
+        msg: "You must specify a dump file via -e dump_file=<filename>"
+      when: dump_file == ""
+
+    - name: Check if dump file exists locally
+      stat:
+        path: "{{ local_backup_folder }}/{{ dump_file }}"
+      register: local_dump_stat
+      delegate_to: localhost
+      become: false
+
+    - name: Fail if dump file not found locally
+      fail:
+        msg: "Dump file '{{ local_backup_folder }}/{{ dump_file }}' not found locally"
+      when: not local_dump_stat.stat.exists
+
+    - name: Upload dump file to remote host
+      copy:
+        src: "{{ local_backup_folder }}/{{ dump_file }}"
+        dest: "{{ dump_folder }}/{{ dump_file }}"
+        owner: postgres
+        group: postgres
+        mode: '0640'
+      become_user: root
+
+    - name: Confirm restore with user
+      pause:
+        prompt: >
+          WARNING: This will DROP and recreate the 'netbox' database on
+          {{ inventory_hostname }}. All current data will be lost.
+          Type 'yes' to continue, anything else to abort
+      register: confirm
+      delegate_to: localhost
+      become: false
+
+    - name: Abort if not confirmed
+      fail:
+        msg: "Restore aborted by user"
+      when: confirm.user_input | trim != 'yes'
+
+    - name: Stop NetBox service before restore
+      systemd:
+        name: netbox
+        state: stopped
+      become_user: root
+      ignore_errors: true  # service may not exist on non-production
+
+    - name: Drop existing database
+      community.postgresql.postgresql_db:
+        name: netbox
+        state: absent
+
+    - name: Recreate empty database
+      community.postgresql.postgresql_db:
+        name: netbox
+        state: present
+        owner: netbox  # adjust to your netbox db user
+
+    - name: Restore dump into database
+      community.postgresql.postgresql_db:
+        name: netbox
+        state: restore
+        target: "{{ dump_folder }}/{{ dump_file }}"
+
+    - name: Verify restore by checking table count
+      community.postgresql.postgresql_query:
+        db: netbox
+        query: >
+          SELECT COUNT(*) as table_count
+          FROM information_schema.tables
+          WHERE table_schema = 'public'
+      register: table_check
+      failed_when: table_check.query_result[0].table_count | int < 10
+
+    - name: Start NetBox service after restore
+      systemd:
+        name: netbox
+        state: started
+      become_user: root
+      ignore_errors: true
+
+    - name: Clean up uploaded dump file from remote
+      file:
+        path: "{{ dump_folder }}/{{ dump_file }}"
+        state: absent
+
+    - name: Restore summary
+      debug:
+        msg:
+          - "Restore completed successfully"
+          - "Database: netbox on {{ inventory_hostname }}"
+          - "Restored from: {{ dump_file }}"
+          - "Tables found: {{ table_check.query_result[0].table_count }}"
