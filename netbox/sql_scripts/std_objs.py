@@ -16,8 +16,8 @@ project_dir = script_dir.parent
 vault_file = script_dir / "vault"
 vault_password_file = project_dir / "src" / "keys" / "vault_pass_netbox"
 
-#host = "192.168.122.140"
-host = "netbox-bb"
+host = "192.168.122.140"
+#host = "netbox-bb"
 
 # Global variable to store the inventory instance
 inventory: Optional[NetworkInventory] = None
@@ -70,7 +70,8 @@ def get_inventory_connection(
 
 def get_devices_numbers(
         number = "serial_number",
-        active_only: bool = True,
+        active_only: bool = False,
+        inactive_only: bool = False,
         host: str = host,
         vault_file: str = vault_file,
         vault_password_file: str = vault_password_file
@@ -95,7 +96,7 @@ def get_devices_numbers(
     """
 
     inventory = get_inventory_connection(host, vault_file, vault_password_file)
-    devices = inventory.get_all_devices(active_only = active_only)
+    devices = inventory.get_all_devices(active_only = active_only, inactive_only = inactive_only)
     
     # Convert to {hostname: serial_number} format
     return {device['hostname']: device[number] for device in devices}

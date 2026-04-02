@@ -51,7 +51,10 @@ def extra():
 
 @app.command()
 def merge():
-    """Merge duplicate entries"""
+    """Merge duplicate serial number entries, then duplicate hostname entries."""
+    typer.secho("\n── Serial number duplicates ──", fg=typer.colors.WHITE, bold=True)
+    merge_duplicate_serials()
+    typer.secho("\n── Hostname duplicates ──", fg=typer.colors.WHITE, bold=True)
     merge_duplicate_hostnames()
 
 @app.command()
@@ -231,6 +234,70 @@ def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
                        fg=typer.colors.RED, err=True)
     
     return results
+
+def merge_duplicate_serials() -> None:
+    """
+    Find entries sharing the same serial number (possibly with different hostnames)
+    and merge them into the most complete record.
+
+    The canonical entry is chosen by preferring:
+    1. The entry whose hostname differs from the serial number (i.e. has a real hostname)
+    2. Otherwise the oldest (lowest ID)
+
+    The duplicate is deleted after merging any missing fields onto the canonical.
+    """
+
+    all_devices = inventory.get_all_devices(active_only=False)
+
+    # Group by serial number, ignoring entries with no serial
+    by_serial: dict[str, list] = {}
+    for device in all_devices:
+        sn = device.get('serial_number')
+        if sn and sn.lower() != 'none': # skip NULL and None strings
+            by_serial.setdefault(sn, []).append(device)
+
+    for serial, entries in by_serial.items():
+        if len(entries) < 2:
+            continue
+
+        # Prefer entry whose hostname is not just the serial number itself
+        entries_with_real_hostname = [e for e in entries if e['hostname'] != serial]
+        if entries_with_real_hostname:
+            canonical = entries_with_real_hostname[0]
+        else:
+            canonical = min(entries, key=lambda d: d['id'])
+
+        duplicates = [e for e in entries if e['id'] != canonical['id']]
+
+        updates = {}
+        for dup in duplicates:
+            if not canonical.get('inventory_number') and dup.get('inventory_number'):
+                updates['inventory_number'] = dup['inventory_number']
+            # Carry over active=True if any duplicate was active
+            if not canonical.get('active') and dup.get('active'):
+                updates['active'] = True
+
+        if updates:
+            inventory.update_device(canonical['id'], **updates)
+            typer.secho(
+                f"  ✓ Merged into ID {canonical['id']} ({canonical['hostname']}): {updates}",
+                fg=typer.colors.GREEN
+            )
+        else:
+            typer.secho(
+                f"  • No missing fields to merge for serial {serial!r} "
+                f"(kept ID {canonical['id']}, hostname {canonical['hostname']!r})",
+                fg=typer.colors.BLUE, dim=True
+            )
+
+        for dup in duplicates:
+            inventory.delete_device(dup['id'])
+            typer.secho(
+                f"  ✗ Deleted duplicate ID {dup['id']} "
+                f"(hostname={dup['hostname']!r}, serial={serial!r}, "
+                f"inv={dup.get('inventory_number') or '-'})",
+                fg=typer.colors.YELLOW
+            )
 
 def merge_duplicate_hostnames() -> None:
     """

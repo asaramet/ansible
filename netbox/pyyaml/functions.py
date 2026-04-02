@@ -37,7 +37,7 @@ def serial_numbers_yaml():
 
     return s_dict 
 
-def serial_numbers(number = "serial_number"):
+def serial_numbers(number = "serial_number", active_only = False, inactive_only = False):
     sql_folder = project_dir / 'sql_scripts'
 
     if not sql_folder.exists():
@@ -51,7 +51,7 @@ def serial_numbers(number = "serial_number"):
     path.insert(0, str(sql_folder))
     from std_objs import get_devices_numbers
 
-    return get_devices_numbers(number)
+    return get_devices_numbers(number, active_only, inactive_only)
 
 # return a tuple (section, value), ex: (interface, interface_name), recursively from a switch config
 def recursive_section_search(text, section, value):
@@ -189,4 +189,6 @@ def _debug(function: callable, *args, **kwargs) -> None:
 
 if __name__ == "__main__":
     #_debug(serial_numbers_yaml)
-    _debug(serial_numbers, 'inventory_number')
+    #_debug(serial_numbers, 'inventory_number')
+    #_debug(serial_numbers, 'inventory_number')
+    _debug(serial_numbers, inactive_only = True)
