@@ -13,6 +13,7 @@
   gather_facts: false
   vars: 
     dump_folder: &dump_folder "/opt/db_dumps"
+    dump_filename: &dump_filename "netbox-{{ ansible_facts.date_time.date }}.sql.gz"
     backup_to_99: &backup_to_99 true
     local_backup_folder: &local_backup_folder "{{ inventory_dir }}/data/db_dumps"
     production: true
@@ -62,24 +63,47 @@
   gather_facts: true
   become: true # run as root
   tags: postgresql
-  become_method: su
+  become_method: sudo
   become_user: postgres # change to postgres user
   vars:
     dump_folder: *dump_folder
+    dump_filename: *dump_filename
     local_backup_folder: *local_backup_folder
+    dump_target: "{{ dump_folder }}/{{ dump_filename }}"
   tasks: 
-    - name: "Dump the 'netbox' database to {{ dump_folder }} with compression"
+    - name: "Dump the 'netbox' database to {{ dump_target }} with compression"
       community.postgresql.postgresql_db:
         name: netbox
         state: dump
-        target: "{{ dump_folder }}/netbox-{{ ansible_facts.date_time.date }}.sql.gz"
-        dump_extra_args: --exclude-table-data extras_cachedvalue --exclude-table-data extras_objectchange
+        target: "{{ dump_target }}"
+        dump_extra_args: >-
+          --exclude-table-data extras_cachedvalue 
+          --exclude-table-data extras_objectchange
+    
+    - name: Verify dump file exists and is non-empty
+      stat: 
+        path: "{{ dump_target }}"
+      register: dump_stat
+      failed_when: not dump_stat.stat.exists or dump_stat.stat.size == 0
 
-    - name: Backup remote data to "{{ local_backup_folder }}"
+    - name: Fetch dump to "{{ local_backup_folder }}"
       fetch:
-        src: "{{ dump_folder }}/netbox-{{ ansible_facts.date_time.date }}.sql.gz"
+        src: "{{ dump_target }}"
         dest: "{{ local_backup_folder }}/"
         flat: true
+
+    - name: Register dumps older than 30 days
+      find:
+        paths: "{{ dump_folder }}"
+        patterns: "netbox-*.sql.gz"
+        age: 90d
+      register: old_dumps
+
+    - name: Delete old dump files
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_dumps.files }}"
 
 - name: Double backup to an internal server
   hosts: rhlx99
@@ -99,5 +123,18 @@
         - "netbox-{{ ansible_facts.date_time.date }}.sql.gz"
         - "localdata.tgz"
       when: backup_to_99
+
+    - name: Register dumps older than 30 days
+      find:
+        paths: "{{ backup_folder }}"
+        patterns: "netbox-*.sql.gz"
+        age: 90d
+      register: old_dumps
+
+    - name: Delete old dump files
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_dumps.files }}"
 
 
