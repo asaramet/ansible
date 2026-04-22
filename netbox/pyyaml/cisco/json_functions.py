@@ -927,4 +927,5 @@ def ip_addresses_json(data_folder):
 if __name__ == "__main__":
     from functions import _debug
 
-    _debug(ip_addresses_json, data_folder)
+    #_debug(ip_addresses_json, data_folder)
+    _debug(vlans_json, data_folder)

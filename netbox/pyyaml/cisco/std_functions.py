@@ -43,6 +43,7 @@ _DEVICE_TYPE_BOOT_RE = re.compile(r'^boot\s+system\s+.*?:(cat\d+\w*|ws-c\d+\w*-\
 
 # Pre-compiled regex patterns for get_ip_addresses() - performance optimization
 _IP_INTERFACE_RE = re.compile(r'^interface\s+(Vlan\d+|Loopback\d+)(?:\s|$)')
+_IP_MGMT_INTERFACE_RE = re.compile(r'^interface\s+(GigabitEthernet0/0\d*|Vlan[123]01\d*)(?:\s|$)')
 _IP_DESCRIPTION_RE = re.compile(r'^\s+description\s+(.+?)\s*$')
 _IP_ADDRESS_RE = re.compile(r'^\s+ip\s+address\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)')
 
@@ -667,7 +668,7 @@ def get_ip_addresses(config_file):
             for line in f:
                 # Match: "interface <type><number>"
                 # Focus on VLAN interfaces (SVIs) and Loopback interfaces
-                interface_match = _IP_INTERFACE_RE.match(line)
+                interface_match = _IP_MGMT_INTERFACE_RE.match(line)
 
                 if interface_match:
                     # Start new interface
