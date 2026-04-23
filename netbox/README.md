@@ -81,5 +81,8 @@ sudo pacman -Syu python-pynetbox python-packaging
   - `cisco` - Collect Cisco devices data from config files and generate a yaml data file.
     - `yamerate.py` - Collect data from config files and generate the yaml data file.
 - `sql_scripts` - Manage devices Postgres database as well as the interaction with the NetBox data.
+  - `auto_db.py` - Automatically manage `network_inventory` database on the PostgreSQL server.
+  - `backup_database.py` - Backup, purge and restore the `network_inventory` PostgreSQL database.
   - `devices_db.py` - Interact with 'devices' table in the Postgres database, over CLI.
-  - `network_inventory.py` - NetworkInventory class to interact with the network_inventory PostgreSQL database.
+  - `network_inventory.py` - NetworkInventory class to interact with the `network_inventory` PostgreSQL database.
+  - `std_obj.py` - Pre defined `sql_scripts` project objects.
