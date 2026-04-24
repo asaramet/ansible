@@ -10,8 +10,12 @@ Install required packages:
     - sudo pacman -Sy postgresql (or equivalent for your distro)
 
 Usage:
-    Backup: python backup_database.py backup --output backup_file.sql
-    Restore: python backup_database.py restore --input backup_file.sql
+    Backup: 
+        - python backup_database.py backup 
+        - python backup_database.py backup --output backup_file.sql
+    Restore: 
+        - python backup_database.py restore
+        - python backup_database.py restore --input backup_file.sql
 """
 
 import os, typer

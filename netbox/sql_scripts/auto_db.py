@@ -49,7 +49,7 @@ def extra():
     #typer.secho(f"Devices: {devices}")
     sync_devices(devices, True)
 
-@app.command()
+#@app.command()
 def merge():
     """Merge duplicate serial number entries, then duplicate hostname entries."""
     typer.secho("\n── Serial number duplicates ──", fg=typer.colors.WHITE, bold=True)
@@ -71,11 +71,13 @@ def is_likely_serial_number(value: str) -> bool:
     Serial numbers typically:
     - Contain mix of letters and numbers
     - Are longer (usually 10+ characters)
-    - Often have specific patterns (FOC, SPE, CN, FDO prefixes)
+    - Have specific vendor prefixes (FOC, SPE, CN, FDO, etc.)
     
     Inventory numbers typically:
-    - Are purely numeric or very short
-    - Usually 4-6 digits
+    - Shorter format codes (HB-001199, CU-230327)
+    - Have dashes or structured patterns
+    - Pure numbers (12345)
+    - Institution-specific prefixes
     
     Args:
         value: String to check
@@ -88,174 +90,61 @@ def is_likely_serial_number(value: str) -> bool:
     
     value = value.strip()
     
+    # Empty after strip
+    if not value:
+        return False
+    
     # Pure numbers under 7 digits are likely inventory numbers
     if value.isdigit() and len(value) <= 6:
         return False
-
-    # Starts with 'CU-' are likely inventory numbers
-    inventory_prefixes = ['CU-', 'CV-']
-    if any(value.upper().startswith(prefix) for prefix in inventory_prefixes):
-        return False
-
-    # Common serial number prefixes
-    serial_prefixes = ['FOC', 'SPE', 'CN', 'FDO', 'FCH', 'JAE', 'SAD']
+    
+    # Common vendor serial number prefixes (definitive indicators)
+    serial_prefixes = ['FOC', 'SPE', 'CN', 'FDO', 'FCH', 'JAE', 'SAD', 'CZ']
     if any(value.upper().startswith(prefix) for prefix in serial_prefixes):
         return True
+    
+    # Common inventory number patterns (institution-specific)
+    # Format: 2-3 letters, dash, numbers (HB-001199, CU-230327)
+    import re
+    inventory_pattern = r'^[A-Z]{2,3}-\d+$'
+    if re.match(inventory_pattern, value.upper()):
+        return False
     
     # Serial numbers usually have letters and numbers mixed
     has_letters = any(c.isalpha() for c in value)
     has_numbers = any(c.isdigit() for c in value)
     
     # If it has both letters and numbers and is long enough, likely serial
-    if has_letters and has_numbers and len(value) >= 8:
+    # Serial numbers are typically 10+ characters
+    if has_letters and has_numbers and len(value) >= 10:
         return True
     
-    # Default: if purely numeric and short, it's inventory
+    # Shorter alphanumeric strings (less than 10 chars) are likely inventory
+    if has_letters and has_numbers and len(value) < 10:
+        return False
+    
+    # Default: if purely numeric, it's inventory
     if value.isdigit():
         return False
     
-    # If we're unsure but it has letters, assume serial
+    # If we're unsure but it has letters, assume serial (conservative)
     return has_letters
-
-
-def add_devices_from_list_old(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
-    """
-    Add multiple devices from a list of {hostname: value} dictionaries
-    Auto-detects if value is serial_number or inventory_number
-    
-    Args:
-        devices_list: List of dicts, each with one key-value pair {hostname: value}
-        Examples:
-            [{'rsgw10118sp-1': '18128'}]  → Detected as inventory_number
-            [{'rgcs0003-1': 'SPE192400AA'}]  → Detected as serial_number
-    
-    Returns:
-        Dictionary with statistics: {added: int, skipped: int, errors: int, details: list}
-    """
-    results = {
-        'added': 0,
-        'skipped': 0,
-        'reactivated': 0,
-        'skipped': 0,
-        'errors': 0,
-        'details': []
-    }
-    
-    for device_dict in devices_list:
-        # Extract hostname and value from dict
-        if not device_dict:
-            continue
-        
-        hostname, value = next(iter(device_dict.items()))
-        
-        # Determine if value is serial number or inventory number
-        is_serial = is_likely_serial_number(value)
-        
-        if is_serial:
-            serial_number = value
-            inventory_number = None
-            field_type = "Serial"
-        else:
-            serial_number = None
-            inventory_number = str(value)
-            field_type = "Inventory"
-        
-        try:
-            # Check if device already exists
-            devices = inventory.get_devices_by_hostname(hostname, active_only=False)
-            existing = devices[0] if devices else None
-            
-            if existing:
-                # Device exists - check if we need to update it
-                needs_update = False
-                updates = {}
-                
-                if not existing['active']:
-                    updates['active'] = True
-                    needs_update = True
-                
-                # Update the field that was provided
-                if is_serial and existing['serial_number'] != serial_number:
-                    updates['serial_number'] = serial_number
-                    needs_update = True
-                elif not is_serial and existing['inventory_number'] != inventory_number:
-                    updates['inventory_number'] = inventory_number
-                    needs_update = True
-                
-                if needs_update:
-                    inventory.update_device(existing['id'], **updates)
-                    status = 'reactivated' if 'active' in updates else 'updated'
-                    results['reactivated'] += 1 if status == 'reactivated' else 0
-                    results['details'].append({
-                        'hostname': hostname,
-                        field_type.lower(): value,
-                        'status': status,
-                        'id': existing['id']
-                    })
-                    typer.secho(f"  \u2713 Updated: {hostname} ({field_type}: {value})", 
-                               fg=typer.colors.YELLOW)
-                else:
-                    results['skipped'] += 1
-                    results['details'].append({
-                        'hostname': hostname,
-                        field_type.lower(): value,
-                        'status': 'already_exists',
-                        'id': existing['id']
-                    })
-                    typer.secho(f"  \u2022 Skipped: {hostname} ({field_type}: {value}) - already exists", 
-                               fg=typer.colors.BLUE, dim=True)
-            else:
-                # Device doesn't exist - add it
-                device_id = inventory.add_device(
-                    hostname=hostname,
-                    serial_number=serial_number,
-                    inventory_number=inventory_number,
-                    active=True
-                )
-                results['added'] += 1
-                results['details'].append({
-                    'hostname': hostname,
-                    field_type.lower(): value,
-                    'status': 'added',
-                    'id': device_id
-                })
-                typer.secho(f"  \u2713 Added: {hostname} ({field_type}: {value}, ID: {device_id})", 
-                           fg=typer.colors.GREEN)
-                
-        except Exception as e:
-            results['errors'] += 1
-            results['details'].append({
-                'hostname': hostname,
-                field_type.lower(): value,
-                'status': 'error',
-                'error': str(e)
-            })
-            typer.secho(f"  \u2717 Error adding {hostname}: {e}", 
-                       fg=typer.colors.RED, err=True)
-    
-    return results
 
 def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
     """
     Add multiple devices from a list of {hostname: value} dictionaries
     Auto-detects if value is serial_number or inventory_number
     
-    If a device with the same hostname but different serial exists:
-    - Renames old device's hostname to its serial number
-    - Adds new device with the original hostname
-    
     Args:
         devices_list: List of dicts, each with one key-value pair {hostname: value}
-        Examples:
-            [{'rsgw10118sp-1': '18128'}]  → Detected as inventory_number
-            [{'rgcs0003-1': 'SPE192400AA'}]  → Detected as serial_number
     
     Returns:
-        Dictionary with statistics: {added: int, skipped: int, errors: int, details: list}
+        Dictionary with statistics
     """
     results = {
         'added': 0,
         'renamed': 0,
+        'updated': 0,
         'reactivated': 0,
         'skipped': 0,
         'errors': 0,
@@ -269,111 +158,149 @@ def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
         
         hostname, value = next(iter(device_dict.items()))
         
+        # Convert value to string if it's not already
+        value_str = str(value) if value is not None else None
+        
         # Determine if value is serial number or inventory number
-        is_serial = is_likely_serial_number(value)
+        is_serial = is_likely_serial_number(value_str) if value_str else False
         
         if is_serial:
-            serial_number = value
+            serial_number = value_str
             inventory_number = None
             field_type = "Serial"
         else:
             serial_number = None
-            inventory_number = value
+            inventory_number = value_str
             field_type = "Inventory"
         
         try:
-            # Check if device exists with this exact hostname and serial/inventory
-            if is_serial:
-                exact_match = inventory.get_device(hostname, serial_number, active_only=False)
-            else:
-                # For inventory numbers, check hostname + inventory
-                all_hostname_devices = inventory.get_devices_by_hostname(hostname, active_only=False)
-                exact_match = next(
-                    (d for d in all_hostname_devices if d['inventory_number'] == inventory_number),
-                    None
-                )
+            # Get all devices with this hostname
+            hostname_devices = inventory.get_devices_by_hostname(hostname, active_only=False)
             
-            if exact_match:
-                # Exact match exists - just reactivate if needed
-                if not exact_match['active']:
-                    inventory.update_device(exact_match['id'], active=True)
-                    results['reactivated'] += 1
-                    results['details'].append({
-                        'hostname': hostname,
-                        field_type.lower(): value,
-                        'status': 'reactivated',
-                        'id': exact_match['id']
-                    })
-                    typer.secho(f"  ✓ Reactivated: {hostname} ({field_type}: {value})", 
-                               fg=typer.colors.YELLOW)
+            if is_serial:
+                # For serial numbers: check if exact match exists
+                exact_match = inventory.get_device(hostname, serial_number, active_only=False)
+                
+                if exact_match:
+                    # Exact match exists - just reactivate if needed
+                    if not exact_match['active']:
+                        inventory.update_device(exact_match['id'], active=True)
+                        results['reactivated'] += 1
+                        typer.secho(f"  ✓ Reactivated: {hostname} (Serial: {value_str})", 
+                                   fg=typer.colors.YELLOW)
+                    else:
+                        results['skipped'] += 1
+                        typer.secho(f"  • Skipped: {hostname} (Serial: {value_str}) - already exists", 
+                                   fg=typer.colors.BLUE, dim=True)
                 else:
-                    results['skipped'] += 1
-                    results['details'].append({
-                        'hostname': hostname,
-                        field_type.lower(): value,
-                        'status': 'already_exists',
-                        'id': exact_match['id']
-                    })
-                    typer.secho(f"  • Skipped: {hostname} ({field_type}: {value}) - already exists", 
-                               fg=typer.colors.BLUE, dim=True)
+                    # Different serial - need to handle old device(s)
+                    if hostname_devices:
+                        for old_device in hostname_devices:
+                            old_serial = old_device['serial_number']
+                            
+                            if old_serial:
+                                new_hostname = old_serial
+                                
+                                # Check if the new hostname already exists
+                                existing_with_new_hostname = inventory.get_devices_by_hostname(
+                                    new_hostname, active_only=False
+                                )
+                                
+                                if existing_with_new_hostname:
+                                    # Target hostname already exists
+                                    # Check if it's the same device (same serial)
+                                    same_device = any(
+                                        d['serial_number'] == old_serial 
+                                        for d in existing_with_new_hostname
+                                    )
+                                    
+                                    if same_device:
+                                        # It's already renamed, just mark as inactive
+                                        typer.secho(
+                                            f"  • Device already renamed: {hostname} → {new_hostname} (marking old as inactive)",
+                                            fg=typer.colors.BLUE, dim=True
+                                        )
+                                        inventory.update_device(old_device['id'], active=False)
+                                    else:
+                                        # Different device exists with that hostname, need unique name
+                                        new_hostname = f"{old_serial}_old_{old_device['id']}"
+                                        typer.secho(
+                                            f"  ⚠ Renaming: {hostname} → {new_hostname} (conflict resolved)",
+                                            fg=typer.colors.MAGENTA
+                                        )
+                                        inventory.update_device(
+                                            old_device['id'], 
+                                            hostname=new_hostname,
+                                            active=False
+                                        )
+                                        results['renamed'] += 1
+                                else:
+                                    # No conflict, rename as planned
+                                    typer.secho(
+                                        f"  ⚠ Renaming: {hostname} → {new_hostname} (preserving old serial)",
+                                        fg=typer.colors.MAGENTA
+                                    )
+                                    inventory.update_device(
+                                        old_device['id'], 
+                                        hostname=new_hostname,
+                                        active=False
+                                    )
+                                    results['renamed'] += 1
+                            else:
+                                # No serial - use ID suffix
+                                new_hostname = f"{hostname}_old_{old_device['id']}"
+                                typer.secho(
+                                    f"  ⚠ Renaming: {hostname} → {new_hostname}",
+                                    fg=typer.colors.MAGENTA
+                                )
+                                inventory.update_device(
+                                    old_device['id'], 
+                                    hostname=new_hostname,
+                                    active=False
+                                )
+                                results['renamed'] += 1
+                    
+                    # Add new device
+                    device_id = inventory.add_device(
+                        hostname=hostname,
+                        serial_number=serial_number,
+                        active=True
+                    )
+                    results['added'] += 1
+                    typer.secho(f"  ✓ Added: {hostname} (Serial: {value_str}, ID: {device_id})", 
+                               fg=typer.colors.GREEN)
+            
             else:
-                # No exact match - check if hostname exists with different serial/inventory
-                hostname_devices = inventory.get_devices_by_hostname(hostname, active_only=False)
-                
+                # For inventory numbers: update existing device or add new
                 if hostname_devices:
-                    # Hostname exists with different serial/inventory
-                    # Rename old device(s) to preserve them
-                    for old_device in hostname_devices:
-                        old_serial = old_device['serial_number']
-                        old_inventory = old_device['inventory_number']
-                        
-                        # Determine new hostname for old device
-                        if old_serial:
-                            new_hostname = old_serial
-                            typer.secho(f"  ⚠ Renaming: {hostname} → {new_hostname} (preserving old serial: {old_serial})", 
-                                       fg=typer.colors.MAGENTA)
-                        elif old_inventory:
-                            new_hostname = f"{hostname}_inv{old_inventory}"
-                            typer.secho(f"  ⚠ Renaming: {hostname} → {new_hostname} (preserving old inventory: {old_inventory})", 
-                                       fg=typer.colors.MAGENTA)
-                        else:
-                            # No serial or inventory - use ID
-                            new_hostname = f"{hostname}_old_{old_device['id']}"
-                            typer.secho(f"  ⚠ Renaming: {hostname} → {new_hostname} (no serial/inventory)", 
-                                       fg=typer.colors.MAGENTA)
-                        
-                        # Rename old device
-                        inventory.update_device(old_device['id'], hostname=new_hostname)
-                        results['renamed'] += 1
-                        results['details'].append({
-                            'old_hostname': hostname,
-                            'new_hostname': new_hostname,
-                            'status': 'renamed',
-                            'id': old_device['id']
-                        })
-                
-                # Now add the new device with the original hostname
-                device_id = inventory.add_device(
-                    hostname=hostname,
-                    serial_number=serial_number,
-                    inventory_number=inventory_number,
-                    active=True
-                )
-                results['added'] += 1
-                results['details'].append({
-                    'hostname': hostname,
-                    field_type.lower(): value,
-                    'status': 'added',
-                    'id': device_id
-                })
-                typer.secho(f"  ✓ Added: {hostname} ({field_type}: {value}, ID: {device_id})", 
-                           fg=typer.colors.GREEN)
+                    # Device exists - update inventory number
+                    device = hostname_devices[0]  # Take first match
+                    
+                    if device['inventory_number'] != inventory_number:
+                        inventory.update_device(device['id'], inventory_number=inventory_number)
+                        results['updated'] += 1
+                        typer.secho(f"  ✓ Updated: {hostname} (Inventory: {value_str})", 
+                                   fg=typer.colors.CYAN)
+                    else:
+                        results['skipped'] += 1
+                        typer.secho(f"  • Skipped: {hostname} (Inventory: {value_str}) - unchanged", 
+                                   fg=typer.colors.BLUE, dim=True)
+                else:
+                    # No device exists - add new with inventory number
+                    device_id = inventory.add_device(
+                        hostname=hostname,
+                        inventory_number=inventory_number,
+                        active=True
+                    )
+                    results['added'] += 1
+                    typer.secho(f"  ✓ Added: {hostname} (Inventory: {value_str}, ID: {device_id})", 
+                               fg=typer.colors.GREEN)
                 
         except Exception as e:
             results['errors'] += 1
             results['details'].append({
                 'hostname': hostname,
-                field_type.lower(): value,
+                field_type.lower(): value_str,
                 'status': 'error',
                 'error': str(e)
             })
@@ -743,6 +670,41 @@ def add_devices_from_dict(devices_dict: Dict[str, List]) -> Dict[str, any]:
                         fg=typer.colors.RED, err=True)
 
     return results
+
+def test_detection():
+    """Test serial vs inventory detection"""
+    test_cases = [
+        # Serial numbers
+        ('SPE192400AA', True, 'Serial'),
+        ('FOC1749S09J', True, 'Serial'),
+        ('FDO2433087X', True, 'Serial'),
+        ('CN14KNN1VZ', True, 'Serial'),
+        ('CN0BHKX2CM', True, 'Serial'),
+        ('CZ00001', True, 'Serial'),
+        ('ABC123DEF456', True, 'Serial'),
+        
+        # Inventory numbers
+        ('HB-001199', False, 'Inventory'),
+        ('CU-230327', False, 'Inventory'),
+        ('18128', False, 'Inventory'),
+        ('20059', False, 'Inventory'),
+        ('123456', False, 'Inventory'),
+        ('AB-12345', False, 'Inventory'),
+        ('XYZ-999', False, 'Inventory'),
+    ]
+    
+    print("Detection Tests:")
+    print("-" * 60)
+    for value, expected, label in test_cases:
+        result = is_likely_serial_number(value)
+        status = "✓" if result == expected else "✗"
+        detected = "Serial" if result else "Inventory"
+        print(f"{status} {value:20} → {detected:10} (expected: {label})")
+
+@app.command()
+def debug():
+    "Run test cases for debugging"
+    test_detection()
 
 if __name__ == "__main__":
     app()
