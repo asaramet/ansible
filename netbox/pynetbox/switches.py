@@ -16,7 +16,7 @@ Supports:
 '''
 
 import logging
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 
 from pynetbox.core.api import Api as NetBoxApi
 
@@ -363,6 +363,77 @@ def _build_update_payload(
         return None
 
 
+def _handle_serial_conflict(
+    nb_session: NetBoxApi,
+    switch_dict: dict,
+    existing_switch: object,
+    dependencies: dict[str, int]
+) -> Optional[dict]:
+    """
+    Handle serial number conflicts by renaming existing device.
+    
+    Simplified logic:
+    1. If device has different serial than new data → rename existing to old serial
+    2. Skip creating new device (will be handled separately)
+    3. Log info that device was skipped for creation
+    
+    Args:
+        nb_session: pynetbox API session
+        switch_dict: Switch data from YAML
+        existing_switch: Existing NetBox device object
+        dependencies: Resolved dependency IDs
+        
+    Returns:
+        Update payload for existing device, or None if no conflict
+    """
+    # Get serial numbers
+    new_serial = switch_dict.get('serial')
+    old_serial = getattr(existing_switch, 'serial', '') or ''
+    
+    # Get asset tags
+    new_asset_tag = (switch_dict.get('asset_tag') or '').strip()
+    old_asset_tag = str(getattr(existing_switch, 'asset_tag', '') or '').strip()
+    
+    # Case 1: Serial conflict - different serial numbers
+    if new_serial and old_serial and new_serial != old_serial:
+        logger.info(f"Serial conflict detected for {existing_switch.name}: "
+                   f"existing serial '{old_serial}' vs new serial '{new_serial}'")
+        
+        # Rename existing device to its current serial number
+        update_payload = {
+            'id': existing_switch.id,
+            'name': old_serial
+        }
+        
+        # Keep other attributes the same except name
+        if old_asset_tag:
+            update_payload['asset_tag'] = old_asset_tag
+        if old_serial:
+            update_payload['serial'] = old_serial
+        
+        # Log that we're skipping creation of new device
+        logger.info(f"Skipped creating new device '{switch_dict['name']}' with serial '{new_serial}' - "
+                   f"it will be created separately later")
+        
+        return update_payload
+    
+    # Case 2: No existing serial but new serial provided - update existing device
+    elif new_serial and not old_serial:
+        logger.info(f"Adding serial to device {existing_switch.name}: '{new_serial}'")
+        # This will be handled by normal update logic, no conflict
+        return None
+    
+    # Case 3: No new serial but existing serial - keep existing
+    elif not new_serial and old_serial:
+        logger.info(f"Keeping existing serial for {existing_switch.name}: '{old_serial}'")
+        # This will be handled by normal update logic, no conflict
+        return None
+    
+    # Case 4: No serials at all - nothing to do
+    else:
+        return None
+
+
 def _categorize_switches(
     nb_session: NetBoxApi,
     switches_data: list[dict]
@@ -402,12 +473,25 @@ def _categorize_switches(
         if not dependencies:
             error_count += 1
             continue
+        logger.debug(f"-> Switch dependencies: {dependencies}")
         
         # Check if switch exists
         existing_switch = existing_devices.get(switch_name)
         
         if existing_switch:
-            # Build update payload (only if there are changes)
+            # Check for serial conflicts first
+            conflict_update = _handle_serial_conflict(
+                nb_session, switch_dict, existing_switch, dependencies
+            )
+            
+            if conflict_update:
+                # We have a serial conflict - rename existing device
+                update_payloads.append(conflict_update)
+                logger.info(f"Resolved serial conflict for {switch_name}: "
+                          f"renamed existing device to '{conflict_update['name']}'")
+                continue
+            
+            # No conflict, proceed with normal update logic
             update_payload = _build_update_payload(
                 nb_session, switch_dict, existing_switch, dependencies
             )
@@ -428,6 +512,20 @@ def _categorize_switches(
         f"Categorization complete: {len(create_payloads)} to create, "
         f"{len(update_payloads)} to update, {skipped_count} unchanged, {error_count} errors"
     )
+
+    if create_payloads:
+        logger.debug(f"✓ Payloads to create:")
+        index = 1
+        for payload in create_payloads:
+            logger.debug(f"{index}: {payload}")
+            index = index + 1 
+    
+    if update_payloads:
+        logger.debug(f"• Payloads to update:")
+        index = 1
+        for payload in update_payloads:
+            logger.debug(f"{index}: {payload}")
+            index = index + 1 
     
     return create_payloads, update_payloads, error_count
 
@@ -513,8 +611,9 @@ def switches(nb_session: NetBoxApi, data: dict) -> list:
 
 if __name__ == '__main__':
     from pynetbox_functions import _main
-    _main("Add or update switches on a NetBox server", switches)
+    #_main("Add or update switches on a NetBox server", switches)
 
-    #from pynetbox_functions import _debug
-    #_debug("Add or update switches on a NetBox server", switches)
+    from pynetbox_functions import _debug
+    #_debug(switches)
+    _debug(_categorize_switches, "devices")
 

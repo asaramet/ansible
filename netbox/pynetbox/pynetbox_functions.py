@@ -814,27 +814,27 @@ def _main(description: str, function: callable, **kwargs) -> None:
     nb.http_session.verify = False # Disable SSL verification
 
     files_yaml = [
-        "procurve_single.yaml",
-        "procurve_modular.yaml",
+#        "procurve_single.yaml",
+#        "procurve_modular.yaml",
 
         "hpe_8_ports.yaml",
-        "hpe_24_ports.yaml",
+#        "hpe_24_ports.yaml",
 
-        "aruba_8_ports.yaml",
-        "aruba_12_ports.yaml",
-        "aruba_48_ports.yaml",
+#        "aruba_8_ports.yaml",
+#        "aruba_12_ports.yaml",
+#        "aruba_48_ports.yaml",
 
-        "aruba_stack.yaml",
-        "aruba_stack_2920.yaml",
-        "aruba_stack_2930.yaml",
+#        "aruba_stack.yaml",
+#        "aruba_stack_2920.yaml",
+#        "aruba_stack_2930.yaml",
 
-        "aruba_modular.yaml",
-        "aruba_modular_stack.yaml",
+#        "aruba_modular.yaml",
+#        "aruba_modular_stack.yaml",
 
         "aruba_6100.yaml",
-        "aruba_6300.yaml", 
+#        "aruba_6300.yaml", 
         
-        "cisco.yaml"
+#        "cisco.yaml"
     ]
     
 
@@ -845,13 +845,13 @@ def _main(description: str, function: callable, **kwargs) -> None:
         # Call the passed function, with additional arguments
         function(nb, data, **kwargs)
 
-def _debug(description: str, function: callable, **kwargs) -> None:
+def _debug(function: callable, data_dict = None, **kwargs) -> None:
     """
-    Debug NetBox API with custom session
+    Debug NetBox API function with custom session
     Args:
         function: debug function to execute, that must have:
-            nb_session: pynetbox API session
-        as argument.
+            nb_session: pynetbox API session as argument.
+        data_dict: Data dictionary, if needed to isolate
     """
     import argparse
     from nb import development, production
@@ -884,10 +884,15 @@ def _debug(description: str, function: callable, **kwargs) -> None:
         #"procurve_modular.yaml",
         #"procurve_single.yaml",
         "hpe_8_ports.yaml",
+        #"aruba_8_ports.yaml",
+        #"aruba_6100.yaml"
     ]
 
     for file_name in files_yaml:
         data_file_path = f"{main_folder}/data/yaml/{file_name}"
         data = load_yaml(data_file_path)
 
-    function(nb, data, **kwargs)
+        if data_dict:
+            data = data.get(data_dict, [])
+
+        logger.debug(function(nb, data, **kwargs))
