@@ -61,8 +61,26 @@ def merge():
 def seed():
     """Seed the database from a yaml backup file"""
     b_file = project_dir / 'data' / 'backup_db.yaml'
+    
+    if not b_file.exists():
+        typer.secho(f"✗ Backup file not found: {b_file}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+    
     device_dict = load_yaml(b_file)
-    add_devices_from_dict(device_dict)
+    
+    typer.secho(f"\nSeeding database from {b_file.name}...", fg=typer.colors.CYAN, bold=True)
+    typer.secho(f"Found {len(device_dict)} devices to process\n", fg=typer.colors.CYAN)
+    
+    results = add_devices_from_dict(device_dict)
+    
+    # Show summary
+    typer.echo("\n" + "="*50)
+    typer.secho("Seed Summary:", fg=typer.colors.CYAN, bold=True)
+    typer.secho(f"  ✓ Added:      {results['added']}", fg=typer.colors.GREEN)
+    typer.secho(f"  ↻ Updated:    {results['updated']}", fg=typer.colors.CYAN)
+    typer.secho(f"  • Skipped:    {results['skipped']}", fg=typer.colors.BLUE)
+    typer.secho(f"  ✗ Errors:     {results['errors']}", fg=typer.colors.RED)
+    typer.echo("="*50)
 
 def is_likely_serial_number(value: str) -> bool:
     """
@@ -129,6 +147,131 @@ def is_likely_serial_number(value: str) -> bool:
     
     # If we're unsure but it has letters, assume serial (conservative)
     return has_letters
+
+def add_devices_from_dict(device_dict: Dict[str, List]) -> Dict[str, any]:
+    """
+    Add devices from a dictionary where keys are hostnames and values are [serial, inventory, state]
+    """
+    results = {
+        'added': 0,
+        'updated': 0,
+        'skipped': 0,
+        'errors': 0,
+        'details': []
+    }
+    
+    for hostname, values in device_dict.items():
+        if not hostname.startswith('r'):
+            results['skipped'] += 1
+            typer.secho(
+                f"  • Skipped: {hostname} - it is not a network device.",
+                fg=typer.colors.BLUE, dim=True
+            )
+            continue
+
+        try:
+            # Parse values
+            serial_number = values[0] if values[0] else None
+            inventory_number = values[1] if len(values) > 1 and values[1] else None
+            state = values[2] if len(values) > 2 else 'active'
+            
+            # Convert empty strings to None
+            if serial_number == '':
+                serial_number = None
+            if inventory_number == '':
+                inventory_number = None
+            
+            # Determine active status
+            active = state.lower() in ['active', 'commissioned']
+            
+            # Smart duplicate checking
+            if serial_number:
+                # Check by hostname AND serial
+                existing = inventory.get_device(hostname, serial_number, active_only=False)
+            else:
+                # No serial - check by hostname only
+                hostname_devices = inventory.get_devices_by_hostname(hostname, active_only=False)
+                existing = hostname_devices[0] if hostname_devices else None
+            
+            if existing:
+                # Device exists - check if we need to update
+                needs_update = False
+                updates = {}
+                update_details = []
+                
+                if existing['serial_number'] != serial_number:
+                    updates['serial_number'] = serial_number
+                    update_details.append(f"serial: {existing['serial_number']} → {serial_number}")
+                    needs_update = True
+                
+                if existing['inventory_number'] != inventory_number:
+                    updates['inventory_number'] = inventory_number
+                    old_inv = existing['inventory_number'] or 'null'
+                    new_inv = inventory_number or 'null'
+                    update_details.append(f"inventory: {old_inv} → {new_inv}")
+                    needs_update = True
+                
+                if existing['active'] != active:
+                    updates['active'] = active
+                    update_details.append(f"state: {existing['active']} → {active}")
+                    needs_update = True
+                
+                if needs_update:
+                    inventory.update_device(existing['id'], **updates)
+                    results['updated'] += 1
+                    changes = ", ".join(update_details)
+                    typer.secho(
+                        f"  ✓ Updated: {hostname} ({changes})",
+                        fg=typer.colors.CYAN
+                    )
+                else:
+                    results['skipped'] += 1
+                    typer.secho(
+                        f"  • Skipped: {hostname} - no changes needed",
+                        fg=typer.colors.BLUE, dim=True
+                    )
+            else:
+                # Device doesn't exist - add it
+                device_id = inventory.add_device(
+                    hostname=hostname,
+                    serial_number=serial_number,
+                    inventory_number=inventory_number,
+                    active=active
+                )
+                results['added'] += 1
+                
+                status_emoji = "✓" if active else "○"
+                status_text = "active" if active else "inactive"
+                serial_display = serial_number if serial_number else "no serial"
+                inv_display = inventory_number if inventory_number else "no inv"
+                
+                typer.secho(
+                    f"  {status_emoji} Added: {hostname} ({serial_display}, {inv_display}, {status_text}, ID: {device_id})",
+                    fg=typer.colors.GREEN if active else typer.colors.BLUE
+                )
+        
+        except Exception as e:
+            # Check if it's a duplicate key error
+            error_str = str(e)
+            if 'duplicate key' in error_str.lower() or 'already exists' in error_str.lower():
+                results['skipped'] += 1
+                typer.secho(
+                    f"  • Skipped: {hostname} - already exists in database",
+                    fg=typer.colors.BLUE, dim=True
+                )
+            else:
+                results['errors'] += 1
+                results['details'].append({
+                    'hostname': hostname,
+                    'status': 'error',
+                    'error': str(e)
+                })
+                typer.secho(
+                    f"  ✗ Error processing {hostname}: {e}",
+                    fg=typer.colors.RED, err=True
+                )
+    
+    return results
 
 def add_devices_from_list(devices_list: List[Dict[str, str]]) -> Dict[str, any]:
     """
@@ -545,131 +688,6 @@ def sync_devices(device_list: List[Dict], active: bool = False) -> Dict[str, int
           f"added: {summary['added']}, errors: {summary['errors']}", fg=typer.colors.GREEN)
     return summary
 
-def add_devices_from_dict(devices_dict: Dict[str, List]) -> Dict[str, any]:
-    """
-    Add/update multiple devices from a dict of {hostname: [serial_number, inventory_number, status]}
-    Only processes switch hostnames starting with 'rs', 'rh', 'rg', or 'rw'.
-    
-    Args:
-        devices_dict: Dict mapping hostname to [serial_number, inventory_number, status]
-        Examples:
-            {'rgcs0006-1': ['SG42LMP0R2', '28411', 'active']}
-            {'rggw1004sp-1': ['', None, 'active']}
-            {'_V.G04.121.2_42': ['', None, 'inventory']}  → skipped (not a switch)
-    
-    Returns:
-        Dictionary with statistics: {added, updated, reactivated, skipped, errors, details}
-    """
-    SWITCH_PREFIXES = ('rs', 'rh', 'rg', 'rw')
-
-    results = {
-        'added': 0,
-        'updated': 0,
-        'reactivated': 0,
-        'skipped': 0,
-        'errors': 0,
-        'details': []
-    }
-
-    for hostname, values in devices_dict.items():
-        # Only process switch hostnames
-        if not hostname.lower().startswith(SWITCH_PREFIXES):
-            results['skipped'] += 1
-            results['details'].append({
-                'hostname': hostname,
-                'status': 'skipped',
-                'reason': 'not a switch hostname'
-            })
-            continue
-
-        # Unpack values, treating empty string as None
-        serial_number   = values[0] if len(values) > 0 and values[0] != '' else None
-        inventory_number = str(values[1]) if len(values) > 1 and values[1] is not None else None
-        device_status   = values[2] if len(values) > 2 else 'offline'
-        #is_active       = device_status != 'offline'
-        is_active       = device_status == 'active'
-
-        try:
-            devices = inventory.get_devices_by_hostname(hostname, active_only=False)
-            existing = devices[0] if devices else None
-
-            if existing:
-                needs_update = False
-                updates = {}
-
-                # Reactivate if currently inactive but shouldn't be
-                if existing['active'] != is_active:
-                    updates['active'] = is_active
-                    needs_update = True
-
-                # Update serial number if provided and different
-                if serial_number and existing['serial_number'] != serial_number:
-                    updates['serial_number'] = serial_number
-                    needs_update = True
-
-                # Update inventory number if provided and different
-                if inventory_number and existing['inventory_number'] != inventory_number:
-                    updates['inventory_number'] = inventory_number
-                    needs_update = True
-
-                if needs_update:
-                    inventory.update_device(existing['id'], **updates)
-                    was_reactivated = 'active' in updates and updates['active']
-                    status = 'reactivated' if was_reactivated else 'updated'
-                    results['reactivated' if was_reactivated else 'updated'] += 1
-                    results['details'].append({
-                        'hostname': hostname,
-                        'serial_number': serial_number,
-                        'inventory_number': inventory_number,
-                        'status': status,
-                        'changes': list(updates.keys()),
-                        'id': existing['id']
-                    })
-                    color = typer.colors.CYAN if was_reactivated else typer.colors.YELLOW
-                    #typer.secho(f"  ✓ {status.capitalize()}: {hostname} (ID: {existing['id']}, changes: {', '.join(updates.keys())})",
-                    #            fg=color)
-                    typer.secho(f"  ✓ {status.capitalize()}: {hostname} (ID: {existing['id']}, changes: {', '.join(f'{k}={v}' for k, v in updates.items())})",
-                                fg=color)
-                else:
-                    results['skipped'] += 1
-                    results['details'].append({
-                        'hostname': hostname,
-                        'status': 'already_exists',
-                        'id': existing['id']
-                    })
-                    typer.secho(f"  • Skipped: {hostname} - already up to date",
-                                fg=typer.colors.BLUE, dim=True)
-
-            else:
-                # Only add if we have at least some identifying data
-                device_id = inventory.add_device(
-                    hostname=hostname,
-                    serial_number=serial_number,
-                    inventory_number=inventory_number,
-                    active=is_active
-                )
-                results['added'] += 1
-                results['details'].append({
-                    'hostname': hostname,
-                    'serial_number': serial_number,
-                    'inventory_number': inventory_number,
-                    'status': 'added',
-                    'id': device_id
-                })
-                typer.secho(f"  ✓ Added: {hostname} (Serial: {serial_number}, Inv: {inventory_number}, ID: {device_id})",
-                            fg=typer.colors.GREEN)
-
-        except Exception as e:
-            results['errors'] += 1
-            results['details'].append({
-                'hostname': hostname,
-                'status': 'error',
-                'error': str(e)
-            })
-            typer.secho(f"  ✗ Error processing {hostname}: {e}",
-                        fg=typer.colors.RED, err=True)
-
-    return results
 
 def test_detection():
     """Test serial vs inventory detection"""
