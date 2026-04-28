@@ -273,14 +273,18 @@ def update(
 
 @app.command()
 def delete(
-    hostname: str,
+    id_nr: Optional[str] = None, 
+    hostname: Optional[str] = None,
     serial_number: Optional[str] = None,
     force: bool = False
 ):
     """Delete device"""
-    
+
     # Try to find specific device
-    device = inventory.get_device(hostname, serial_number, active_only=False)
+    if id_nr:
+        device = inventory.get_device_by_id(id_nr)
+    else:
+        device = inventory.get_device(hostname, serial_number, active_only=False)
     
     if not device:
         # Check if multiple devices exist
