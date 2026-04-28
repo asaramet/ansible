@@ -405,9 +405,11 @@ def _handle_serial_conflict(
             'name': old_serial
         }
         
-        # Keep other attributes the same except name
+        # Update asset tag
         if old_asset_tag:
-            update_payload['asset_tag'] = old_asset_tag
+            update_payload['asset_tag'] = None
+            update_payload['name'] = f"{update_payload['name']} ({old_asset_tag})"
+        # Keep other attributes the same except name
         if old_serial:
             update_payload['serial'] = old_serial
         
@@ -611,9 +613,9 @@ def switches(nb_session: NetBoxApi, data: dict) -> list:
 
 if __name__ == '__main__':
     from pynetbox_functions import _main
-    #_main("Add or update switches on a NetBox server", switches)
+    _main("Add or update switches on a NetBox server", switches)
 
-    from pynetbox_functions import _debug
+    #from pynetbox_functions import _debug
     #_debug(switches)
-    _debug(_categorize_switches, "devices")
+    #_debug(_categorize_switches, "devices")
 

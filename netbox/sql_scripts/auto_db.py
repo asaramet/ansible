@@ -636,7 +636,7 @@ def sync_devices(device_list: List[Dict], active: bool = False) -> Dict[str, int
     Sync a list of devices into the inventory, setting their active status.
 
     For each device:
-    - If serial number exists in DB → update active flag
+    - If serial number exists in DB → update active flag and inventory number if different
     - If not found → insert new record with given active flag
 
     Args:
@@ -647,7 +647,7 @@ def sync_devices(device_list: List[Dict], active: bool = False) -> Dict[str, int
     Returns:
         Summary dict with counts: {'updated': n, 'added': n, 'errors': n}
     """
-    summary = {'updated': 0, 'added': 0, 'errors': 0}
+    summary = {'updated': 0, 'added': 0, 'skipped': 0, 'errors': 0, 'inventory_updated': 0}
 
     for entry in device_list:
         for serial, (inv_raw, host_raw) in entry.items():
@@ -662,6 +662,7 @@ def sync_devices(device_list: List[Dict], active: bool = False) -> Dict[str, int
                 inventory_norm = normalize(inv_raw)
                 hostname_norm  = normalize(host_raw)
 
+                # Search for device by serial number
                 results = inventory.search_devices(serial_norm)
                 match = next(
                     (d for d in results if d.get('serial_number') == serial_norm),
@@ -669,25 +670,127 @@ def sync_devices(device_list: List[Dict], active: bool = False) -> Dict[str, int
                 )
 
                 if match:
-                    inventory.update_device(match['id'], active=active)
-                    summary['updated'] += 1
+                    # Device exists - check what needs updating
+                    updates = {}
+                    update_msgs = []
+                    
+                    # Always update active flag
+                    if match['active'] != active:
+                        updates['active'] = active
+                        update_msgs.append(f"active: {match['active']} → {active}")
+                    
+                    # Update inventory number if:
+                    # 1. New inventory is provided (not None)
+                    # 2. AND it's different from existing
+                    if inventory_norm is not None:
+                        existing_inv = match.get('inventory_number')
+                        if existing_inv != inventory_norm:
+                            updates['inventory_number'] = inventory_norm
+                            old_inv_display = existing_inv if existing_inv else 'null'
+                            update_msgs.append(f"inventory: {old_inv_display} → {inventory_norm}")
+                            summary['inventory_updated'] += 1
+                    
+                    # Update hostname if provided and different
+                    if hostname_norm is not None and hostname_norm != match['hostname']:
+                        updates['hostname'] = hostname_norm
+                        update_msgs.append(f"hostname: {match['hostname']} → {hostname_norm}")
+                    
+                    # Perform update if there are changes
+                    if updates:
+                        inventory.update_device(match['id'], **updates)
+                        summary['updated'] += 1
+                        
+                        if update_msgs:
+                            changes = ", ".join(update_msgs)
+                            typer.secho(
+                                f"  ✓ Updated: {match['hostname']} (Serial: {serial_norm}) - {changes}",
+                                fg=typer.colors.CYAN
+                            )
+                        else:
+                            typer.secho(
+                                f"  ✓ Updated: {match['hostname']} (Serial: {serial_norm})",
+                                fg=typer.colors.CYAN
+                            )
+                    else:
+                        summary['skipped'] += 1
+                        typer.secho(
+                            f"  • Skipped: {match['hostname']} (Serial: {serial_norm}) - no changes",
+                            fg=typer.colors.BLUE, dim=True
+                        )
                 else:
-                    inventory.add_device(
-                        hostname=hostname_norm or serial_norm,
-                        serial_number=serial_norm,
-                        inventory_number=inventory_norm,
-                        active=active
+                    # Device not found - need to add it
+                    # But first check if hostname=serial already exists to avoid duplicate
+                    fallback_hostname = hostname_norm or serial_norm
+                    
+                    # Check if this exact hostname+serial combo exists
+                    existing_with_hostname = std_app.inventory.get_device(
+                        fallback_hostname, 
+                        serial_norm, 
+                        active_only=False
                     )
-                    summary['added'] += 1
+                    
+                    if existing_with_hostname:
+                        # This exact combo already exists - just update it
+                        updates = {}
+                        update_msgs = []
+                        
+                        if existing_with_hostname['active'] != active:
+                            updates['active'] = active
+                            update_msgs.append(f"active: {existing_with_hostname['active']} → {active}")
+                        
+                        if inventory_norm is not None:
+                            existing_inv = existing_with_hostname.get('inventory_number')
+                            if existing_inv != inventory_norm:
+                                updates['inventory_number'] = inventory_norm
+                                old_inv_display = existing_inv if existing_inv else 'null'
+                                update_msgs.append(f"inventory: {old_inv_display} → {inventory_norm}")
+                                summary['inventory_updated'] += 1
+                        
+                        if updates:
+                            inventory.update_device(existing_with_hostname['id'], **updates)
+                            summary['updated'] += 1
+                            changes = ", ".join(update_msgs)
+                            typer.secho(
+                                f"  ✓ Updated existing: {fallback_hostname} (Serial: {serial_norm}) - {changes}",
+                                fg=typer.colors.CYAN
+                            )
+                        else:
+                            summary['skipped'] += 1
+                            typer.secho(
+                                f"  • Skipped: {fallback_hostname} (Serial: {serial_norm}) - already exists, no changes",
+                                fg=typer.colors.BLUE, dim=True
+                            )
+                    else:
+                        # Truly new device - add it
+                        inventory.add_device(
+                            hostname=fallback_hostname,
+                            serial_number=serial_norm,
+                            inventory_number=inventory_norm,
+                            active=active
+                        )
+                        summary['added'] += 1
+                        
+                        inv_display = inventory_norm if inventory_norm else 'no inv'
+                        typer.secho(
+                            f"  ✓ Added: {fallback_hostname} (Serial: {serial_norm}, Inv: {inv_display})",
+                            fg=typer.colors.GREEN
+                        )
 
             except Exception as e:
-                typer.secho(f"\u2717 Error processing entry {entry}: {e}", fg=typer.colors.RED, err=True)
+                typer.secho(f"✗ Error processing entry {entry}: {e}", fg=typer.colors.RED, err=True)
                 summary['errors'] += 1
 
-    typer.secho(f"\n\u2713 Sync complete → updated: {summary['updated']}, "
-          f"added: {summary['added']}, errors: {summary['errors']}", fg=typer.colors.GREEN)
+    # Show summary
+    typer.echo("\n" + "="*50)
+    typer.secho("Sync Summary:", fg=typer.colors.CYAN, bold=True)
+    typer.secho(f"  ✓ Updated:             {summary['updated']}", fg=typer.colors.CYAN)
+    typer.secho(f"  ✓ Added:               {summary['added']}", fg=typer.colors.GREEN)
+    typer.secho(f"  • Skipped:             {summary['skipped']}", fg=typer.colors.BLUE)
+    typer.secho(f"  ↻ Inventory updated:   {summary['inventory_updated']}", fg=typer.colors.YELLOW)
+    typer.secho(f"  ✗ Errors:              {summary['errors']}", fg=typer.colors.RED)
+    typer.echo("="*50)
+    
     return summary
-
 
 def test_detection():
     """Test serial vs inventory detection"""
