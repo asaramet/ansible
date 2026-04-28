@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 
-remote_srv="23:/opt/ansible/inventories/aruba"
+remote_srv="23:/opt/ansible/inventories/aruba/"
 
 sync_objs="
 playbooks
 hosts.ini
 "
 
-for file in ${sync_objs}; do
-    rsync -uav --delete-excluded ${file} ${remote_srv}/
-done
+rsync -uav --delete-excluded ${sync_objs} ${remote_srv}
