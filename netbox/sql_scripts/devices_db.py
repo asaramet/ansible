@@ -221,7 +221,7 @@ def update(
 
     if new_hostname:
         updates['hostname'] = new_hostname
-        changes.append(f"hostname: '{device['hostname']}' -> {hew_hostname}")
+        changes.append(f"hostname: '{device['hostname']}' -> {new_hostname}")
 
     if new_serial is not None: # don't ignore empty string
         updates['serial_number'] = new_serial
