@@ -1,4 +1,6 @@
-# Rocky Linux Server
+# Former rhlx0023
+
+- Rocky Linux Server on rslx6010
 
 - `hs_23` - Former rhlx0023
 

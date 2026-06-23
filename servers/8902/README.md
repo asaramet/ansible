@@ -1,5 +1,6 @@
-# Debian Linux
+# virtueller Adminhost Linux for Yubikey-Management
 
+- Debian Linux on rzlx8701
 - `vm` - rzlx8902
 
 ## Install and configure ufw firewall
