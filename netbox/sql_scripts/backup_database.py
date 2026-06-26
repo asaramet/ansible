@@ -22,6 +22,7 @@ import os, typer
 import subprocess
 from pathlib import Path
 from typing import Optional
+from datetime import datetime
 
 from std_objs import initialize_inventory, project_dir
 
@@ -29,10 +30,16 @@ app = typer.Typer(help="Backup and restore network_inventory database")
 
 # Backup directory
 BACKUP_DIR = project_dir / "data" / "backups"
-BACKUP_FILE = BACKUP_DIR / "nw_backup.sqlc"
+#BACKUP_FILE = BACKUP_DIR / "nw_backup.sqlc"
 
 # Global inventory object
 inventory = None
+
+def backup_filename():
+    """Create a current filename"""
+    return f"backup_{datetime.today().strftime('%Y_%m_%d')}.sqlc"
+
+BACKUP_FILE = BACKUP_DIR / backup_filename()
 
 def ensure_backup_directory():
     """Create backup directory if it doesn't exist"""

@@ -4,6 +4,12 @@
 - `hs_checkmk` - Production Checkmk Server
 - `local` - Development local server
 
+## Virtual Network Interface
+
+Network source: `Bridge device...`
+    Device name: `br801`
+Device model: `virtio`
+
 ## Clean install requirements
 
 ### SSH Server
@@ -35,6 +41,12 @@ vim .vimrc
 
 # add:
 set mouse-=a
+```
+
+### Add user to `sudo` group
+
+```bash
+usermod -a -G sudo <USERNAME>
 ```
 
 ### Install and configure ufw firewall
