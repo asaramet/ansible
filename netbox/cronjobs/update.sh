@@ -14,9 +14,10 @@ server='production'
 
 cd $EXEC_DIR
 
-python3 sql_scripts/backup_database.py backup
-python3 sql_scripts/netbox_to_db_sync.py sync --dry-run --server production
-python3 sql_scripts/netbox_to_db_sync.py sync --server production
+#python3 sql_scripts/backup_database.py backup
+#python3 sql_scripts/netbox_to_db_sync.py sync --dry-run --server production
+#python3 sql_scripts/netbox_to_db_sync.py sync --server production
+ansible-playbook playbooks/backup_network_inventory.yaml | tee ${logs_folder}/sync_data.logs
 
 ansible-playbook playbooks/0.new_sync.yaml | tee ${logs_folder}/sync_data.logs &&
 python3 pyyaml/sort_data.py | tee ${logs_folder}/sync_data.logs  &&

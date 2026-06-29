@@ -1,0 +1,158 @@
+---
+# Backup the network_inventory PostgreSQL database using Ansible
+#
+# This playbook provides an alternative to pg_dump for backing up the network_inventory database.
+# It uses the community.postgresql.postgresql_db module which communicates directly with PostgreSQL
+# over the network, without requiring pg_dump on the target system.
+#
+# RUN:
+# - development server
+#   ansible-playbook backup_network_inventory.yaml -e production=false
+#
+# - production server
+#   ansible-playbook backup_network_inventory.yaml
+#
+# REQUIREMENTS:
+#   - community.postgresql collection installed: ansible-galaxy collection install community.postgresql
+#   - PostgreSQL server accessible from Ansible control node
+
+- name: Define global variables
+  hosts: localhost
+  gather_facts: false
+  vars: 
+    # Backup configuration 
+    dump_folder: &dump_folder "/opt/db_dumps"
+    dump_filename: &dump_filename "network_inventory-{{ ansible_facts.date_time.date }}.sql.gz"
+    local_backup_folder: &local_backup_folder "{{ inventory_dir }}/data/db_dumps"
+    db_name: &db_name "network_inventory"
+
+- name: Manage local directories
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  vars:
+    dump_folder: *dump_folder
+    dump_filename: *dump_filename
+    local_backup_folder: *local_backup_folder
+  tasks:
+    - name: Create local backup directory
+      file:
+        path: "{{ local_backup_folder }}"
+        state: directory
+        mode: '0755'
+
+- name: Manage remote directorues
+  hosts: "{{ 'hs_netbox' if production | default(true) else 'local' }}"
+  gather_facts: true
+  become: true
+  vars:
+    dump_folder: *dump_folder
+    local_backup_folder: *local_backup_folder
+  tasks:
+    - name: Create remote dump directory
+      file:
+        path: "{{ dump_folder }}"
+        state: directory
+        mode: '0755'
+        owner: postgres
+        group: postgres
+      when: dump_folder != local_backup_folder
+
+- name: Backup network_inventory database using Ansible
+  hosts: "{{ 'hs_netbox' if production | default(true) else 'local' }}"
+  gather_facts: true
+  become: true # run as root
+  tags: postgresql
+  become_method: sudo
+  become_user: postgres # change to postgres user
+  vars:
+    dump_folder: *dump_folder
+    dump_filename: *dump_filename
+    local_backup_folder: *local_backup_folder
+    db_name: *db_name
+    dump_target: "{{ dump_folder }}/{{ dump_filename }}"
+  tasks:
+    - name: Backup network_inventory database using PostgreSQL module
+      community.postgresql.postgresql_db:
+        name: "{{ db_name }}"
+        state: dump
+        target: "{{ dump_target }}"
+        # Use custom format for compression
+        dump_extra_args: >-
+          --format=custom --compress=9
+          --exclude-table-data extras_cachedvalue 
+          --exclude-table-data extras_objectchange
+      register: dump_result
+      no_log: true  # Don't log sensitive connection info
+
+    - name: Verify dump file was created
+      stat: 
+        path: "{{ dump_target }}"
+      register: dump_stat
+      failed_when: not dump_stat.stat.exists or dump_stat.stat.size == 0
+
+    - name: Fetch dump to local backup folder
+      fetch:
+        src: "{{ dump_target }}"
+        dest: "{{ local_backup_folder }}/"
+        flat: true
+      when: dump_folder != local_backup_folder
+
+    - name: Clean up remote dump file
+      file:
+        path: "{{ dump_target }}"
+        state: absent
+      when: dump_folder != local_backup_folder
+
+    - name: Show backup information
+      debug:
+        msg: "Network inventory database backed up to {{ local_backup_folder }}/{{ dump_filename }} ({{ dump_stat.stat.size | filesizeformat }})"
+
+- name: Cleanup old backups
+  hosts: localhost
+  gather_facts: false
+  vars:
+    dump_folder: *dump_folder
+    local_backup_folder: *local_backup_folder
+    retention_days: 90
+  tasks:
+    - name: Find old backup files (local)
+      find:
+        paths: "{{ local_backup_folder }}"
+        patterns: "network_inventory*.sql.gz,network_inventory*.json.gz"
+        age: "{{ retention_days }}d"
+      register: old_local_dumps
+
+    - name: Delete old local backup files
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_local_dumps.files }}"
+      when: old_local_dumps.files | length > 0
+
+- name: Cleanup old backups (remote)
+  hosts: "{{ 'hs_netbox' if production | default(true) else 'local' }}"
+  gather_facts: false
+  become: true # run as root
+  tags: postgresql
+  become_method: sudo
+  become_user: postgres # change to postgres user
+  vars:
+    dump_folder: *dump_folder
+    local_backup_folder: *local_backup_folder
+    retention_days: 90
+  tasks:
+    - name: Find old backup files (remote)
+      find:
+        paths: "{{ dump_folder }}"
+        patterns: "network_inventory*.sql.gz"
+        age: "{{ retention_days }}d"
+      register: old_remote_dumps
+      when: dump_folder != local_backup_folder
+
+    - name: Delete old remote backup files
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_remote_dumps.files }}"
+      when: old_remote_dumps.files | length > 0 and dump_folder != local_backup_folder
