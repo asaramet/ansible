@@ -1,0 +1,127 @@
+---
+# CIS Benchmark 1.1.1.11 - Ensure unused filesystems kernel modules are not available
+#
+# WARNING: Disabling modules that are in use may be FATAL.
+# Review mounted filesystems (findmnt -Dkerno fstype) before remediation.
+#
+# Modules with known CVEs to check:
+#   ceph (CVE-2022-0670), cifs (CVE-2022-29869), exfat (CVE-2022-29973),
+#   ext (CVE-2022-1184), fat (CVE-2022-22043), fscache (CVE-2022-3630),
+#   fuse (CVE-2023-0386), gfs2 (CVE-2023-3212), nfs_common (CVE-2022-3630),
+#   nfsd (CVE-2022-43945), smbfs_common (CVE-2022-2585)
+#
+# Audit steps:
+#   1. List mounted filesystems: findmnt -Dkerno fstype | sort -u
+#   2. List installed FS modules
+#   3. List loaded modules: lsmod
+#   4. Verify unmounted/unloaded modules are blacklisted
+#
+# Remediation:
+#   modprobe -r <module> 2>/dev/null
+#   rmmod <module> 2>/dev/null
+#   printf '%s\n' "blacklist <module>" "install <module> /bin/false" >> /etc/modprobe.d/<module>.conf
+
+- name: Check unused filesystems kernel modules per CIS 1.1.1.11
+  hosts: all # Override this with -l yourhost
+  become: true
+  gather_facts: false
+
+  vars:
+    # Modules with known CVEs - CIS 1.1.1.11
+    cve_filesystem_modules:
+      - ceph
+      - cifs
+      - exfat
+      - ext
+      - fat
+      - fscache
+      - fuse
+      - gfs2
+      - nfs_common
+      - nfsd
+      - smbfs_common
+    
+    # Initialize to avoid undefined errors
+    non_compliant: []
+
+  tasks:
+    # Step 1: Get currently mounted filesystems
+    - name: List mounted filesystems
+      ansible.builtin.shell: findmnt -Dkerno fstype | sort -u
+      register: mounted_fs
+      changed_when: false
+
+    # Step 2: Get all installed filesystem kernel modules
+    - name: List installed filesystem kernel modules
+      ansible.builtin.shell: |
+        #!/usr/bin/env bash
+        find /lib/modules /usr/lib/modules -path '*/kernel/fs/*' -type f -printf '%f\n' 2>/dev/null | sed 's/\.ko$//' | sort -u | tr '\n' ' '
+      register: installed_modules
+      changed_when: false
+
+    # Step 3: Get currently loaded modules
+    - name: List loaded kernel modules
+      ansible.builtin.shell: lsmod | awk 'NR>1 {print $1}'
+      register: loaded_modules
+      changed_when: false
+
+    # Step 4: Identify unused modules (installed but not mounted and not loaded)
+    - name: Set facts for analysis
+      ansible.builtin.set_fact:
+        mounted_list: "{{ mounted_fs.stdout_lines | default([]) }}"
+        installed_list: "{{ installed_modules.stdout | trim | split(' ') if installed_modules.stdout | trim else [] }}"
+        loaded_list: "{{ loaded_modules.stdout_lines | default([]) }}"
+
+    - name: Find unused filesystem modules
+      ansible.builtin.set_fact:
+        unused_modules: >-
+          {{ installed_list | default([]) | 
+             difference(mounted_list | default([])) | 
+             difference(loaded_list | default([])) | 
+             intersect(cve_filesystem_modules) | 
+             unique | list }}
+
+    # Step 5: Check if unused modules are properly disabled
+    - name: Check blacklist status of unused modules
+      ansible.builtin.shell: |
+        #!/usr/bin/env bash
+        not_disabled=""
+        for mod in {{ unused_modules | join(' ') }}; do
+          config=$(modprobe --show-config 2>/dev/null)
+          if ! echo "$config" | grep -q "blacklist ${mod}"; then
+            not_disabled+=" $mod"
+            continue
+          fi
+          if ! echo "$config" | grep -qE "install ${mod} (/bin/false|/bin/true)"; then
+            not_disabled+=" $mod"
+          fi
+        done
+        echo "${not_disabled# }"
+      register: disabled_check
+      changed_when: false
+      when: unused_modules | length > 0
+
+    - name: Set non-compliant unused modules
+      ansible.builtin.set_fact:
+        non_compliant: "{{ disabled_check.stdout | trim | split(' ') if disabled_check.stdout | trim else [] }}"
+      when: unused_modules | length > 0
+
+    # Step 6: Display results
+    - name: Display CIS 1.1.1.11 compliance results
+      ansible.builtin.debug:
+        msg: |
+          CIS 1.1.1.11 - Unused Filesystems Kernel Modules
+          {{ '-' * 45 }}
+          Mounted FS:      {{ mounted_list | join(', ') or 'None' }}
+          Installed:      {{ installed_list | join(', ') or 'None' }}
+          Loaded:        {{ loaded_list | join(', ') or 'None' }}
+          Unused:        {{ unused_modules | join(', ') or 'None' }}
+          Non-compliant:  {{ non_compliant | default([]) | join(', ') or 'None' }}
+          {{ '-' * 45 }}
+          WARNING: Disabling modules in use may crash the system!
+          Review mounted filesystems before remediation.
+
+    - name: Fail if non-compliant modules found
+      ansible.builtin.fail:
+        msg: "CIS 1.1.1.11 FAILED: {{ non_compliant | join(', ') }}. Remediation: blacklist + install /bin/false"
+      when: non_compliant | length > 0
