@@ -1,5 +1,5 @@
 ---
-# Backup the NetBoxes Postgres database 
+# Backup the NetBox database 
 #
 # RUN
 # - development server
