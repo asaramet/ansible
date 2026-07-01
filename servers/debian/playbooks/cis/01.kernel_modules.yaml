@@ -1,0 +1,109 @@
+---
+# CIS Benchmark 1.1.1 - Ensure unnecessary filesystem kernel modules are not available
+#
+# Audit procedure (per CIS Debian Linux 13):
+# 1. Check if module exists on disk
+# 2. If exists: verify not loaded (lsmod) AND blacklisted (modprobe --show-config)
+#
+# PASS states:
+#   - Module not available on system
+#   - Module built into kernel (not loadable as module)
+#   - Module on disk but blacklisted with: blacklist <module> + install <module> /bin/false
+#
+# Remediation:
+#   1. Remove module packages: apt purge <module>
+#   2. Blacklist: echo "blacklist <module>" > /etc/modprobe.d/<module>.conf
+#   3. Disable: echo "install <module> /bin/false" >> /etc/modprobe.d/<module>.conf
+#   4. Unload: rmmod <module>
+
+- name: Check filesystem kernel modules for CIS compliance
+  hosts: local
+  become: true
+  gather_facts: false
+
+  vars:
+    # CIS Debian 13 - Filesystem modules to verify
+    cis_filesystem_modules:
+      - cramfs
+      - freevxfs
+      - hfs
+      - hfsplus
+      - jffs2
+      - overlay
+      - squashfs
+      - udf
+      - firewire-core
+      - usb-storage
+
+  tasks:
+    # Step 1: Check which modules exist on disk (CIS audit step 1)
+    - name: Check modules on disk
+      ansible.builtin.shell: |
+        #!/usr/bin/env bash
+        found=""
+        for mod in {{ cis_filesystem_modules | join(' ') }}; do
+          mod_dir=$(echo "$mod" | tr '-' '/')
+          for kdir in /lib/modules/*/kernel/fs /usr/lib/modules/*/kernel/fs; do
+            [ -d "${kdir}/${mod_dir}" ] && [ -n "$(ls -A "${kdir}/${mod_dir}" 2>/dev/null)" ] && { found+=" $mod"; break; }
+          done
+        done
+        echo "${found# }"
+      register: disk_check
+      changed_when: false
+
+    - name: Set fact for modules on disk
+      ansible.builtin.set_fact:
+        modules_on_disk: "{{ disk_check.stdout | trim | split(' ') if disk_check.stdout | trim else [] }}"
+
+    # Step 2: For modules found on disk, check if they're properly disabled (CIS audit steps 2-3)
+    - name: Check blacklist configuration
+      ansible.builtin.shell: |
+        #!/usr/bin/env bash
+        bad=""
+        for mod in {{ modules_on_disk | join(' ') }}; do
+          [[ $(lsmod | grep -c "^${mod} ") -gt 0 ]] && { bad+=" $mod"; continue; }
+          config=$(modprobe --show-config 2>/dev/null)
+          [[ ! "$config" =~ blacklist\ ${mod} ]] && { bad+=" $mod"; continue; }
+          [[ ! "$config" =~ install\ ${mod}\ /bin/(false|true) ]] && { bad+=" $mod"; continue; }
+        done
+        echo "${bad# }"
+      register: blacklist_check
+      changed_when: false
+      when: modules_on_disk | length > 0
+
+    - name: Set fact for non-compliant modules
+      ansible.builtin.set_fact:
+        non_compliant: "{{ blacklist_check.stdout | trim | split(' ') if blacklist_check.stdout | trim else [] }}"
+      when: modules_on_disk | length > 0
+
+    # Step 3: Check currently loaded modules
+    - name: Check current loaded modules
+      ansible.builtin.shell: lsmod | awk 'NR>1 {print $1}' | grep -E '^({{ cis_filesystem_modules | join("|") }})$' || true
+      register: loaded_check
+      changed_when: false
+
+    # Step 4: Combine all findings
+    - name: Combine all issues
+      ansible.builtin.set_fact:
+        all_issues: >-
+          {{ (non_compliant | default([])) + 
+             (loaded_check.stdout_lines | default([]) | difference(modules_on_disk | default([]))) | unique }}
+
+    # Step 5: Display summary
+    - name: Display results
+      ansible.builtin.debug:
+        msg: |
+          CIS 1.1.1 - Filesystem Kernel Modules
+          {{ '-' * 40 }}
+          On disk:     {{ modules_on_disk | join(', ') or 'None' }}
+          Non-compliant: {{ all_issues | join(', ') or 'None' }}
+          Loaded:     {{ loaded_check.stdout_lines | join(', ') or 'None' }}
+          {{ '-' * 40 }}
+          PASS: All good if all_issues is empty
+          FAIL: Fix modules in 'Non-compliant' list
+
+    # Step 6: Fail if needed
+    - name: Fail if non-compliant
+      ansible.builtin.fail:
+        msg: "CIS 1.1.1 FAILED: {{ all_issues | join(', ') }}. Blacklist with: blacklist <mod> + install <mod> /bin/false"
+      when: all_issues | length > 0

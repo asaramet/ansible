@@ -1,7 +1,7 @@
 # Debian Servers
 
-- `hs_netbox` - Production NetBox Server
-- `hs_checkmk` - Production Checkmk Server
+- `hs_netbox` - Production NetBox server
+- `hs_checkmk` - Production Checkmk server
 - `local` - Development local server
 
 ## Virtual Network Interface
