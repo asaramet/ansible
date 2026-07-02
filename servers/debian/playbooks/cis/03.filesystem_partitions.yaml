@@ -1,0 +1,239 @@
+---
+# CIS Benchmark 1.1.2. - Configure Filesystem Partitions
+# Checks that specific directories are on separate partitions ot `tmpfs`, 
+# with required mount options.
+# Rationale: Prevents unauthorized device access, SUID execution, and code execution
+# on directories that should not contain user executables.
+#
+# Directories with separate partitions or is tmpfs:
+#   /tmp, /dev/shm 
+#
+# Directories with separate partitions:
+#   /home, /var, /var/tmp, /var/log
+#
+# Directories with nodev, nosuid, noexec:
+#   /tmp, /dev/shm, /var/tmp, /var/log, /var/log/audit
+#
+# Directories with nodev, nosuid (no noexec):
+#   /home, /var
+#
+# Note: If /tmp entry exists in /etc/fstab, it takes precedence over systemd unit file.
+#       On diskless/iSCSI systems, fstab may not override systemd configuration.
+#
+# Audit:
+#   1. findmnt -kn [DIR] # DIR example: /tmp
+#     Example output: /tmp tmpfs tmpfs rw,nosuid,nodev,noexec
+#   2.  findmnt -kn [DIR] | grep -v [OPT] # OPT example: noexec
+#     Nothing should be returned
+#
+# Remediation 1: (example for /tmp)
+#   systemctl unmask tmp.mount
+#   Edit /etc/fstab: tmpfs /tmp tmpfs defaults,rw,nosuid,nodev,noexec,relatime,size=2G 0 0
+# Remediation 2: (example for /tmp and noexec) 
+#   - IF - a separate partition exists for /tmp.
+#   Edit the /etc/fstab file and add noexec to the fourth field (mounting options) for the 
+#   /tmp partition.
+#     Example:
+#     <device> /tmp  <fstype>  defaults,rw,nosuid,nodev,noexec,relatime  0 0
+#   Run the following command to remount /tmp with the configured options:
+#   mount -o remount /tmp
+
+- name: Check partitions mount configuration per CIS
+  hosts: local
+  become: true
+  gather_facts: false
+
+  vars:
+    partitions_tmpfs:
+      - '/tmp'
+      - '/dev/shm'
+    partitions:
+      - '/home'
+      - '/var'
+      - '/var/tmp'
+      - '/var/log'
+
+    root_filesystems: "rootfs,unknown"
+    valid_systemd_statuses: "enabled,generated,static"
+
+  tasks:
+    # Step 1: Check if partitions are mounted
+    - name: Get existing tmpfs partitions mount data
+      ansible.builtin.shell: "findmnt -kn {{ item }} | grep tmpfs"
+      register: tmpfs_parts
+      changed_when: false
+      failed_when: false
+      loop: "{{ partitions_tmpfs }}"
+
+    - name: Get existing partitions mount data
+      ansible.builtin.shell: "findmnt -kn {{ item }}"
+      register: default_parts
+      changed_when: false
+      failed_when: false
+      loop: "{{ partitions }}"
+
+    - name: Set fact for tmpfs mounted partitions
+      ansible.builtin.set_fact:
+        mounted_tmpfs_partitions: >-
+          {{
+            tmpfs_parts.results
+            | map(attribute='stdout_lines')
+            | flatten
+            | select('match', '.+')
+            | list
+          }}
+
+    - name: Set fact for default mounted partitions
+      ansible.builtin.set_fact:
+        mounted_partitions: >-
+          {{
+            default_parts.results
+            | map(attribute='stdout_lines')
+            | flatten
+            | select('match', '.+')
+            | list
+          }}
+
+    - name: Mounted tmpfs partitions found
+      ansible.builtin.debug:
+        msg: "{{ mounted_tmpfs_partitions }}"
+
+    - name: Mounted default partitions found
+      ansible.builtin.debug:
+        msg: "{{ mounted_partitions }}"
+
+    - name: Extract tmpfs mount points into tmpfs_mount_points
+      ansible.builtin.set_fact:
+        tmpfs_mount_points: >-
+          {{
+            mounted_tmpfs_partitions
+            | map('split', ' ')
+            | map('first')
+            | list
+          }}
+
+    - name: Extract default mount points into default_mount_points
+      ansible.builtin.set_fact:
+        default_mount_points: >-
+          {{
+            mounted_partitions
+            | map('split', ' ')
+            | map('first')
+            | list
+          }}
+
+    - name: Assert all tmpfs required partitions are mounted
+      ansible.builtin.assert:
+        that: item in tmpfs_mount_points
+        fail_msg: |
+          {{ item }} isn't mounted or doesn't exist!
+
+          You have to create a new partition and configure /etc/fstab accordingly. For Example:
+
+          tmpfs {{ item }}     tmpfs    defaults,rw,nosuid,nodev,noexec,relatime,size=2G 0 0
+
+          Note: the size=2G is an example of setting a specific size for tmpfs.
+          Example of using a volume or disk with specific mount options. The source location of
+          the volume or disk will vary depending on your environment:
+
+          <device> {{ item }}    <fstype>   defaults,nodev,nosuid,noexec  0 0
+        success_msg: "{{ item }} partition is correctly mounted as tmpfs"
+      loop: "{{ partitions_tmpfs }}"
+
+    - name: Assert all required partitions are mounted
+      ansible.builtin.assert:
+        that: item in default_mount_points
+        fail_msg: |
+          {{ item }} isn't mounted or doesn't exist!
+
+          You have to create a new partition and configure /etc/fstab accordingly. For Example:
+
+          <device> {{ item }}     <fstype>    defaults,rw,nosuid,nodev,relatime 0 0
+        success_msg: "{{ item }} partition is correctly mounted"
+      loop: "{{ partitions }}"
+
+## Step 2
+##    - name: Check if nosuid option is set
+##      ansible.builtin.shell: "findmnt -kn {{ item }} | grep nosuid"
+##      register: nosuid_parts
+##      changed_when: false
+##      failed_when: false
+##      loop: "{{ partitions_tmpfs }}"
+
+##    - name: Debug
+##      ansible.builtin.debug:
+##        msg: "{{ nosuid_parts }}"
+
+##  #    # Step 2: Check systemd tmp.mount status
+  #    - name: Check systemd tmp.mount is enabled
+#      ansible.builtin.shell: systemctl is-enabled tmp.mount 2>/dev/null || echo "not-found"
+#      register: tmp_mount_enabled
+#      changed_when: false
+
+#    # Step 3: Parse mount information
+#    - name: Set mount facts
+#      ansible.builtin.set_fact:
+#        tmp_filesystem: "{{ tmp_mount.stdout_lines[1] if tmp_mount.stdout_lines | length > 1 else 'unknown' }}"
+#        tmp_options: "{{ tmp_mount.stdout_lines[2] if tmp_mount.stdout_lines | length > 2 else 'unknown' }}"
+#        tmp_systemd_status: "{{ tmp_mount_enabled.stdout | trim }}"
+
+#    # Step 4: Check compliance (split into simple expressions)
+#    - name: Check if /tmp is on separate partition
+#      ansible.builtin.set_fact:
+#        is_separate_partition: >-
+#          {{ (tmp_filesystem == 'tmpfs') or 
+#             (tmp_mount.stdout_lines | length > 0 and 
+#              tmp_mount.stdout_lines[0] == '/tmp' and 
+#              tmp_filesystem not in root_filesystems.split(',')) }}
+
+#    - name: Check if systemd status is OK
+#      ansible.builtin.set_fact:
+#        is_systemd_ok: "{{ tmp_systemd_status in valid_systemd_statuses.split(',') }}"
+
+#    - name: Determine overall compliance
+#      ansible.builtin.set_fact:
+#        is_compliant: "{{ is_separate_partition and is_systemd_ok }}"
+
+#    # Step 5: Display results
+#    - name: Display CIS 1.1.2.1.1 compliance results
+#      ansible.builtin.debug:
+#        msg: |
+#          CIS 1.1.2.1.1 - /tmp Mount Configuration
+#          {{ '-' * 42 }}
+#          Mount point:     /tmp
+#          Filesystem:     {{ tmp_filesystem | default('unknown') }}
+#          Mount options:  {{ tmp_options | default('unknown') }}
+#          systemd status: {{ tmp_systemd_status | default('unknown') }}
+#          Separate FS:    {{ is_separate_partition | ternary('YES', 'NO') }}
+#          systemd OK:     {{ is_systemd_ok | ternary('YES', 'NO') }}
+#          {{ '-' * 42 }}
+#          Compliant: {{ is_compliant | ternary('YES', 'NO') }}
+          
+#          For tmpfs: should show 'tmpfs' filesystem with nosuid,nodev,noexec options
+#          For partition: should be separate from root filesystem (not on /)
+#          systemd: should be 'enabled', 'generated', or 'static'
+
+#    - name: Fail if non-compliant
+#      ansible.builtin.fail:
+#        msg: |
+#          CIS 1.1.2.1.1 FAILED
+#          Current state:
+#            Filesystem: {{ tmp_filesystem | default('unknown') }}
+#            Mount options: {{ tmp_options | default('unknown') }}
+#            systemd: {{ tmp_systemd_status | default('unknown') }}
+          
+#          REMEDIATION:
+#          1. Unmask systemd tmp.mount:
+#             systemctl unmask tmp.mount
+          
+#          2. For tmpfs (RAM-based, recommended):
+#             echo "tmpfs /tmp tmpfs defaults,rw,nosuid,nodev,noexec,relatime,size=2G 0 0" >> /etc/fstab
+          
+#          3. For separate partition:
+#             <device> /tmp <fstype> defaults,nodev,nosuid,noexec 0 0
+          
+#          4. Verify and reload:
+#             mount -o remount /tmp
+#             systemctl daemon-reload
+#             systemctl restart tmp.mount
+#      when: not is_compliant

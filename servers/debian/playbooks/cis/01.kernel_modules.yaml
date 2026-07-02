@@ -17,7 +17,7 @@
 #   4. Unload: rmmod <module>
 
 - name: Check filesystem kernel modules for CIS compliance
-  hosts: all # Override this with -l yourhost
+  hosts: debian # Override this with -l yourhost
   become: true
   gather_facts: false
 

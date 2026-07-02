@@ -22,7 +22,7 @@
 #   printf '%s\n' "blacklist <module>" "install <module> /bin/false" >> /etc/modprobe.d/<module>.conf
 
 - name: Check unused filesystems kernel modules per CIS 1.1.1.11
-  hosts: all # Override this with -l yourhost
+  hosts: debian # Override this with -l yourhost
   become: true
   gather_facts: false
 
