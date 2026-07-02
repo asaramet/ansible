@@ -43,13 +43,16 @@ def extract_netbox_devices_bulk(nb_session: NetBoxApi,
     Optimized to minimize HTTP requests by fetching all devices at once.
     
     Note: 
-    - Devices with hostnames starting with capital letters are automatically
+    - Devices with hostnames starting with capital letters or underscore are automatically
       filtered out as they are not devices that should be monitored.
     - In NetBox, inventory_number is mapped from the 'asset_tag' field.
+    - To properly sync the Active flag to PostgreSQL, use active_only=False to include
+      all devices (active, offline, decommissioning, etc.)
     
     Args:
         nb_session: Active NetBox API session
-        active_only: If True, only extract active devices (default: True)
+        active_only: If True, only extract devices with status='active' from NetBox.
+                     Set to False to extract all devices regardless of status (default: True)
         
     Returns:
         Dictionary with structure:
@@ -58,7 +61,8 @@ def extract_netbox_devices_bulk(nb_session: NetBoxApi,
                 "hostname": device_hostname,
                 "id": netbox_device_id,
                 "serial_number": device_serial_number,
-                "inventory_number": device_asset_tag  # from NetBox asset_tag field
+                "inventory_number": device_asset_tag,  # from NetBox asset_tag field
+                "status": device_status  # from NetBox status field
             },
             ...
         }
@@ -82,10 +86,10 @@ def extract_netbox_devices_bulk(nb_session: NetBoxApi,
                 logger.warning(f"Device without hostname found (ID: {device.id}), skipping")
                 continue
             
-            # Ignore devices with hostnames starting with capital letters
+            # Ignore devices with hostnames starting with capital letters or underscore
             # (they are not devices that should be monitored)
-            if hostname and hostname[0].isupper():
-                logger.debug(f"Skipping device {hostname} (starts with capital letter)")
+            if hostname and (hostname[0].isupper() or hostname.startswith('_')):
+                logger.debug(f"Skipping device {hostname} (starts with capital letter or underscore)")
                 continue
             
             # Access only the fields we need - these are in the initial response
@@ -94,11 +98,19 @@ def extract_netbox_devices_bulk(nb_session: NetBoxApi,
             # In NetBox, inventory number is stored as 'asset_tag', not in custom_fields
             inventory_number = str(device.asset_tag) if hasattr(device, 'asset_tag') and device.asset_tag else None
             
+            # Get device status from NetBox
+            # status can be a Record object with .value attribute or a plain string
+            if device.status:
+                device_status = device.status.value if hasattr(device.status, 'value') else str(device.status)
+            else:
+                device_status = None
+            
             devices_dict[hostname] = {
                 'hostname': hostname,
                 'id': device.id,
                 'serial_number': serial_number,
                 'inventory_number': inventory_number,
+                'status': device_status,
             }
         
         logger.info(f"Extracted {len(devices_dict)} devices with valid hostnames")
@@ -251,6 +263,18 @@ def needs_update(db_device: Dict[str, Any],
     if nb_inv is not None and db_inv != nb_inv:
         updates['inventory_number'] = (db_inv, nb_inv)
     
+    # Check if Active flag needs updating based on NetBox status
+    nb_status = nb_device.get('status')
+    if nb_status is not None:
+        # Device is active in NetBox if status.lower() is 'active' or 'commissioned'
+        # All other statuses (decommissioning, decomissioning, offline, staged, etc.) are considered inactive
+        nb_active = nb_status.lower() in ['active', 'commissioned']
+        db_active = db_device.get('active', False)
+        
+        # Only update if the active status differs between NetBox and DB
+        if db_active != nb_active:
+            updates['active'] = (db_active, nb_active)
+    
     return updates
 
 
@@ -343,20 +367,25 @@ def synchronize_devices(nb_devices: Dict[str, Dict[str, Any]],
             
             if not db_devices:
                 # Device doesn't exist in database - add it
+                # Determine active status from NetBox status
+                nb_status = nb_device.get('status')
+                is_active = nb_status.lower() in ['active', 'commissioned'] if nb_status else False
+                
                 if dry_run:
                     stats['details'].append({
                         'hostname': hostname,
                         'action': 'add',
                         'serial_number': nb_device['serial_number'],
-                        'inventory_number': nb_device['inventory_number']
+                        'inventory_number': nb_device['inventory_number'],
+                        'active': is_active
                     })
-                    logger.info(f"[DRY RUN] Would add: {hostname}")
+                    logger.info(f"[DRY RUN] Would add: {hostname} (active={is_active})")
                 else:
                     device_id = inventory.add_device(
                         hostname=hostname,
                         serial_number=nb_device['serial_number'],
                         inventory_number=nb_device['inventory_number'],
-                        active=True
+                        active=is_active
                     )
                     stats['added'] += 1
                     stats['details'].append({
@@ -413,20 +442,25 @@ def synchronize_devices(nb_devices: Dict[str, Dict[str, Any]],
                     stats['conflicts_resolved'] += 1
                     new_device_data = handle_device_conflict(db_devices, nb_device, inventory)
                     
+                    # Determine active status from NetBox status
+                    nb_status = nb_device.get('status')
+                    is_active = nb_status.lower() in ['active', 'commissioned'] if nb_status else False
+                    
                     if dry_run:
                         stats['details'].append({
                             'hostname': hostname,
                             'action': 'conflict_resolved_and_add',
                             'serial_number': new_device_data['serial_number'],
-                            'inventory_number': new_device_data['inventory_number']
+                            'inventory_number': new_device_data['inventory_number'],
+                            'active': is_active
                         })
-                        logger.info(f"[DRY RUN] Would resolve conflict and add: {hostname}")
+                        logger.info(f"[DRY RUN] Would resolve conflict and add: {hostname} (active={is_active})")
                     else:
                         device_id = inventory.add_device(
                             hostname=hostname,
                             serial_number=new_device_data['serial_number'],
                             inventory_number=new_device_data['inventory_number'],
-                            active=True
+                            active=is_active
                         )
                         stats['added'] += 1
                         stats['details'].append({
@@ -445,20 +479,25 @@ def synchronize_devices(nb_devices: Dict[str, Dict[str, Any]],
                     
                     if ((new_serial and new_serial not in existing_serials) or
                         (new_inv and new_inv not in existing_invs)):
+                        # Determine active status from NetBox status
+                        nb_status = nb_device.get('status')
+                        is_active = nb_status.lower() in ['active', 'commissioned'] if nb_status else False
+                        
                         if dry_run:
                             stats['details'].append({
                                 'hostname': hostname,
                                 'action': 'add_new_variant',
                                 'serial_number': new_serial,
-                                'inventory_number': new_inv
+                                'inventory_number': new_inv,
+                                'active': is_active
                             })
-                            logger.info(f"[DRY RUN] Would add new variant: {hostname}")
+                            logger.info(f"[DRY RUN] Would add new variant: {hostname} (active={is_active})")
                         else:
                             device_id = inventory.add_device(
                                 hostname=hostname,
                                 serial_number=new_serial,
                                 inventory_number=new_inv,
-                                active=True
+                                active=is_active
                             )
                             stats['added'] += 1
                             stats['details'].append({
@@ -512,7 +551,7 @@ def get_netbox_session(server: str = "development") -> NetBoxApi:
 def sync(
     server: str = "development",
     db_host: str = host,
-    active_only: bool = True,
+    active_only: bool = False,
     dry_run: bool = False,
     verbose: bool = False
 ):
@@ -522,7 +561,7 @@ def sync(
     Args:
         server: NetBox server to connect to (development or production)
         db_host: PostgreSQL database host
-        active_only: Only sync active devices from NetBox
+        active_only: If True, only sync active devices from NetBox (default: False to sync all devices including offline/decommissioning)
         dry_run: If True, only show what would be changed
         verbose: Enable verbose logging
     """
@@ -589,7 +628,7 @@ def sync(
 def extract(
     server: str = "development",
     output_file: Optional[str] = None,
-    active_only: bool = True,
+    active_only: bool = False,
     verbose: bool = False
 ):
     """
@@ -598,7 +637,7 @@ def extract(
     Args:
         server: NetBox server to connect to
         output_file: If provided, save extracted data to this YAML file
-        active_only: Only extract active devices
+        active_only: If True, only extract active devices (default: False to extract all)
         verbose: Enable verbose logging
     """
     log_level = logging.DEBUG if verbose else logging.INFO
@@ -639,7 +678,7 @@ def extract(
 def compare(
     server: str = "development",
     db_host: str = host,
-    active_only: bool = True,
+    active_only: bool = False,
     show_matches: bool = False,
     verbose: bool = False
 ):
@@ -649,7 +688,7 @@ def compare(
     Args:
         server: NetBox server to connect to
         db_host: PostgreSQL database host
-        active_only: Only compare active devices from NetBox
+        active_only: If True, only compare active devices from NetBox (default: False to compare all)
         show_matches: Show devices that match (default: only show differences)
         verbose: Enable verbose logging
     """
@@ -747,13 +786,13 @@ def compare(
 
 # Public functions for programmatic use
 def create_device_dict_from_netbox(nb_session: NetBoxApi, 
-                                   active_only: bool = True) -> Dict[str, Dict[str, Any]]:
+                                   active_only: bool = False) -> Dict[str, Dict[str, Any]]:
     """
     Public function to create device dictionary from NetBox.
     
     Args:
         nb_session: Active NetBox API session
-        active_only: Only extract active devices
+        active_only: If True, only extract active devices (default: False to extract all)
         
     Returns:
         Dictionary with structure: {hostname: device_data_dict}
@@ -763,7 +802,7 @@ def create_device_dict_from_netbox(nb_session: NetBoxApi,
 
 def sync_with_database(nb_session: NetBoxApi,
                        inventory: NetworkInventory,
-                       active_only: bool = True,
+                       active_only: bool = False,
                        dry_run: bool = False) -> Dict[str, Any]:
     """
     Public function to synchronize NetBox devices with PostgreSQL database.
@@ -771,7 +810,7 @@ def sync_with_database(nb_session: NetBoxApi,
     Args:
         nb_session: Active NetBox API session
         inventory: NetworkInventory instance
-        active_only: Only sync active devices from NetBox
+        active_only: If True, only sync active devices from NetBox (default: False to sync all)
         dry_run: Only report changes without applying them
         
     Returns:
