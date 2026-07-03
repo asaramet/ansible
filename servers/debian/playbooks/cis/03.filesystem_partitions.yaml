@@ -1,325 +1,188 @@
 ---
 # CIS Benchmark 1.1.2. - Configure Filesystem Partitions
-# Checks that specific directories are on separate partitions ot `tmpfs`, 
+# Checks that specific directories are on separate partitions or tmpfs,
 # with required mount options.
 # Rationale: Prevents unauthorized device access, SUID execution, and code execution
 # on directories that should not contain user executables.
 #
-# Directories with separate partitions or is tmpfs:
-#   /tmp, /dev/shm 
+# Directories with separate partitions or tmpfs:
+#   /tmp, /dev/shm
 #
 # Directories with separate partitions:
 #   /home, /var, /var/tmp, /var/log, /var/log/audit
 #
-# Directories with nodev, nosuid, noexec:
-#   /tmp, /dev/shm, /var/tmp, /var/log, 
-#   and /var/log/audit - for auditd deamon, which is usually missing
+# Directories requiring nodev, nosuid, noexec:
+#   /tmp, /dev/shm, /var/tmp, /var/log, /var/log/audit
 #
-# Directories with nodev, nosuid (no noexec):
+# Directories requiring nodev, nosuid (no noexec):
 #   /home, /var
 #
 # Note: If /tmp entry exists in /etc/fstab, it takes precedence over systemd unit file.
 #       On diskless/iSCSI systems, fstab may not override systemd configuration.
 #
 # Audit:
-#   1. findmnt -kn [DIR] # DIR example: /tmp
-#     Example output: /tmp tmpfs tmpfs rw,nosuid,nodev,noexec
-#   2.  findmnt -kn [DIR] | grep -v [OPT] # OPT example: noexec
-#     Nothing should be returned
+#   findmnt -kn [DIR] # Example: findmnt -kn /tmp
+#   Expected output: /tmp tmpfs tmpfs rw,nosuid,nodev,noexec
 #
-# Remediation 1: (example for /tmp)
+# Remediation 1 (for tmpfs):
 #   systemctl unmask tmp.mount
 #   Edit /etc/fstab: tmpfs /tmp tmpfs defaults,rw,nosuid,nodev,noexec,relatime,size=2G 0 0
-# Remediation 2: (example for /tmp and noexec) 
-#   - IF - a separate partition exists for /tmp.
-#   Edit the /etc/fstab file and add noexec to the fourth field (mounting options) for the 
-#   /tmp partition.
-#     Example:
-#     <device> /tmp  <fstype>  defaults,rw,nosuid,nodev,noexec,relatime  0 0
-#   Run the following command to remount /tmp with the configured options:
-#   mount -o remount /tmp
+#
+# Remediation 2 (for separate partitions):
+#   Edit /etc/fstab and add required options to the fourth field (mounting options).
+#   Example: <device> /var/log <fstype> defaults,rw,nosuid,nodev,noexec,relatime 0 0
+#   Then run: mount -o remount /var/log
 
 - name: Check partitions mount configuration per CIS
-  hosts: local
+  hosts: debian
   become: true
   gather_facts: false
 
   vars:
-    partitions_tmpfs:
+    # Partitions that must be tmpfs
+    tmpfs_partitions:
       - '/tmp'
       - '/dev/shm'
-    partitions:
+
+    # Partitions that must exist on separate partitions
+    separate_partitions:
       - '/home'
       - '/var'
       - '/var/tmp'
       - '/var/log'
       #- '/var/log/audit'
-    noexec_partiotions:
+
+    # Partitions requiring noexec option (in addition to nodev, nosuid)
+    noexec_partitions:
       - '/tmp'
       - '/dev/shm'
       - '/var/tmp'
       - '/var/log'
       #- '/var/log/audit'
 
-    root_filesystems: "rootfs,unknown"
-    valid_systemd_statuses: "enabled,generated,static"
-
   tasks:
-    # Step 1: Check if partitions are mounted
-    - name: Get existing tmpfs partitions mount data
-      ansible.builtin.shell: "findmnt -kn {{ item }} | grep tmpfs"
-      register: tmpfs_parts
-      changed_when: false
-      failed_when: false
-      loop: "{{ partitions_tmpfs }}"
-
-    - name: Get existing partitions mount data
-      ansible.builtin.shell: "findmnt -kn {{ item }}"
-      register: default_parts
-      changed_when: false
-      failed_when: false
-      loop: "{{ partitions }}"
-
-    - name: Set fact for tmpfs mounted partitions
-      ansible.builtin.set_fact:
-        mounted_tmpfs_partitions: >-
-          {{
-            tmpfs_parts.results
-            | map(attribute='stdout_lines')
-            | flatten
-            | select('match', '.+')
-            | list
-          }}
-
-    - name: Set fact for default mounted partitions
-      ansible.builtin.set_fact:
-        mounted_partitions: >-
-          {{
-            default_parts.results
-            | map(attribute='stdout_lines')
-            | flatten
-            | select('match', '.+')
-            | list
-          }}
-
-    - name: Mounted tmpfs partitions found
-      ansible.builtin.debug:
-        msg: "{{ mounted_tmpfs_partitions }}"
-
-    - name: Mounted default partitions found
-      ansible.builtin.debug:
-        msg: "{{ mounted_partitions }}"
-
-    - name: Extract tmpfs mount points into tmpfs_mount_points
-      ansible.builtin.set_fact:
-        tmpfs_mount_points: >-
-          {{
-            mounted_tmpfs_partitions
-            | map('split', ' ')
-            | map('first')
-            | list
-          }}
-
-    - name: Extract default mount points into default_mount_points
-      ansible.builtin.set_fact:
-        default_mount_points: >-
-          {{
-            mounted_partitions
-            | map('split', ' ')
-            | map('first')
-            | list
-          }}
-
-    - name: Assert all tmpfs required partitions are mounted
-      ansible.builtin.assert:
-        that: item in tmpfs_mount_points
-        fail_msg: |
-          {{ item }} isn't mounted or doesn't exist!
-
-          You have to create a new partition and configure /etc/fstab accordingly. For Example:
-
-          tmpfs {{ item }}     tmpfs    defaults,rw,nosuid,nodev,noexec,relatime,size=2G 0 0
-
-          Note: the size=2G is an example of setting a specific size for tmpfs.
-          Example of using a volume or disk with specific mount options. The source location of
-          the volume or disk will vary depending on your environment:
-
-          <device> {{ item }}    <fstype>   defaults,nodev,nosuid   0 0
-        success_msg: "{{ item }} partition is correctly mounted as tmpfs"
-      loop: "{{ partitions_tmpfs }}"
-
-    - name: Assert all required partitions are mounted
-      ansible.builtin.assert:
-        that: item in default_mount_points
-        fail_msg: |
-          WARNING: {{ item }} isn't mounted or doesn't exist!
-
-          If {{ item }} already exists, create a new partition, mount the new partition to a temporary mountpoint e.g. 
-          
-          mount /dev/vdb2 /mnt
-
-          Copy data from the original partition to the new partition. e.g. 
-          
-          rsync -avz {{ item }}/* /mnt 
-          
-          Verify that all data is present on the new partition. e.g. 
-          
-          ls -la /mnt
-          
-          Unmount the new partition. e.g. 
-          
-          umount /mnt
-
-          Remove the data from the original directory that was in the old partition. e.g. 
-          
-          rm -Rf {{ item }}/* 
-          
-          Otherwise it will still consume space in the old partition that will be masked when the new filesystem is mounted.
-
-          Mount the new partition to the desired mountpoint. e.g. 
-          
-          mount /dev/vdb2 {{ item }}
-
-          Update /etc/fstab with the new mountpoint. e.g. 
-          
-          <partition UUID> {{ item }} <partition TYPE> defaults,rw,nosuid,nodev,noexec,relatime 0 0
-
-          To get partition UUID and type: 
-
-          blkid
-        success_msg: "{{ item }} partition exists, is correctly mounted and configured"
-      loop: "{{ partitions }}"
-
-    # Step 2 Ensure filesystem options are correctly set 
-    - name: Collect filesystems mount data
+    # Step 1: Collect ALL mount data in one pass
+    - name: Get mount information for all partitions
       ansible.builtin.shell: "findmnt -kn {{ item }}"
       register: raw_mount_data
       changed_when: false
       failed_when: false
-      loop: "{{ partitions_tmpfs + partitions }}"
+      loop: "{{ tmpfs_partitions + separate_partitions | unique }}"
 
-    - name: Set fact for mount data
+    # Step 2: Parse into structured data
+    # mount_info: mount_point -> options (column 3)
+    # mount_fstype: mount_point -> filesystem type (column 2)
+    - name: Parse mount data into structured dictionaries
       ansible.builtin.set_fact:
-        mount_data: >-
+        mount_info: >-
           {{
             raw_mount_data.results
             | map(attribute='stdout')
             | flatten
             | select('match', '.+')
-            | list
+            | map('trim')
+            | map('split')
+            | items2dict(key_name=0, value_name=3)
           }}
-
-    - name: Collected mount data
-      ansible.builtin.debug:
-        msg: "{{ mount_data }}"
-
-    - name: Initialize list for missing nosuid
-      ansible.builtin.set_fact:
-        missing_nosuid: []
-
-    - name: Check for nosuid in each mount line
-      ansible.builtin.set_fact:
-        missing_nosuid: "{{ missing_nosuid + [item.split(' ')[0]] }}"
-      loop: "{{ mount_data }}"
-      when: "'nosuid' not in item.split(' ')[3]"
-
-    - name: Debug missing nosuid
-      ansible.builtin.debug:
-        msg: "Mount points missing nosuid: {{ missing_nosuid }}"
-
-    - name: Assert nosuid option missing
-      ansible.builtin.assert:
-        that: item not in missing_nosuid
-        fail_msg: |
-          ERROR: Missing nosuid option for partition {{ item }}
-
-          Edit the /etc/fstab file and add nosuid to the fourth field (mounting options) for the {{ item }} partition.
-
-          Example:
-          <device> {{ item }} <fstype> defaults,rw,nosuid,relatime 0 0
-          
-          Run the following command to remount /var/log/audit with the configured options:
-
-          mount -o remount {{ item }}
-        success_msg: "{{ item }} partition exists with nosuid option."
-      loop: "{{ partitions + partitions_tmpfs }}"
-
-    - name: Initialize list for missing nodev
-      ansible.builtin.set_fact:
-        missing_nodev: []
-
-    - name: Check for nodev in each mount line
-      ansible.builtin.set_fact:
-        missing_nodev: "{{ missing_nodev + [item.split(' ')[0]] }}"
-      loop: "{{ mount_data }}"
-      when: "'nodev' not in item.split(' ')[3]"
-
-    - name: Debug missing nodev
-      ansible.builtin.debug:
-        msg: "Mount points missing nodev: {{ missing_nodev }}"
-
-    - name: Assert nodev option missing
-      ansible.builtin.assert:
-        that: item not in missing_nodev
-        fail_msg: |
-          ERROR: Missing nodev option for partition {{ item }}
-
-          Edit the /etc/fstab file and add nodev to the fourth field (mounting options) for the {{ item }} partition.
-
-          Example:
-          <device> {{ item }} <fstype> defaults,rw,nosuid,nodev,relatime 0 0
-          
-          Run the following command to remount /var/log/audit with the configured options:
-
-          mount -o remount {{ item }}
-        success_msg: "{{ item }} partition exists with nodev option."
-      loop: "{{ partitions + partitions_tmpfs }}"
-
-    - name: Collect filesystems mount data for noexec partitions
-      ansible.builtin.shell: "findmnt -kn {{ item }}"
-      register: raw_noexec_mount_data
-      changed_when: false
-      failed_when: false
-      loop: "{{ noexec_partiotions }}"
-
-    - name: Set fact for noexec partitions mount data
-      ansible.builtin.set_fact:
-        noexec_mount_data: >-
+        mount_fstype: >-
           {{
-            raw_noexec_mount_data.results
+            raw_mount_data.results
             | map(attribute='stdout')
             | flatten
             | select('match', '.+')
-            | list
+            | map('trim')
+            | map('split')
+            | items2dict(key_name=0, value_name=2)
           }}
 
-    - name: Initialize list for missing noexec
-      ansible.builtin.set_fact:
-        missing_noexec: []
-
-    - name: Check for noexec in each mount line
-      ansible.builtin.set_fact:
-        missing_noexec: "{{ missing_noexec + [item.split(' ')[0]] }}"
-      loop: "{{ noexec_mount_data }}"
-      when: "'noexec' not in item.split(' ')[3]"
-
-    - name: Debug missing noexec
-      ansible.builtin.debug:
-        msg: "Mount points missing noexec: {{ missing_noexec | join(', ') }}"
-
-    - name: Assert noexec option missing
+    # Step 3: Verify tmpfs partitions (check filesystem type column)
+    - name: Assert tmpfs partitions are mounted as tmpfs
       ansible.builtin.assert:
-        that: item not in missing_noexec
+        that: mount_fstype[item] == 'tmpfs'
         fail_msg: |
-          ERROR: Missing noexec option for partition {{ item }}
+          {{ item }} is not mounted as tmpfs!
+          Current fstype: {{ mount_fstype[item] | default('NOT FOUND') }}
+          Add to /etc/fstab: tmpfs {{ item }} tmpfs defaults,rw,nosuid,nodev,noexec,size=2G 0 0
+        success_msg: "{{ item }} is correctly mounted as tmpfs"
+      loop: "{{ tmpfs_partitions }}"
 
-          Edit the /etc/fstab file and add noexec to the fourth field (mounting options) for the {{ item }} partition.
+    # Step 4: Verify all required partitions exist
+    - name: Assert all required partitions are mounted
+      ansible.builtin.assert:
+        that: item in mount_info
+        fail_msg: |
+          {{ item }} is not mounted or doesn't exist!
+          Current fstype: {{ mount_fstype[item] | default('NOT FOUND') }}
+          Create a new partition and configure /etc/fstab accordingly.
 
-          Example:
-          <device> {{ item }} <fstype> defaults,rw,nosuid,nodev,noexec,relatime 0 0
-          
-          Run the following command to remount /var/log/audit with the configured options:
+          Example for disk partition:
+          <device> {{ item }} <fstype> defaults,nodev,nosuid,noexec,relatime 0 0
 
+          Example for tmpfs:
+          tmpfs {{ item }} tmpfs defaults,rw,nosuid,nodev,noexec,relatime,size=2G 0 0
+
+          Remediation:
+
+          1. Create new partition, e.g. /dev/vdb1, with fdisk /dev/vdb, then mkfs.xfs or mkfs.ext4 /dev/vdb1
+          2. Mount new partition to a temporary  mountpoint e.g. mount /dev/vdb1 /mnt
+          3. Sync data from current folder, if it exists to the mounted partition, e.g: rsync -azv /home/* /mnt
+          4. Verify that all data is present with right permissions e.g ls -la /mnt 
+          5. Unmount the new partition. e.g umount /mnt
+          6. Remove the data from the original directory, to save space. e.g. rm -Rfv /home/*
+          7. Mount new partition to the desired folder. e.g mount /dev/vdb1 /home
+          8. Update /etc/fstab with the new mountpoint. e.g
+
+          UUID=7da67e29-d23b-4c57-81e0-80165f648d62       /home   xfs     defaults,rw,nosuid,nodev,relatime       0       0
+
+          NB: blkid will show the partition ID and type
+        success_msg: "{{ item }} exists and is mounted"
+      loop: "{{ separate_partitions }}"
+
+    # Step 5: Verify nosuid option on all partitions
+    - name: Assert nosuid option is set
+      ansible.builtin.assert:
+        that: "'nosuid' in mount_info[item] | default('')"
+        fail_msg: |
+          Missing nosuid option on {{ item }}.
+          Current options: {{ mount_info[item] | default('NOT FOUND') }}
+          Edit /etc/fstab and add nosuid to the mount options for {{ item }}.
+          Then run: mount -o remount {{ item }}
+        success_msg: "{{ item }} has nosuid option"
+      loop: "{{ tmpfs_partitions + separate_partitions | unique }}"
+
+    # Step 6: Verify nodev option on all partitions
+    - name: Assert nodev option is set
+      ansible.builtin.assert:
+        that: "'nodev' in mount_info[item] | default('')"
+        fail_msg: |
+          Missing nodev option on {{ item }}.
+          Current options: {{ mount_info[item] | default('NOT FOUND') }}
+          Edit /etc/fstab and add nodev to the mount options for {{ item }}.
+          Then run: mount -o remount {{ item }}
+        success_msg: "{{ item }} has nodev option"
+      loop: "{{ tmpfs_partitions + separate_partitions | unique }}"
+
+    # Step 7: Verify noexec option on strict partitions
+    - name: Assert noexec option is set on noexec partitions
+      ansible.builtin.assert:
+        that: "'noexec' in mount_info[item] | default('')"
+        fail_msg: |
+          Missing noexec option on {{ item }}.
+
+          Current options: {{ mount_info[item] | default('NOT FOUND') }}
+
+          Edit /etc/fstab and add noexec to the mount options for {{ item }}.
+
+          Example for a tmpfs partition:
+          tmpfs {{ item }} tmpfs defaults,rw,nosuid,nodev,noexec,relatime,size=2G 0 0
+
+          Example for a separate partition: 
+          UUID=9e25b1ff-7a61-4e16-a984-f787b4ff0113 {{ item }} xfs	defaults,rw,nosuid,nodev,noexec,relatime	0	0
+
+          Then run, for tmpfs partitions:
+          systemctl daemon-reload
+
+          For separate partitions:
           mount -o remount {{ item }}
-        success_msg: "{{ item }} partition exists with noexec option."
-      loop: "{{ noexec_partiotions }}"
+        success_msg: "{{ item }} has noexec option"
+      loop: "{{ noexec_partitions }}"
