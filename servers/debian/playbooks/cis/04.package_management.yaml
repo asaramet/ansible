@@ -1,0 +1,115 @@
+---
+# CIS Benchmark 1.2.1 - APT Package Management Configuration
+# 1.2.1.1: Ensure Signed-By is configured for repository sources
+# 1.2.1.2: Ensure weak dependencies are disabled
+#
+# Rationale: 
+# - Verifying authenticity of repositories prevents tampered packages (1.2.1.1)
+# - Disabling weak dependencies (Recommends/Suggests) reduces attack surface (1.2.1.2)
+
+- name: Check APT repository configuration per CIS 1.2.1
+  hosts: local
+  #hosts: rzlx8799
+  become: true
+  gather_facts: false
+
+  tasks:
+    # Check for source files without Signed-By
+    - name: Find files without Signed-By in sources.list.d
+      ansible.builtin.shell: |
+        grep -L 'Signed-By' /etc/apt/sources.list.d/*.sources \ 
+        /etc/apt/sources.list.d/*.list /etc/apt/sources.list 2>/dev/null || true
+      register: unsigned_files_raw
+      changed_when: false
+
+    # Parse output to get clean file list
+    - name: Get list of non-compliant files
+      ansible.builtin.set_fact:
+        non_compliant: >-
+          {% if unsigned_files_raw.stdout %}{{ unsigned_files_raw.stdout.split('\n') | select('match', '.+') | list }}{% else %}{{ [] }}{% endif %}
+
+    # Display results
+    - name: Display APT source file compliance
+      ansible.builtin.debug:
+        msg: |
+          CIS 1.2.1.1 - APT Repository Signed-By Check
+          ==================================================
+          {% for f in non_compliant %}
+          {{ f }}: NON-COMPLIANT (missing Signed-By)
+          {% endfor %}
+          {% if non_compliant | length == 0 %}
+          All files are compliant
+          {% endif %}
+          ==================================================
+
+    # Fail if non-compliant
+    - name: Fail if non-compliant files found
+      ansible.builtin.fail:
+        msg: |
+          CIS 1.2.1.1 FAILED
+          Files missing Signed-By: {{ non_compliant | join(', ') }}
+          REMEDIATION: Add Signed-By to each .sources file stanza
+
+          For example, a Esslingen Debian mirror configuration would look like
+          the following file named /etc/apt/sources.list.d/debian.sources:
+
+          Types: deb deb-src
+          URIs: http://ftp-stud.hs-esslingen.de/debian/
+          Suites: trixie trixie-updates
+          Components: main
+          Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+          Types: deb deb-src
+          URIs: http://ftp-stud.hs-esslingen.de/debian-security/
+          Suites: trixie-security
+          Components: main
+          Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+      when: non_compliant | length > 0
+
+    # FAIL
+
+    # Step 6: CIS 1.2.1.2 - Check weak dependencies configuration
+    - name: Get APT::Install-Recommends value
+      ansible.builtin.command: apt-config get APT::Install-Recommends
+      register: recommends_raw
+      changed_when: false
+
+    - name: Get APT::Install-Suggests value
+      ansible.builtin.command: apt-config get APT::Install-Suggests
+      register: suggests_raw
+      changed_when: false
+
+    - name: Set recommends value
+      ansible.builtin.set_fact:
+        recommends_value: '"{{ recommends_raw.stdout | trim }}"'
+
+    - name: Set suggests value
+      ansible.builtin.set_fact:
+        suggests_value: '"{{ suggests_raw.stdout | trim }}"'
+
+    - name: Display weak dependencies compliance
+      ansible.builtin.debug:
+        msg: |
+          CIS 1.2.2 - Weak Dependencies Check
+          ==================================================
+          Install-Recommends: {{ recommends_value }} (should be "0")
+          Install-Suggests:   {{ suggests_value }} (should be "0")
+          ==================================================
+
+    - name: Fail if weak dependencies are not disabled
+      ansible.builtin.fail:
+        msg: |
+          CIS 1.2.2 FAILED
+          Weak dependencies are not properly disabled:
+          {% if recommends_value != '"0"' %}
+          - APT::Install-Recommends is {{ recommends_value }} (should be "0")
+          {% endif %}
+          {% if suggests_value != '"0"' %}
+          - APT::Install-Suggests is {{ suggests_value }} (should be "0")
+          {% endif %}
+          
+          REMEDIATION:
+          Add to /etc/apt/apt.conf.d/99disable-weak-deps:
+          APT::Install-Recommends "0";
+          APT::Install-Suggests "0";
+      when: recommends_value != '"0"' or suggests_value != '"0"
