@@ -2,14 +2,27 @@
 # CIS Benchmark 1.2.1 - APT Package Management Configuration
 # 1.2.1.1: Ensure Signed-By is configured for repository sources
 # 1.2.1.2: Ensure weak dependencies are disabled
+# 1.2.1.3: Ensure access to GPG key files are configured
+# 1.2.1.4: Ensure access to /etc/apt/trusted.gpg.d directory is configured
+# 1.2.1.5: Ensure access to /etc/apt/auth.conf.d directory is configured
+# 1.2.1.6: Ensure access to files in /etc/apt/auth.conf.d/ directory is configured
+# 1.2.1.7: Ensure access to /usr/share/keyrings directory is configured
+# 1.2.1.8: Ensure access to /etc/apt/sources.list.d directory is configured
+# 1.2.1.9: Ensure access to files in /etc/apt/sources.list.d directory is configured
 #
 # Rationale: 
 # - Verifying authenticity of repositories prevents tampered packages (1.2.1.1)
 # - Disabling weak dependencies (Recommends/Suggests) reduces attack surface (1.2.1.2)
+# - Proper GPG key file permissions prevent tampering with trusted keys (1.2.1.3)
+# - Proper directory permissions prevent unauthorized key additions (1.2.1.4)
+# - Restricting access to auth.conf.d directory prevents credential exposure (1.2.1.5)
+# - Restricting access to auth.conf.d files prevents credential leakage (1.2.1.6)
+# - Restricting access to keyrings prevents unauthorized key management (1.2.1.7)
+# - Restricting access to sources.list.d directory prevents unauthorized repo additions (1.2.1.8)
+# - Restricting access to sources.list.d files prevents unauthorized repo modifications (1.2.1.9)
 
-- name: Check APT repository configuration per CIS 1.2.1
-  hosts: local
-  #hosts: rzlx8799
+- name: Package Management Analysis per CIS 1.2.1
+  hosts: hs_netz
   become: true
   gather_facts: false
 
@@ -42,10 +55,10 @@
           {% endif %}
           ==================================================
 
-    # Fail if non-compliant
-    - name: Fail if non-compliant files found
-      ansible.builtin.fail:
-        msg: |
+    - name: Assert all APT source files have Signed-By
+      ansible.builtin.assert:
+        that: non_compliant | length == 0
+        fail_msg: |
           CIS 1.2.1.1 FAILED
           Files missing Signed-By: {{ non_compliant | join(', ') }}
           REMEDIATION: Add Signed-By to each .sources file stanza
@@ -64,52 +77,290 @@
           Suites: trixie-security
           Components: main
           Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-      when: non_compliant | length > 0
+        success_msg: "CIS 1.2.1.1 - All APT source files have Signed-By"
 
-    # FAIL
-
-    # Step 6: CIS 1.2.1.2 - Check weak dependencies configuration
+    # CIS 1.2.1.2 - Check weak dependencies configuration
     - name: Get APT::Install-Recommends value
-      ansible.builtin.command: apt-config get APT::Install-Recommends
+      ansible.builtin.command: apt-config dump | grep 'APT::Install-Recommends'
       register: recommends_raw
       changed_when: false
 
     - name: Get APT::Install-Suggests value
-      ansible.builtin.command: apt-config get APT::Install-Suggests
+      ansible.builtin.command: apt-config dump | grep 'APT::Install-Suggests'
       register: suggests_raw
       changed_when: false
 
     - name: Set recommends value
       ansible.builtin.set_fact:
-        recommends_value: '"{{ recommends_raw.stdout | trim }}"'
+        recommends_value: "{{ recommends_raw.stdout.split('\"')[1] }}"
 
     - name: Set suggests value
       ansible.builtin.set_fact:
-        suggests_value: '"{{ suggests_raw.stdout | trim }}"'
+        suggests_value: "{{ suggests_raw.stdout.split('\"')[1] }}"
 
     - name: Display weak dependencies compliance
       ansible.builtin.debug:
         msg: |
-          CIS 1.2.2 - Weak Dependencies Check
+          CIS 1.2.1.2 - Weak Dependencies Check
           ==================================================
           Install-Recommends: {{ recommends_value }} (should be "0")
           Install-Suggests:   {{ suggests_value }} (should be "0")
           ==================================================
 
-    - name: Fail if weak dependencies are not disabled
-      ansible.builtin.fail:
-        msg: |
-          CIS 1.2.2 FAILED
+    - name: Assert weak dependencies are disabled
+      ansible.builtin.assert:
+        that:
+          - recommends_value == "0"
+          - suggests_value == "0"
+        fail_msg: |
+          CIS 1.2.1.2 FAILED
           Weak dependencies are not properly disabled:
-          {% if recommends_value != '"0"' %}
+          {% if recommends_value != "0" %}
           - APT::Install-Recommends is {{ recommends_value }} (should be "0")
           {% endif %}
-          {% if suggests_value != '"0"' %}
+          {% if suggests_value != "0" %}
           - APT::Install-Suggests is {{ suggests_value }} (should be "0")
           {% endif %}
           
           REMEDIATION:
-          Add to /etc/apt/apt.conf.d/99disable-weak-deps:
+          Add to /etc/apt/apt.conf.d/60no-weak-dependencies:
           APT::Install-Recommends "0";
           APT::Install-Suggests "0";
-      when: recommends_value != '"0"' or suggests_value != '"0"
+        success_msg: "CIS 1.2.1.2 - Weak dependencies check PASSED"
+
+    # CIS 1.2.1.3 - Ensure access to GPG key files are configured
+    - name: Find all non-compliant GPG and signed-by files with details
+      ansible.builtin.shell: |
+        GPG_FILES=$(find /usr/share/keyrings/ /etc/apt/trusted.gpg.d/ -name '*.gpg' -type f 2>/dev/null)
+        SIGNED_BY_FILES=$(grep -l -i 'signed-by' /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources /etc/apt/sources.list 2>/dev/null || true)
+        for f in $GPG_FILES $SIGNED_BY_FILES; do
+          [ -z "$f" ] && continue
+          mode=$(stat -c "%a" "$f" 2>/dev/null)
+          owner=$(stat -c "%U" "$f" 2>/dev/null)
+          group=$(stat -c "%G" "$f" 2>/dev/null)
+          if [ "$mode" != "644" ] || [ "$owner" != "root" ] || [ "$group" != "root" ]; then
+            echo "$f|$mode|$owner|$group"
+          fi
+        done
+      register: non_compliant_gpg_raw
+      changed_when: false
+
+    - name: Parse non-compliant GPG files
+      ansible.builtin.set_fact:
+        non_compliant_gpg: >-
+          {{ (non_compliant_gpg_raw.stdout.split('\n')
+          | select('match', '.+')
+          | map('split', '|')
+          | select('length', 4)
+          | json_query('[].{path: [0], mode: [1], owner: [2], group: [3]}')) | default([]) }}
+
+    - name: Display GPG key file compliance
+      ansible.builtin.debug:
+        msg: |
+          CIS 1.2.1.3 - GPG Key File Access Check
+          ==================================================
+          {% if non_compliant_gpg | length > 0 %}
+          {% for f in non_compliant_gpg %}
+          NON-COMPLIANT: {{ f.path }}
+            Mode: {{ f.mode }} (should be 0644)
+            Owner: {{ f.owner }} (should be root)
+            Group: {{ f.group }} (should be root)
+          {% endfor %}
+          {% else %}
+          All GPG key files are compliant
+          {% endif %}
+          ==================================================
+
+    - name: Assert all GPG key files have correct permissions and ownership
+      ansible.builtin.assert:
+        that: non_compliant_gpg | length == 0
+        fail_msg: |
+          CIS 1.2.1.3 FAILED
+          Non-compliant files:
+          {% for f in non_compliant_gpg %}
+          - {{ f.path }}: mode={{ f.mode }}, owner={{ f.owner }}, group={{ f.group }}
+            REMEDIATION for this file:
+            # chown root:root "{{ f.path }}"
+            # chmod 0644 "{{ f.path }}"
+          {% endfor %}
+        success_msg: "CIS 1.2.1.3 - All GPG key files have correct permissions and ownership"
+
+    # CIS 1.2.1.4 - Ensure access to /etc/apt/trusted.gpg.d directory is configured
+    - name: Get /etc/apt/trusted.gpg.d directory stats
+      ansible.builtin.stat:
+        path: /etc/apt/trusted.gpg.d
+      register: trusted_gpg_dir
+      ignore_errors: yes
+
+    - name: Check /etc/apt/trusted.gpg.d compliance
+      ansible.builtin.set_fact:
+        trusted_gpg_compliant: >-
+          {{ trusted_gpg_dir.stat is defined and
+              trusted_gpg_dir.stat.pw_name == 'root' and
+              trusted_gpg_dir.stat.gr_name == 'root' and
+              trusted_gpg_dir.stat.mode in ['0755', '0750', '0700', '0555', '0550', '0500', '755', '750', '700', '555', '550', '500'] }}
+
+    - name: Display /etc/apt/trusted.gpg.d compliance
+      ansible.builtin.debug:
+        msg: |
+          CIS 1.2.1.4 - /etc/apt/trusted.gpg.d Access Check
+          ==================================================
+          {% if trusted_gpg_dir.stat is defined %}
+          Path: /etc/apt/trusted.gpg.d
+          Mode: {{ trusted_gpg_dir.stat.mode }} (should be 0755 or more restrictive)
+          Owner: {{ trusted_gpg_dir.stat.pw_name }} (should be root)
+          Group: {{ trusted_gpg_dir.stat.gr_name }} (should be root)
+          {% if trusted_gpg_compliant %}
+          COMPLIANT
+          {% else %}
+          NON-COMPLIANT
+          {% endif %}
+          {% else %}
+          Directory /etc/apt/trusted.gpg.d does not exist
+          {% endif %}
+          ==================================================
+
+    - name: Assert /etc/apt/trusted.gpg.d has correct permissions and ownership
+      ansible.builtin.assert:
+        that: trusted_gpg_compliant
+        fail_msg: |
+          CIS 1.2.1.4 FAILED
+          /etc/apt/trusted.gpg.d is not properly configured:
+          {% if trusted_gpg_dir.stat is defined %}
+          Mode: {{ trusted_gpg_dir.stat.mode }} (should be 0755 or more restrictive)
+          Owner: {{ trusted_gpg_dir.stat.pw_name }} (should be root)
+          Group: {{ trusted_gpg_dir.stat.gr_name }} (should be root)
+          {% else %}
+          Directory does not exist
+          {% endif %}
+          REMEDIATION:
+          Run the following commands:
+          # chown root:root /etc/apt/trusted.gpg.d
+          # chmod 0755 /etc/apt/trusted.gpg.d
+        success_msg: "CIS 1.2.1.4 - /etc/apt/trusted.gpg.d is properly configured"
+
+    # CIS 1.2.1.5, 1.2.1.7, 1.2.1.8 - Directory permission checks
+    - name: Define directories to check
+      ansible.builtin.set_fact:
+        dirs_to_check:
+          - { path: '/etc/apt/auth.conf.d', cis: '1.2.1.5', name: '/etc/apt/auth.conf.d' }
+          - { path: '/usr/share/keyrings', cis: '1.2.1.7', name: '/usr/share/keyrings' }
+          - { path: '/etc/apt/sources.list.d', cis: '1.2.1.8', name: '/etc/apt/sources.list.d' }
+
+    - name: Get stats for all directories
+      ansible.builtin.stat:
+        path: "{{ item.path }}"
+      loop: "{{ dirs_to_check }}"
+      register: dir_stats
+      ignore_errors: yes
+
+    - name: Check compliance for all directories
+      ansible.builtin.set_fact:
+        non_compliant_dirs: >-
+          {{ (dir_stats.results | json_query(non_compliant_query)) | default([]) }}
+      vars:
+        non_compliant_query: >-
+          [?stat == null || (stat.pw_name != 'root' || stat.gr_name != 'root' || 
+            stat.mode != '0755' && stat.mode != '0750' && stat.mode != '0700' && 
+            stat.mode != '0555' && stat.mode != '0550' && stat.mode != '0500' &&
+            stat.mode != '755' && stat.mode != '750' && stat.mode != '700' && 
+            stat.mode != '555' && stat.mode != '550' && stat.mode != '500')
+          ].{cis: item.cis, path: item.path, stat: stat}
+
+    - name: Display directory compliance
+      ansible.builtin.debug:
+        msg: |
+          Directory Permission Checks (CIS 1.2.1.5, 1.2.1.7, 1.2.1.8)
+          ==================================================
+          {% for check in dirs_to_check %}
+          {{ check.name }} (CIS {{ check.cis }}):
+            {% set stat = dir_stats.results[loop.index0].stat if dir_stats.results[loop.index0].stat is defined else none %}
+            {% if stat is defined %}
+            Mode: {{ stat.mode }}, Owner: {{ stat.pw_name }}, Group: {{ stat.gr_name }}
+            {{ 'COMPLIANT' if (stat.pw_name == 'root' and stat.gr_name == 'root' and stat.mode in ['0755','0750','0700','0555','0550','0500','755','750','700','555','550','500']) else 'NON-COMPLIANT' }}
+            {% else %}
+            Directory does not exist - NON-COMPLIANT
+            {% endif %}
+          {% endfor %}
+          ==================================================
+
+    - name: Assert all directories have correct permissions
+      ansible.builtin.assert:
+        that: non_compliant_dirs | length == 0
+        fail_msg: |
+          Directory permission checks FAILED:
+          {% for d in non_compliant_dirs %}
+          - CIS {{ d.cis }}: {{ d.path }}
+            {% if d.stat is none %}
+            Directory does not exist
+            {% else %}
+            Mode: {{ d.stat.mode }}, Owner: {{ d.stat.pw_name }}, Group: {{ d.stat.gr_name }}
+            {% endif %}
+          {% endfor %}
+          REMEDIATION:
+          For each non-compliant directory, run:
+          # chown root:root <directory>
+          # chmod 0755 <directory>
+        success_msg: "All directory permission checks (CIS 1.2.1.5, 1.2.1.7, 1.2.1.8) PASSED"
+
+    # CIS 1.2.1.6, 1.2.1.9 - File permission checks
+    - name: Find non-compliant files
+      ansible.builtin.shell: |
+        check_file() {
+          local f="$1"
+          local required_mode="$2"
+          local mode owner group
+          mode=$(stat -c "%a" "$f" 2>/dev/null)
+          owner=$(stat -c "%U" "$f" 2>/dev/null)
+          group=$(stat -c "%G" "$f" 2>/dev/null)
+          if [ "$mode" != "$required_mode" ] || [ "$owner" != "root" ] || [ "$group" != "root" ]; then
+            echo "$f|$mode|$owner|$group|$required_mode"
+          fi
+        }
+        find /etc/apt/auth.conf.d/ -maxdepth 1 -name '*.conf' -type f 2>/dev/null | while read -r f; do
+          check_file "$f" "0640"
+        done
+        find /etc/apt/sources.list.d/ -maxdepth 1 \( -name '*.list' -o -name '*.sources' \) -type f 2>/dev/null | while read -r f; do
+          check_file "$f" "0644"
+        done
+      register: files_raw
+      changed_when: false
+
+    - name: Parse non-compliant files
+      ansible.builtin.set_fact:
+        non_compliant_files: >-
+          {{ (files_raw.stdout.split('\n')
+          | select('match', '.+')
+          | map('split', '|')
+          | selectattr('length', 'equalto', 5)
+          | json_query('[].{path: [0], mode: [1], owner: [2], group: [3], required_mode: [4]}')) | default([]) }}
+
+    - name: Display file compliance
+      ansible.builtin.debug:
+        msg: |
+          File Permission Checks (CIS 1.2.1.6, 1.2.1.9)
+          ==================================================
+          {% for f in non_compliant_files %}
+          NON-COMPLIANT: {{ f.path }} (CIS {{ '1.2.1.6' if f.required_mode == '0640' else '1.2.1.9' }})
+            Mode: {{ f.mode }} (should be {{ f.required_mode }})
+            Owner: {{ f.owner }} (should be root)
+            Group: {{ f.group }} (should be root)
+          {% endfor %}
+          {% if non_compliant_files | length == 0 %}
+          All files are compliant
+          {% endif %}
+          ==================================================
+
+    - name: Assert all files have correct permissions
+      ansible.builtin.assert:
+        that: non_compliant_files | length == 0
+        fail_msg: |
+          File permission checks FAILED:
+          {% for f in non_compliant_files %}
+          - CIS {{ '1.2.1.6' if f.required_mode == '0640' else '1.2.1.9' }}: {{ f.path }}
+            Mode: {{ f.mode }}, Owner: {{ f.owner }}, Group: {{ f.group }}
+            REMEDIATION:
+            # chown root:root "{{ f.path }}"
+            # chmod {{ f.required_mode }} "{{ f.path }}"
+          {% endfor %}
+        success_msg: "All file permission checks (CIS 1.2.1.6, 1.2.1.9) PASSED"
