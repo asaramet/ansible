@@ -1,0 +1,108 @@
+---
+# CIS Benchmark 1.4 - Configure Bootloader 
+# NB! This won't allow to automatically boot into a VM, you'll have to insert the 
+#     GRUB superuser name and password first...
+
+# 1.4.1: Ensure bootloader password is set
+# 1.4.2: Ensure access to bootloader config is configured
+#
+# Rationale: 
+# - Requiring a boot password upon execution of the boot loader will prevent an
+#   unauthorized user from entering boot parameters or changing the boot partition.
+# - This prevents users from weakening security (e.g. turning off AppArmor at boot time).
+# - Also prevents non-root users from seeing the boot parameters or changing them
+- name: Configure Bootloader as per CIS 1.4
+  hosts: hs_netz
+  become: true
+  gather_facts: false
+
+  tasks:
+    # CIS 1.4.1 - Ensure bootloader password is set
+    - name: Check for superusers in GRUB config
+      ansible.builtin.command: grep "^set superusers" /boot/grub/grub.cfg
+      register: grub_superusers
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Check for password in GRUB config
+      ansible.builtin.shell: |
+        grep -E '^[[:space:]]*(password|password_pbkdf2)' /boot/grub/grub.cfg
+      register: grub_password
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Set bootloader password status
+      ansible.builtin.set_fact:
+        bootloader_password_compliant: >-
+          {{ grub_superusers.rc == 0 and
+             grub_password.rc == 0 and
+             'root' in grub_superusers.stdout and
+             'root' in grub_password.stdout }}
+
+    - name: Display bootloader password status
+      ansible.builtin.debug:
+        msg: |
+          CIS 1.4.1 - Bootloader Password Check
+          ==================================================
+          Superusers: {{ grub_superusers.stdout | default('NOT SET') | trim }}
+          Password entry: {{ grub_password.stdout | default('NOT SET') | trim }}
+          ==================================================
+
+    - name: Assert bootloader password is set
+      ansible.builtin.assert:
+        that: bootloader_password_compliant
+        fail_msg: |
+          CIS 1.4.1 FAILED
+          Bootloader password is not set
+          REMEDIATION:
+          1. Create encrypted password:
+             # grub-mkpasswd-pbkdf2 --iteration-count=600000 --salt=64
+          2. Create /etc/grub.d/01_users, with the following content: 
+             cat << 'EOF'
+             set superusers=root
+             password_pbkdf2 root <encrypted-password>
+             EOF
+          3. Make executable and update GRUB:
+             # chmod +x /etc/grub.d/01_users
+             # update-grub
+          IMPORTANT: Do NOT add to /etc/grub.d/00_header as it will be overwritten during GRUB updates.
+        success_msg: "CIS 1.4.1 - Bootloader password is set"
+
+    # CIS 1.4.2 - Ensure access to bootloader config is configured
+    - name: Get grub.cfg file stats
+      ansible.builtin.stat:
+        path: /boot/grub/grub.cfg
+      register: grub_cfg_stat
+
+    - name: Set bootloader config compliance fact
+      ansible.builtin.set_fact:
+        bootloader_config_compliant: >-
+          {{ grub_cfg_stat.stat.exists and
+             grub_cfg_stat.stat.pw_name == 'root' and
+             grub_cfg_stat.stat.gr_name == 'root' and
+             grub_cfg_stat.stat.mode in ['0600', '0400', '0000', '600', '400', '000'] }}
+
+    - name: Display bootloader config permissions
+      ansible.builtin.debug:
+        msg: |
+          CIS 1.4.2 - Bootloader Config Access Check
+          ==================================================
+          Path: /boot/grub/grub.cfg
+          Exists: {{ grub_cfg_stat.stat.exists }}
+          Mode: {{ grub_cfg_stat.stat.mode | default('N/A') }}
+          Owner: {{ grub_cfg_stat.stat.pw_name | default('N/A') }}
+          Group: {{ grub_cfg_stat.stat.gr_name | default('N/A') }}
+          ==================================================
+
+    - name: Assert bootloader config has correct permissions
+      ansible.builtin.assert:
+        that: bootloader_config_compliant
+        fail_msg: |
+          CIS 1.4.2 FAILED
+          /boot/grub/grub.cfg has incorrect permissions or ownership
+          Current: mode={{ grub_cfg_stat.stat.mode }}, owner={{ grub_cfg_stat.stat.pw_name }}, group={{ grub_cfg_stat.stat.gr_name }}
+          REMEDIATION:
+          Run the following commands:
+          # chown root:root /boot/grub/grub.cfg
+          # chmod u-x,go-rwx /boot/grub/grub.cfg
+        success_msg: "CIS 1.4.2 - Bootloader config has correct permissions"
