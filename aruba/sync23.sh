@@ -5,6 +5,7 @@ remote_srv="23:/opt/ansible/inventories/aruba/"
 sync_objs="
 playbooks
 hosts.ini
+ansible.cfg
 "
 
 rsync -uav --delete-excluded ${sync_objs} ${remote_srv}

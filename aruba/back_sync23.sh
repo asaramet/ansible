@@ -9,5 +9,3 @@ hosts.ini
 for file in ${sync_objs}; do
     rsync -uav --delete-excluded ${remote_srv}/${file} ${file}
 done
-
-rsync -uav --delete-excluded ${remote_srv}/host_vars .
