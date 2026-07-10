@@ -6,6 +6,7 @@ sync_objs="
 playbooks
 hosts.ini
 ansible.cfg
+cronjobs
 "
 
 rsync -uav --delete-excluded ${sync_objs} ${remote_srv}
