@@ -1,0 +1,62 @@
+---
+# Update firmware on old Aruba OS (Procurve) switches.
+#
+# To run the playbook on multiple hosts simultaneously use '--forks' flag
+# ansible-playbook update_firmware_procurve.yml --forks 50
+#
+# Required inventory variables for [procurve:vars]:
+#   tftp_server: IP address of TFTP server
+#   firmware_version: Version string (e.g., "WC_16_11_0030")
+#
+- name: Update firmware on Procurve/ArubaOS switches
+  hosts: procurve
+  gather_facts: false
+  serial: 0       # Run on all hosts simultaneously
+  vars: 
+    # Firmware file pattern for Aruba 2930F switches
+    # Override this in inventory or via --extra-vars if using different model
+    firmware: "{{ firmware_version }}.swi"
+
+  tasks: 
+      - name: Save running configuration to startup configuration
+        ansible.netcommon.cli_command:
+          command: "write memory"
+
+      - name: Copy primary image to secondary"
+        ansible.netcommon.cli_command:
+          command: "copy flash flash secondary"
+
+      - name: Temporarily permit TFTP traffic
+        ansible.netcommon.cli_command:
+          command: |
+            config
+            tftp client
+
+      - name: Download new firmware from TFTP server
+        ansible.netcommon.cli_command:
+          command: "copy tftp flash {{ tftp_server }} software/{{ firmware }} primary"
+          prompt: "[Cc]ontinue"
+          answer: "y"
+        vars: 
+          ansible_command_timeout: 300
+        register: tftp_output
+
+      - name: Debug TFTP Output
+        ansible.builtin.debug:
+          var: tftp_output.stdout_lines
+
+      - name: Remove temporary TFTP permit
+        ansible.netcommon.cli_command:
+          command: |
+            config
+            ip ssh filetransfer
+
+      - name: Reboot the switch to apply firmware
+        ansible.netcommon.cli_command:
+          command: "boot system flash primary"
+          prompt:
+            - "[Cc]ontinue"
+          answer:
+            - "y"
+            - "n"
+        ignore_errors: true
