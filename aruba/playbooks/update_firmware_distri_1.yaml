@@ -1,0 +1,70 @@
+---
+# Update firmware on Aruba CX distribution switches.
+#
+# Run the playbook:
+# ansible-playbook update_firmware_distri_1.yml
+#
+- name: Update firmware on the first set of Aruba 8320 switches
+  hosts: distri_1_8320
+  gather_facts: false
+  vars: 
+    firmware: "AOS-CX_8320_{{ firmware_version }}.swi"
+  tasks: 
+      - name: Save running configuration to startup configuration
+        arubanetworks.aoscx.aoscx_command:
+          commands: 
+            - "write memory"
+
+      - name: Backup current primary image to secondary partition
+        arubanetworks.aoscx.aoscx_command:
+          commands:
+            - command: "copy primary secondary"
+              prompt: "continue"
+              answer: "y"
+        vars: 
+          ansible_command_timeout: 60
+
+      - name: Temporarily permit TFTP traffic in the ACL
+        arubanetworks.aoscx.aoscx_config:
+          lines: |
+            access-list ip SWITCH-ACCESS
+              permit udp {{ tftp_server }} any
+
+      - name: Download new firmware from TFTP server to primary partition
+        arubanetworks.aoscx.aoscx_command:
+          commands:
+            - command: "copy tftp://{{ tftp_server }}/software/{{ firmware }} primary vrf mgmt"
+              prompt: "[Cc]ontinue"
+              answer: 
+                - "y"
+                - "y"
+        vars: 
+          ansible_command_timeout: 300
+        register: tftp_output
+
+      - name: Debug TFTP Output
+        ansible.builtin.debug:
+          var: tftp_output.stdout_lines
+    
+      - name: Remove temporary TFTP permit rule from the ACL
+        arubanetworks.aoscx.aoscx_config:
+          lines: |
+            access-list ip SWITCH-ACCESS
+              no {{ acl_line_number }}
+
+      - name: Set boot partition to primary
+        arubanetworks.aoscx.aoscx_command:
+          commands:
+            - "boot set-default primary"
+
+      - name: Reboot the switch to apply firmware
+        ansible.netcommon.cli_command:
+          command: "boot system primary"
+          check_all: true
+          prompt:
+            - "save the current configuration"
+            - "[Cc]ontinue"
+          answer:
+            - "n"
+            - "y"
+        ignore_errors: true
