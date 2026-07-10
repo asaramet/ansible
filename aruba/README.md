@@ -48,6 +48,12 @@ The Ansible Galaxy distribution server will be a nice tool to install an maintai
     ansible-galaxy collection install -U arubanetworks.aoscx -p /opt/ansible/lib/python3.9/site-packages/ansible_collections 
     ```
 
+### Install the AOS Switch collection
+
+```bash
+ansible-galaxy collection install arubanetworks.aos_switch
+```
+
 ## Control node
 
 The control node is the machine where Ansible CLI tools such as `ansible`, `ansible-playbook`, `ansible-inventory`, etc. are executed from. In our environment, we use a virtual Linux machine with the hostname `rhlx0023` as our control node.
