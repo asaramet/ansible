@@ -13,7 +13,7 @@ cd /opt/ansible/inventories/aruba
 ansible --version
 
 echo -e "\n++ Firmware version before updates --\n"
-ansible-playbook playbooks/show_version.yaml --fork 20 | tee ${logs_folder}/version_before.logs
+ansible-playbook playbooks/show_version.yaml --forks 20 | tee ${logs_folder}/version_before.logs
 
 ansible-playbook playbooks/update_firmware.yaml | tee ${logs_folder}/update_firmware.logs
 
@@ -24,4 +24,4 @@ ansible-playbook playbooks/update_firmware_distri_2.yaml | tee ${logs_folder}/up
 
 sleep 15m &&
 echo -e "\n++ Firmware version after updates --\n"
-ansible-playbook playbooks/show_version.yaml --fork 20 | tee ${logs_folder}/version_after.logs
+ansible-playbook playbooks/show_version.yaml --forks 20 | tee ${logs_folder}/version_after.logs
