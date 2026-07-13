@@ -16,15 +16,15 @@ ansible --version
 HOSTS_GROUP='aos_cx_failed'
 
 echo -e "\n++ Firmware version before updates --\n"
-ansible-playbook playbooks/show_version.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/version_before.logs
+ansible-playbook playbooks/show_version.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/${HOSTS_GROUP}_version_before.logs
 
-ansible-playbook playbooks/update_firmware.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/update_firmware.logs
+ansible-playbook playbooks/update_firmware.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/${HOSTS_GROUP}_update_firmware.logs
 
-#ansible-playbook playbooks/update_firmware_distri_1.yaml | tee ${logs_folder}/update_firmware_distri_1.logs
+#ansible-playbook playbooks/update_firmware_distri_1.yaml | tee -a ${logs_folder}/${HOSTS_GROUP}_update_firmware.logs
 
 sleep 30m &&
-#ansible-playbook playbooks/update_firmware_distri_2.yaml | tee ${logs_folder}/update_firmware_distri_2.logs
+#ansible-playbook playbooks/update_firmware_distri_2.yaml | tee -a ${logs_folder}/${HOSTS_GROUP}_update_firmware.logs
 
 sleep 15m &&
 echo -e "\n++ Firmware version after updates --\n"
-ansible-playbook playbooks/show_version.yaml | tee ${logs_folder}/version_after.logs
+ansible-playbook playbooks/show_version.yaml | tee ${logs_folder}/${HOSTS_GROUP}_version_after.logs

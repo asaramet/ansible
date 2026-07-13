@@ -15,11 +15,23 @@ ansible --version
 HOSTS_GROUP='wc_2930f'
 
 echo -e "\n++ Firmware version on ${HOSTS_GROUP} before updates --\n"
-ansible-playbook playbooks/show_version_procurve.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/version_before.logs
+ansible-playbook playbooks/show_version_procurve.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/${HOSTS_GROUP}_version_before.logs
 
-ansible-playbook playbooks/update_firmware_procurve.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/update_firmware.logs
+ansible-playbook playbooks/update_firmware_procurve.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/${HOSTS_GROUP}_update_firmware.logs
 
 sleep 30m &&
 
 echo -e "\n++ Firmware version on ${HOSTS_GROUP} after updates --\n"
-ansible-playbook playbooks/show_version.yaml | tee ${logs_folder}/version_after.logs
+ansible-playbook playbooks/show_version.yaml | tee ${logs_folder}/${HOSTS_GROUP}_version_after.logs
+
+HOSTS_GROUP='ya_2530'
+
+echo -e "\n++ Firmware version on ${HOSTS_GROUP} before updates --\n"
+ansible-playbook playbooks/show_version_procurve.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/${HOSTS_GROUP}_version_before.logs
+
+ansible-playbook playbooks/update_firmware_procurve.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/${HOSTS_GROUP}_update_firmware.logs
+
+sleep 30m &&
+
+echo -e "\n++ Firmware version on ${HOSTS_GROUP} after updates --\n"
+ansible-playbook playbooks/show_version.yaml | tee ${logs_folder}/${HOSTS_GROUP}_version_after.logs
