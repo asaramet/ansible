@@ -1,13 +1,12 @@
 ---
 # Show firmware version on old Aruba OS (Procurve) switches.
 #
-# To run the playbook on multiple hosts simultaneously use '--forks' flag
-# ansible-playbook show_version_procurve.yml --forks 50
+# ansible-playbook show_version_procurve.yml
 #
-- name: Show firmware version on Procurve/ArubaOS switches
+- name: "Show firmware version on Procurve/ArubaOS switches"
   hosts: procurve
   gather_facts: false
-  serial: 0       # Run on all hosts simultaneously
+  #serial: 20
   tasks: 
       - name: Get version
         ansible.netcommon.cli_command:

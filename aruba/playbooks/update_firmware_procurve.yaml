@@ -1,20 +1,18 @@
 ---
 # Update firmware on old Aruba OS (Procurve) switches.
 #
-# To run the playbook on multiple hosts simultaneously use '--forks' flag
-# ansible-playbook update_firmware_procurve.yml --forks 50
+# To run the playbook:
+# ansible-playbook update_firmware_procurve.yml
 #
 # Required inventory variables for [procurve:vars]:
 #   tftp_server: IP address of TFTP server
 #   firmware_version: Version string (e.g., "WC_16_11_0030")
 #
-- name: Update firmware on Procurve/ArubaOS switches
+- name: "Update firmware on Procurve/ArubaOS switches"
   hosts: procurve
   gather_facts: false
-  serial: 10
+  serial: 20
   vars: 
-    # Firmware file pattern for Aruba 2930F switches
-    # Override this in inventory or via --extra-vars if using different model
     firmware: "{{ firmware_version }}.swi"
 
   tasks: 
