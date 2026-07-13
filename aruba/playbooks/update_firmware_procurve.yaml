@@ -11,7 +11,7 @@
 - name: Update firmware on Procurve/ArubaOS switches
   hosts: procurve
   gather_facts: false
-  serial: 0       # Run on all hosts simultaneously
+  serial: 10
   vars: 
     # Firmware file pattern for Aruba 2930F switches
     # Override this in inventory or via --extra-vars if using different model

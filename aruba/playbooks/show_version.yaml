@@ -4,10 +4,10 @@
 # To run the playbook on multiple hosts simultaneously use '--forks' flag
 # ansible-playbook show_version.yml --forks 50
 #
-- name: Show firmware version on Aruba 6100 
+- name: Show firmware version on Aruba AOS_CX 6100 switches
   hosts: aruba_6100
   gather_facts: false
-  serial: 0       # Run on all hosts simultaneously
+  serial: 20       # Run on all hosts simultaneously
   tasks: 
       - name: Get version
         arubanetworks.aoscx.aoscx_command:
@@ -18,11 +18,11 @@
       - name: Show version
         ansible.builtin.debug:
           var: version.stdout_lines
-    
-- name: Update firmware on Aruba 6300 switches
+
+- name: Show firmware version on Aruba AOS_CX 6300 switches
   hosts: aruba_6300
   gather_facts: false
-  serial: 0       # Run on all hosts simultaneously
+  serial: 20       # Run on all hosts simultaneously
   tasks: 
       - name: Get version
         arubanetworks.aoscx.aoscx_command:
@@ -34,10 +34,10 @@
         ansible.builtin.debug:
           var: version.stdout_lines
 
-- name: Update firmware on the first set of Aruba 8320 switches
+- name: Show firmware version on Aruba AOS_CX 8320 switches
   hosts: aruba_8320
   gather_facts: false
-  serial: 0       # Run on all hosts simultaneously
+  serial: 20       # Run on all hosts simultaneously
   tasks: 
       - name: Get version
         arubanetworks.aoscx.aoscx_command:

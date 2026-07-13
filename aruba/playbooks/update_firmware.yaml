@@ -7,7 +7,8 @@
 - name: Update firmware on Aruba 6100 switches
   hosts: aruba_6100
   gather_facts: false
-  serial: 0       # Run on all hosts simultaneously
+  #serial: 0       # Run on all hosts simultaneously
+  serial: 20       # Run on 20 hosts at a time
   vars: 
     firmware: "AOS-CX_6100-6000_{{ firmware_version }}.swi"
 
@@ -74,7 +75,7 @@
 - name: Update firmware on Aruba 6300 switches
   hosts: aruba_6300
   gather_facts: false
-  serial: 0       # Run on all hosts simultaneously
+  serial: 5
   vars: 
     firmware: "AOS-CX_6400-6300_{{ firmware_version }}.swi"
   tasks: 
