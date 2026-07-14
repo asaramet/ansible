@@ -1,14 +1,13 @@
 ---
-# Update firmware on Aruba CX distribution switches.
+# Update firmware on Aruba CX switches.
 #
-# Run the playbook:
-# ansible-playbook update_firmware_distri_1.yml
+# To run the playbook specify the hosts group
+# ansible-playbook update_firmware.yml -l aruba_6xxx
 #
-- name: Update firmware on the first set of Aruba 8320 switches
-  hosts: distri_1_8320
+- name: Update firmware on Aruba OS-CX Switches
+  hosts: aruba
   gather_facts: false
-  vars: 
-    firmware: "AOS-CX_8320_{{ firmware_version }}.swi"
+  serial: 10       # Run on 10 hosts at a time
   tasks: 
       - name: Save running configuration to startup configuration
         arubanetworks.aoscx.aoscx_command:
@@ -33,7 +32,7 @@
       - name: Download new firmware from TFTP server to primary partition
         arubanetworks.aoscx.aoscx_command:
           commands:
-            - command: "copy tftp://{{ tftp_server }}/software/{{ firmware }} primary vrf mgmt"
+            - command: "{{ update_command }}"
               prompt: "[Cc]ontinue"
               answer: 
                 - "y"
@@ -56,15 +55,3 @@
         arubanetworks.aoscx.aoscx_command:
           commands:
             - "boot set-default primary"
-
-      - name: Reboot the switch to apply firmware
-        ansible.netcommon.cli_command:
-          command: "boot system primary"
-          check_all: true
-          prompt:
-            - "save the current configuration"
-            - "[Cc]ontinue"
-          answer:
-            - "n"
-            - "y"
-        ignore_errors: true

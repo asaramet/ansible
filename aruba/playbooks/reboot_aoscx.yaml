@@ -1,0 +1,35 @@
+---
+# Reboot Aruba AOS-CX Switches
+#
+# To run the playbook:
+#   ansible-playbook reboot_aoscx.yaml -l <HOSTS>
+#
+- name: Reboot Aruba OS-CX switches
+  hosts: "{{ target_hosts | default('aruba') }}"
+  gather_facts: false
+  serial: 1       # Run on 1 hosts at a time
+  vars:
+    ansible_command_timeout: 120
+
+  tasks:
+      - name: Save running configuration to startup configuration
+        ansible.netcommon.cli_command:
+          command: "write memory"
+
+
+      - name: Reboot the switch to apply firmware
+        ansible.netcommon.cli_command:
+          command: "boot system primary"
+          check_all: true
+          prompt:
+            - "save the current configuration"
+            - "[Cc]ontinue"
+          answer:
+            - "n"
+            - "y"
+        ignore_errors: true
+
+      - name: Wait for switch to reconnect
+        ansible.builtin.wait_for_connection:
+          delay: 30
+          timeout: 300
