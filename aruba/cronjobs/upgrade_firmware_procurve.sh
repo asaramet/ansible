@@ -12,26 +12,19 @@ source /opt/ansible/envs
 cd /opt/ansible/inventories/aruba
 ansible --version
 
-HOSTS_GROUP='wc_2930f'
+HOSTS_GROUPS='wc_2930f ya_2530'
 
-echo -e "\n++ Firmware version on ${HOSTS_GROUP} before updates --\n"
-ansible-playbook playbooks/show_version_procurve.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/${HOSTS_GROUP}_version_before.logs
+for i in ${HOSTS_GROUPS}; do
 
-ansible-playbook playbooks/update_firmware_procurve.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/${HOSTS_GROUP}_update_firmware.logs
+echo -e "\n++ Firmware version on ${i} before updates --\n"
+ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_before.logs
 
-sleep 30m &&
+#ansible-playbook playbooks/update_firmware_procurve.yaml -l ${i} | tee ${logs_folder}/${i}_update.logs
+ansible-playbook playbooks/reboot_procurve.yaml -l ${i} | tee ${logs_folder}/${i}_reboot.logs
 
-echo -e "\n++ Firmware version on ${HOSTS_GROUP} after updates --\n"
-ansible-playbook playbooks/show_version.yaml | tee ${logs_folder}/${HOSTS_GROUP}_version_after.logs
+sleep 10m &&
 
-HOSTS_GROUP='ya_2530'
+echo -e "\n++ Firmware version on ${i} after updates --\n"
+ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_after.logs
 
-echo -e "\n++ Firmware version on ${HOSTS_GROUP} before updates --\n"
-ansible-playbook playbooks/show_version_procurve.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/${HOSTS_GROUP}_version_before.logs
-
-ansible-playbook playbooks/update_firmware_procurve.yaml -l ${HOSTS_GROUP} | tee ${logs_folder}/${HOSTS_GROUP}_update_firmware.logs
-
-sleep 30m &&
-
-echo -e "\n++ Firmware version on ${HOSTS_GROUP} after updates --\n"
-ansible-playbook playbooks/show_version.yaml | tee ${logs_folder}/${HOSTS_GROUP}_version_after.logs
+done

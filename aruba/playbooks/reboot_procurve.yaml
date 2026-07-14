@@ -1,0 +1,34 @@
+---
+# Reboot Aruba Switches
+#
+# To run the playbook:
+#   ansible-playbook reboot_procurve.yaml -l <HOSTS>
+#
+- name: Reboot Procurve/ArubaOS switches
+  hosts: "{{ target_hosts | default('procurve') }}"
+  gather_facts: false
+  serial: 20
+  vars:
+    ansible_command_timeout: 120
+
+  tasks:
+      - name: Save running configuration to startup configuration
+        ansible.netcommon.cli_command:
+          command: "write memory"
+
+      - name: Reboot the switch to apply firmware
+        ansible.netcommon.cli_command:
+          command: "boot system flash primary"
+          check_all: true
+          prompt:
+            - "[Cc]ontinue"
+            - "Do you want to save the current configuration"
+          answer:
+            - "y"
+            - "n"
+        ignore_errors: true
+
+      - name: Wait for switch to reconnect
+        ansible.builtin.wait_for_connection:
+          delay: 30
+          timeout: 300

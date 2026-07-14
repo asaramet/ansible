@@ -48,13 +48,3 @@
           command: |
             config
             ip ssh filetransfer
-
-      - name: Reboot the switch to apply firmware
-        ansible.netcommon.cli_command:
-          command: "boot system flash primary"
-          prompt:
-            - "[Cc]ontinue"
-          answer:
-            - "y"
-            - "n"
-        ignore_errors: true
