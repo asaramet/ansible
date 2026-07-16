@@ -7,7 +7,7 @@
 - name: Update firmware on Aruba OS-CX Switches
   hosts: aruba
   gather_facts: false
-  serial: 10       # Run on 10 hosts at a time
+  serial: 20
   tasks: 
       - name: Save running configuration to startup configuration
         arubanetworks.aoscx.aoscx_command:

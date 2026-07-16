@@ -12,7 +12,8 @@ source /opt/ansible/envs
 cd /opt/ansible/inventories/aruba
 ansible --version
 
-#HOSTS_GROUPS='wc_2930f ya_2530 yb_2530'
+#HOSTS_GROUPS='wc_2930f ya_2530 yb_2530 yc_2540 wc_2930f wc_2930m'
+#HOSTS_GROUPS='procurve_distri'
 HOSTS_GROUPS='procurve_reboot'
 
 for i in ${HOSTS_GROUPS}; do
