@@ -12,14 +12,15 @@ source /opt/ansible/envs
 cd /opt/ansible/inventories/aruba
 ansible --version
 
-HOSTS_GROUPS='wc_2930f ya_2530'
+#HOSTS_GROUPS='wc_2930f ya_2530 yb_2530'
+HOSTS_GROUPS='procurve_reboot'
 
 for i in ${HOSTS_GROUPS}; do
 
 echo -e "\n++ Firmware version on ${i} before updates --\n"
 ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_before.logs
 
-#ansible-playbook playbooks/update_procurve.yaml -l ${i} | tee ${logs_folder}/${i}_update.logs
+ansible-playbook playbooks/update_procurve.yaml -l ${i} | tee ${logs_folder}/${i}_update.logs
 ansible-playbook playbooks/reboot_procurve.yaml -l ${i} | tee ${logs_folder}/${i}_reboot.logs
 
 sleep 10m &&
