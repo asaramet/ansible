@@ -20,9 +20,21 @@
         ansible.netcommon.cli_command:
           command: "write memory"
 
-      - name: Copy primary image to secondary"
+#      - name: Copy primary image to secondary
+#        ansible.netcommon.cli_command:
+#          command: "copy flash flash secondary"
+#        register: copy_primary
+#        until: copy_primary is succeeded
+#        retries: 3
+#        delay: 10
+
+      - name: Wait until the secondary has the old primary image
         ansible.netcommon.cli_command:
-          command: "copy flash flash secondary"
+          command: show flash
+        register: flash_result
+        until: "'Secondary' in flash_result.stdout and 'Primary' in flash_result.stdout"
+        retries: 12
+        delay: 10
 
       - name: Temporarily permit TFTP traffic
         ansible.netcommon.cli_command:

@@ -10,11 +10,12 @@
     - name: Execute 'show x' on the switch and register output
       aoscx_command:
         commands: 
-          - show vlan
+          - show image
+          #- show vlan
           #- show images
-      register: show_vlan_output
+      register: show_output
 
     - name: Display registered ouput
       debug:
-        var: show_vlan_output.stdout
+        var: show_output.stdout
 ...
