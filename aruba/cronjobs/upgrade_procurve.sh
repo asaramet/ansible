@@ -22,30 +22,12 @@ for i in ${HOSTS_GROUPS}; do
 echo -e "\n++ Firmware version on ${i} before updates --\n"
 ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_before.logs
 
-#ansible-playbook playbooks/update_procurve.yaml -l ${i} | tee ${logs_folder}/${i}_update.logs
-ansible-playbook playbooks/reboot_procurve.yaml -l ${i} | tee ${logs_folder}/${i}_reboot.logs
-
-sleep 10m &&
-
-echo -e "\n++ Firmware version on ${i} after updates --\n"
-ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_after.logs
-
-done
-
-HOSTS_GROUPS='procurve_core'
-
-for i in ${HOSTS_GROUPS}; do
-
-echo -e "\n++ Firmware version on ${i} before updates --\n"
-ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_before.logs
-
 ansible-playbook playbooks/update_procurve.yaml -l ${i} | tee ${logs_folder}/${i}_update.logs
 ansible-playbook playbooks/reboot_procurve.yaml -l ${i} | tee ${logs_folder}/${i}_reboot.logs
 
 sleep 10m &&
 
 echo -e "\n++ Firmware version on ${i} after updates --\n"
-ansible-playbook playbooks/show_flash.yaml -l ${i} | tee ${logs_folder}/${i}_flash.logs
 ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_after.logs
 
 done

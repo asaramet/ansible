@@ -2,12 +2,12 @@
 - name: Debugging
   hosts: all
   gather_facts: false
-  serial: 1
+  #serial: 1
   tasks:
 
-    - name: Show hosts variables
-      ansible.builtin.debug:
-        var: "{{ hostvars[inventory_hostname] }}"
+#    - name: Show hosts variables
+#      ansible.builtin.debug:
+#        var: "{{ hostvars[inventory_hostname] }}"
 
     - name: Get version
       ansible.netcommon.cli_command:
@@ -17,3 +17,9 @@
     - name: Show version
       ansible.builtin.debug:
         var: version.stdout_lines
+      
+    - name: Show firmware to be installed
+      ansible.builtin.debug:
+        var: firmware
+
+
