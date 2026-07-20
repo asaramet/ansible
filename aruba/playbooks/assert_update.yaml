@@ -9,7 +9,7 @@
 #   firmware_version: Version string (e.g., "WC_16_11_0030")
 #
 - name: "Assert devices firmware"
-  hosts: all
+  hosts: aruba
   gather_facts: false
   #serial: 20
 

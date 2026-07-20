@@ -12,10 +12,9 @@ source /opt/ansible/envs
 cd /opt/ansible/inventories/aruba
 ansible --version
 
-#HOSTS_GROUPS='procurve_access'
+HOSTS_GROUPS='procurve_access'
 #HOSTS_GROUPS='procurve_distri'
 #HOSTS_GROUPS='procurve_core'
-HOSTS_GROUPS='procurve_distri'
 
 for i in ${HOSTS_GROUPS}; do
 
@@ -24,6 +23,7 @@ ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_v
 
 ansible-playbook playbooks/update_procurve.yaml -l ${i} | tee ${logs_folder}/${i}_update.logs
 ansible-playbook playbooks/reboot_procurve.yaml -l ${i} | tee ${logs_folder}/${i}_reboot.logs
+ansible-playbook playbooks/assert_update.yaml -l ${i} | tee ${logs_folder}/${i}_assert.logs
 
 sleep 10m &&
 

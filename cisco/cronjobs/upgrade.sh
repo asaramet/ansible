@@ -12,16 +12,15 @@ source /opt/ansible/envs
 cd /opt/ansible/inventories/aruba
 ansible --version
 
-HOSTS_GROUPS='aruba_6xxx distri_aoscx_1 distri_aoscx_2'
+HOSTS_GROUPS='cisco'
 
 for i in ${HOSTS_GROUPS}; do
 
 echo -e "\n++ Firmware version ${i} before updates --\n"
 ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_before.logs
 
-ansible-playbook playbooks/update_aoscx.yaml -l ${i} | tee ${logs_folder}/${i}_update_.logs
-ansible-playbook playbooks/reboot_aoscx.yaml -l ${i} | tee ${logs_folder}/${i}_reboot.logs
-ansible-playbook playbooks/assert_update.yaml -l ${i} | tee ${logs_folder}/${i}_assert.logs
+ansible-playbook playbooks/update.yaml -l ${i} | tee ${logs_folder}/${i}_update_.logs
+ansible-playbook playbooks/reboot.yaml -l ${i} | tee ${logs_folder}/${i}_reboot.logs
 
 sleep 15m &&
 echo -e "\n++ Firmware version ${i} after updates --\n"

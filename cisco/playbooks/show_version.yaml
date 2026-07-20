@@ -1,0 +1,17 @@
+---
+# Show firmware version on 
+# ansible-playbook show_version.yaml
+#
+- name: "Show firmware version"
+  hosts: cisco_ios
+  gather_facts: false
+  tasks: 
+      - name: Get version
+        cisco.ios.ios_command:
+          commands: 
+            - show version
+        register: version
+
+      - name: Show version
+        ansible.builtin.debug:
+          var: version.stdout_lines
