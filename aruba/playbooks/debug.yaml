@@ -1,6 +1,6 @@
 ---
 - name: Debugging
-  hosts: all
+  hosts: aruba
   gather_facts: false
   #serial: 1
   tasks:

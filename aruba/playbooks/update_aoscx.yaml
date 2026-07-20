@@ -5,7 +5,7 @@
 # ansible-playbook update_firmware.yml -l aruba_6xxx
 #
 - name: Update firmware on Aruba OS-CX Switches
-  hosts: aruba
+  hosts: aruba_aoscx
   gather_facts: false
   serial: 20
   tasks: 

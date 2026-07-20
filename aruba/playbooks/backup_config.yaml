@@ -6,7 +6,7 @@
     work_dir: &work_dir "/opt/ansible/inventories/aruba/"
 
 - name: Backup 'running-config' into a local folder
-  hosts: aruba
+  hosts: aruba_aoscx
   gather_facts: false
   tags: get_runs
   vars:

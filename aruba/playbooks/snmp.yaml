@@ -1,5 +1,5 @@
 - name: Add rules to SWITCH-ACCESS ACL (AOS-CX)
-  hosts: aruba
+  hosts: aruba_aoscx
   gather_facts: false
   collections:
     - arubanetworks.aoscx

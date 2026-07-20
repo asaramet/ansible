@@ -1,6 +1,6 @@
 ---
 - name: Run 'show x' commands on all Aruba switches
-  hosts: aruba
+  hosts: aruba_aoscx
   gather_facts: false
   collections:
     - arubanetworks.aoscx
