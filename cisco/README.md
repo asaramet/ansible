@@ -2,7 +2,88 @@
 
 This project provides Ansible inventory and playbooks specifically designed for network administration of Cisco devices.
 
-## Add an admin user with SSH-Key on the Cisco devices
+## Create the "Jail" (Parser View) for `ansible` user
+
+This view mimics exactly what we were trying to do with Privilege 10, but it executes from Privilege 15.
+
+```cisco-ios
+parser view ANSIBLE_FIRMWARE
+ ! Assign a dummy secret required to initialize the view
+ secret <YOUR_SECRET_PASSWORD>
+
+ ! 1. Allow all show commands
+ commands exec include all show
+
+ ! 2. Allow file transfer, verification, and NVRAM saving
+ commands exec include copy
+ commands exec include delete
+ commands exec include dir
+ commands exec include verify
+ commands exec include write memory
+
+ ! 3. Allow rebooting
+ commands exec include reload
+
+ ! 4. Allow entering config mode to change the boot variable
+ commands exec include configure terminal
+ commands configure include boot system
+
+ ! 5. Allow Ansible to disable terminal pagination
+commands exec include terminal length
+commands exec include terminal width
+ ! 6. Allow upgrade commands
+ ! On the Catalyst 9500
+commands exec include install
+
+ ! On the Catalyst 4506-E
+commands exec include issu
+
+ ! On the Catalyst 2960-X
+commands exec include archive
+exit
+```
+
+Now create `ansible` user with elevated privilege 15, but trapped inside the `ANSIBLE_FIRMWARE` view upon login.
+
+```cisco-ios
+username ansible privilege 15 view ANSIBLE_FIRMWARE secret <YOUR_SECRET_PASSWORD>
+```
+
+## Alternative configure privilege level on the device
+
+By default, Cisco IOS has privilege level 1 (User EXEC) and privilege level 15 (Privileged EXEC). Levels 2–14 are custom levels you can define.
+
+You can set up privilege level 10 (or any number between 2–14) and explicitly grant it access to the specific commands Ansible needs.
+
+Create privilege level 10 for Ansible only required commands
+
+```cisco-ios
+configure terminal
+
+! 1. Allow all show commands at privilege level 10
+
+privilege exec level 10 show
+
+! 2. Allow file operations needed to stage firmware (flash/bootflash management)
+
+privilege exec level 10 dir
+privilege exec level 10 copy
+privilege exec level 10 delete
+privilege exec level 10 verify
+privilege exec level 10 write memory
+
+! 3. Allow boot system configuration and reboot commands
+
+privilege exec level 10 configure terminal
+privilege configure level 10 boot system
+privilege exec level 10 reload
+
+! 4. Create the ansible user assigned directly to privilege 10
+
+username ansible privilege 10 secret <YOUR_PASSWORD_OR_RSA_KEY>
+```
+
+## Add an ansible user with SSH-Key on the Cisco devices
 
 SSH RSA 4096 bit key is compatible with legacy IOS switches as well as with the new IOS-XE.
 
@@ -15,10 +96,9 @@ awk '{print $2}' ~/.ssh/id_rsa.pub | fold -w 150
 - Add the key to the Cisco devices
 
 ```cisco-ios
-configure terminal
+show running-config | s pubkey-
 
-! Create the local user with full administrative privileges
-username ansible privilege 15
+configure terminal
 
 ! Bind the public key to the ansible user
 ip ssh pubkey-chain
@@ -44,4 +124,18 @@ Host rggw*s
   HostKeyAlgorithms=+ssh-rsa 
   PubkeyAcceptedAlgorithms=+ssh-rsa
   MACs=hmac-sha1,hmac-sha1-96,hmac-sha2-256,hmac-sha2-512
+  User=ansible
+  IdentityFile=~/.ssh/id_rsa_ansible
+
+Host r?cs*
+  User=ansible
+  IdentityFile=~/.ssh/id_rsa_ansible
 ```
+
+
+conf term
+parser view ANSIBLE_FIRMWARE
+commands exec include install
+commands exec include issu
+commands exec include archive
+exit

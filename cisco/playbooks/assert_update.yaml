@@ -1,0 +1,34 @@
+---
+# Check if firmware have been updated, by comparing current one on the device with 
+# the latest required to be installed
+#
+# To run the playbook:
+# ansible-playbook assert_update.yml
+#
+# Required inventory variables:
+#   firmware_version: Firmware version string to check if it is installed
+#
+- name: "Assert devices firmware"
+  hosts: cisco
+  gather_facts: false
+  #serial: 20
+
+  tasks: 
+      - name: Format the expected firmware version
+        ansible.builtin.set_fact:
+          expected_firmware: "{{ firmware_version }}"
+
+      - name: Get current firmware version on the devices
+        ansible.netcommon.cli_command:
+          command: show version
+        register: device_firmware
+
+      - name: Verify that the formatted firmware version exists in 'show version' output
+        ansible.builtin.assert:
+          that:
+            - expected_firmware in device_firmware.stdout
+          fail_msg: >-
+            Firmware mismatch! Target version '{{ expected_firmware }}' 
+            was not found in 'show version' output.
+          success_msg: >-
+            Firmware version '{{ expected_firmware }}' is active on {{ inventory_hostname }}.

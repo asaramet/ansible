@@ -1,0 +1,62 @@
+---
+# Check if firmware have been updated, by comparing current one on the device with 
+# the latest required to be installed
+#
+# To run the playbook:
+# ansible-playbook update.yml
+#
+# Required inventory variables:
+#   firmware: Firmware image string (e.g., "c2960x-universalk9-mz.152-2.E7.bin")
+#   previous_firmware_version: Firmware version string to check if the new firmware can be installed
+#
+- name: "Update devices firmware"
+  hosts: cisco
+  gather_facts: false
+  #serial: 20
+
+  tasks: 
+      - name: Get current firmware version on the devices
+        ansible.netcommon.cli_command:
+          command: show version
+        register: device_firmware
+
+      - name: Devise should be updated as it has the right firmware to update
+        debug:
+          msg: "Update the devise as the firmware is {{ previous_firmware_version }}"
+        when: previous_firmware_version in device_firmware.stdout
+
+      # ---------------------------------------------------------
+      # CATALYST 2960-X UPGRADE BLOCK (Standard Reload)
+      # ---------------------------------------------------------
+      - name: Execute 2960-X Upgrade Process
+        block:
+          - name: Verify firmware file exists on 2960X flash
+            debug: 
+              msg: "Insert 2960X copy/boot system tasks here"
+        when: 
+          - previous_firmware_version in device_firmware.stdout
+          - inventory_hostname in groups['catalyst_2960x']
+
+      # ---------------------------------------------------------
+      # CATALYST 9500 UPGRADE BLOCK (Install Mode ISSU)
+      # ---------------------------------------------------------
+      - name: Execute 9500 ISSU Upgrade Process
+        block:
+          - name: Run Install Add/Activate ISSU on 9500
+            debug: 
+              msg: "Insert 9500 install tasks here"
+        when: 
+          - previous_firmware_version in device_firmware.stdout
+          - inventory_hostname in groups['catalyst_9500']
+
+      # ---------------------------------------------------------
+      # CATALYST 4506-E UPGRADE BLOCK (Legacy eFSU / ISSU)
+      # ---------------------------------------------------------
+      - name: Execute 4506-E ISSU Upgrade Process
+        block:
+          - name: Run legacy ISSU loadversion on 4500
+            debug: 
+              msg: "Insert 4500 issu tasks here"
+        when: 
+          - previous_firmware_version in device_firmware.stdout
+          - inventory_hostname in groups['catalyst_4506es']

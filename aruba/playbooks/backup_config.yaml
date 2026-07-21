@@ -40,10 +40,10 @@
     #ansible_become_method: sudo
     #ansible_become_pass: "{{ vault_ansible_become_pass }}"
   tasks:
-    - name: Get the sub groups/folders in the "aruba" hosts group
+    - name: Get the sub groups/folders in the "aruba_aoscx" hosts group
       set_fact:
         subgroups: "{{ subgroups|default([]) | union([hostvars[item].group_names[1]]) }}"
-      loop: "{{ groups.aruba }}"
+      loop: "{{ groups.aruba_aoscx }}"
       run_once: true
 
     - name: Copy sub folders config files to rhlx99:/tftpboot/
