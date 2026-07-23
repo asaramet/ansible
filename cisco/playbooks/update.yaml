@@ -42,9 +42,53 @@
       # ---------------------------------------------------------
       - name: Execute 9500 ISSU Upgrade Process
         block:
-          - name: Run Install Add/Activate ISSU on 9500
-            debug: 
-              msg: "Insert 9500 install tasks here"
+          - name: Check if firmware already exists on bootflash
+            ansible.netcommon.cli_command:
+              command: "dir bootflash:{{ firmware }}"
+            register: file_check
+            # Fails the playbook early if you forgot to upload the .bin file
+            failed_when: "'No such file or directory' in file_check.stdout or 'Error' in file_check.stdout"
+
+          - name: Ensure configuration is saved before upgrade
+            ansible.netcommon.cli_command:
+              command: "write memory"
+            vars:
+              ansible_command_timeout: 120
+
+          - name: Run Install Add/Activate/Commit via ISSU
+            ansible.netcommon.cli_command:
+              command: "install add file bootflash:{{ firmware }} activate issu commit"
+            vars:
+              ansible_command_timeout: 1800
+            ignore_errors: true
+          
+          - name: Wait for the standby supervisor to take over and resume SSH
+            ansible.builtin.wait_for_connection:
+              # Wait 2 minutes before polling to give the standby sup time to initialize
+              delay: 120
+              # Allow up to 30 minutes for the switch to become reachable again
+              timeout: 1800
+
+          - name: Verify new firmware is active (Optional but recommended)
+            ansible.netcommon.cli_command:
+              command: "show version"
+            register: sh_version
+
+          - name: Display current version
+            ansible.builtin.debug:
+              msg: "{{ sh_version.stdout_lines[0] }}"
+
+          - name: Auto remove old firmware from flash
+            ansible.netcommon.cli_command:
+              command: "install remove inactive"
+              prompt: 
+                # Match a safe substring without any regex special characters
+                - "remove the above files"
+              answer:
+                - "y"
+            vars:
+              ansible_command_timeout: 120
+
         when: 
           - previous_firmware_version in device_firmware.stdout
           - inventory_hostname in groups['catalyst_9500']

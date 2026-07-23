@@ -33,7 +33,7 @@ commands exec include terminal length
 commands exec include terminal width
  ! 6. Allow upgrade commands
  ! On the Catalyst 9500
-commands exec include install
+ commands exec include all install 
 
  ! On the Catalyst 4506-E
 commands exec include issu
@@ -90,7 +90,7 @@ SSH RSA 4096 bit key is compatible with legacy IOS switches as well as with the 
 - Display key string in multiple chunks
 
 ```bash
-awk '{print $2}' ~/.ssh/id_rsa.pub | fold -w 150
+awk '{print $2}' ~/.ssh/id_rsa_ansible.pub | fold -w 150
 ```
 
 - Add the key to the Cisco devices
@@ -132,10 +132,8 @@ Host r?cs*
   IdentityFile=~/.ssh/id_rsa_ansible
 ```
 
+## Copy Firmware over SCP
 
-conf term
-parser view ANSIBLE_FIRMWARE
-commands exec include install
-commands exec include issu
-commands exec include archive
-exit
+```bash
+scp -O /tftpboot/software/cisco/cat9k_iosxe.17.15.05.SPA.bin rwcs0001:bootflash:cat9k_iosxe.17.15.05.SPA.bin
+```
