@@ -1,0 +1,46 @@
+---
+# Update ACL on 6100s
+#
+- name: "Assert ACL length"
+  hosts: aruba_6100
+  gather_facts: false
+  tasks: 
+      - name: Get current access list
+        ansible.netcommon.cli_command:
+          command: show access-list
+        register: access_list
+
+      - name: Remove line in access list
+        arubanetworks.aoscx.aoscx_config:
+          lines: |
+            access-list ip SWITCH-ACCESS
+              no {{ acl_line_number }}
+        when: acl_line_number in access_list.stdout
+
+      - name: Get renewed access list
+        ansible.netcommon.cli_command:
+          command: show access-list
+        register: access_list_new
+
+      - name: Verify that the ACL line is missing
+        ansible.builtin.assert:
+          that:
+            - acl_line_number not in access_list_new.stdout
+          fail_msg: >-
+            Line Number '{{ acl_line_number }}' is present on {{ inventory_hostname }}.
+          success_msg: >-
+            ACL is missing the line '{{ acl_line_number }}'
+
+      - name: Add missing lines
+        arubanetworks.aoscx.aoscx_config:
+          lines: |
+            access-list ip SWITCH-ACCESS
+              permit udp 134.108.49.9/32 any eq 161
+              permit udp 134.108.49.9/32 any eq 162
+        when: >
+          access_list_new.stdout is not search('\n\s*180\s*$')
+          and access_list_new.stdout is not search('\n\s*190\s*$')
+
+      - name: Write memory
+        ansible.netcommon.cli_command:
+          command: write memory

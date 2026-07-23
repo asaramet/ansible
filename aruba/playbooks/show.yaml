@@ -10,7 +10,8 @@
     - name: Execute 'show x' on the switch and register output
       aoscx_command:
         commands: 
-          - show image
+          - show access-list
+          #- show image
           #- show vlan
           #- show images
       register: show_output
