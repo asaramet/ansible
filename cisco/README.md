@@ -26,13 +26,13 @@ commands exec include terminal width
  ! On the Catalyst 9500
 commands exec include all install 
 
- ! On the Catalyst 4506-E
+ ! On the Catalyst 4506-E and 2960-X
 commands exec include configure terminal
 commands configure include all boot
 commands exec include reload
+commands exec include all copy
+commands exec include all delete
 
- ! On the Catalyst 2960-X
-commands exec include archive
 exit
 ```
 

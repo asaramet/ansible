@@ -26,25 +26,13 @@
         when: previous_firmware_version in device_firmware.stdout
 
       # ---------------------------------------------------------
-      # CATALYST 2960-X UPGRADE BLOCK (Standard Reload)
-      # ---------------------------------------------------------
-      - name: Execute 2960-X Upgrade Process
-        block:
-          - name: Verify firmware file exists on 2960X flash
-            debug: 
-              msg: "Insert 2960X copy/boot system tasks here"
-        when: 
-          - previous_firmware_version in device_firmware.stdout
-          - inventory_hostname in groups['catalyst_2960x']
-
-      # ---------------------------------------------------------
       # CATALYST 9500 UPGRADE BLOCK (Install Mode ISSU)
       # ---------------------------------------------------------
       - name: Execute 9500 ISSU Upgrade Process
         block:
-          - name: Check if firmware already exists on bootflash
+          - name: Check if firmware already exists on the filesystem
             ansible.netcommon.cli_command:
-              command: "dir bootflash:{{ firmware }}"
+              command: "dir {{ filesystem }}:{{ firmware }}"
             register: file_check
             # Fails the playbook early if you forgot to upload the .bin file
             failed_when: "'No such file or directory' in file_check.stdout or 'Error' in file_check.stdout"
@@ -57,7 +45,7 @@
 
           - name: Run Install Add/Activate/Commit via ISSU
             ansible.netcommon.cli_command:
-              command: "install add file bootflash:{{ firmware }} activate issu commit"
+              command: "install add file {{ filesystem }}:{{ firmware }} activate issu commit"
             vars:
               ansible_command_timeout: 1800
             ignore_errors: true
@@ -93,34 +81,35 @@
           - previous_firmware_version in device_firmware.stdout
           - inventory_hostname in groups['catalyst_9500']
       # ---------------------------------------------------------
-      # CATALYST 4506-E UPGRADE BLOCK (Traditional Boot/Reload)
+      # CATALYST 4506-E and 2960-X UPGRADE BLOCK (Traditional Boot/Reload)
       # ---------------------------------------------------------
-      - name: Execute 4506-E Upgrade Process
+      - name: Execute 4506-E/2960-X Upgrade Process
         block:
-          - name: Update boot system variable to new firmware
-            ansible.netcommon.cli_config:
-              # This cleanly enters config mode and sets the boot statement
-              config: "boot system bootflash:{{ firmware }}"
+#          - name: Update boot system variable to new firmware
+#            ansible.netcommon.cli_config:
+#              # This cleanly enters config mode and sets the boot statement
+#              config: "boot system {{ filesystem }}:{{ firmware }}"
 
           - name: Save configuration to NVRAM
             ansible.netcommon.cli_command:
               command: "write memory"
 
-          - name: Reload the 4506-E to boot the new image
-            ansible.netcommon.cli_command:
-              command: "reload"
-              prompt: 
-                # Cisco's reload confirmation prompt
-                - "Proceed with reload"
-              answer:
-                - "y"
-            # The switch will sever the SSH connection immediately upon reloading
-            ignore_errors: true
+#          - name: Reload the device to boot the new image
+#            ansible.netcommon.cli_command:
+#              command: "reload"
+#              prompt: 
+#                # Cisco's reload confirmation prompt
+#                - "Proceed with reload"
+#              answer:
+#                - "y"
+#            # The switch will sever the SSH connection immediately upon reloading
+#            ignore_errors: true
 
-          - name: Wait for the 4506-E to reboot and resume SSH
+          - name: Wait for the device to reboot and resume SSH
             ansible.builtin.wait_for_connection:
               # Give the 4506-E 5 minutes (300s) to POST and load the new image before polling
-              delay: 300
+              delay: 30
+              #delay: 300
               # Allow up to 20 minutes (1200s) for it to fully return
               timeout: 1200
 
@@ -129,10 +118,10 @@
               command: "show version"
             register: sh_version
 
-          - name: Display current 4506-E version
+          - name: Display current firmware version
             ansible.builtin.debug:
               msg: "{{ sh_version.stdout_lines[0] }}"
 
         when: 
           - previous_firmware_version in device_firmware.stdout
-          - inventory_hostname in groups['catalyst_4506es']
+          - (inventory_hostname in groups['catalyst_4506es']) or (inventory_hostname in groups['catalyst_2960x'])
