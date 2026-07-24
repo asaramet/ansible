@@ -1,9 +1,8 @@
 ---
-# Check Cisco firmware overs SSH
-# the latest required to be installed
+# Copy Cisco firmware overs SSH
 #
 # To run the playbook:
-# ansible-playbook copy_firmware.yml
+# ansible-playbook scp_firmware.yml
 #
 - name: "SCP devices firmware"
   #hosts: cisco
@@ -12,28 +11,24 @@
   #serial: 20
 
   tasks: 
+      - name: Check if firmware already exists on bootflash
+        ansible.netcommon.cli_command:
+          command: "dir bootflash:{{ firmware }}"
+        register: file_check
+        ignore_errors: true
+
       - name: Get current firmware version on the devices
         ansible.netcommon.cli_command:
           command: show version
         register: device_firmware
 
-      # ---------------------------------------------------------
-      # CATALYST 9500 BLOCK 
-      # ---------------------------------------------------------
       - name: Copy new firmware to Catalyst 9500 devices
-#        block:
-#          - name: Copy firmware from Ansible server to active bootflash via SCP
-#            ansible.netcommon.net_put:
-#              src: "{{ playbook_dir }}/../software/{{ firmware }}" 
-#              dest: "bootflash:{{ firmware }}"
-#              protocol: scp
-#            vars:
-#              ansible_command_timeout: 1800
         block:
           - name: Native Linux SCP transfer (Bypassing net_put and Parser View)
             ansible.builtin.command: >
               scp {{ playbook_dir }}/../software/{{ firmware }} {{ inventory_hostname }}:bootflash:{{ firmware }}
             delegate_to: localhost
         when: 
+          - file_check.failed
           - previous_firmware_version in device_firmware.stdout
           - inventory_hostname in groups['catalyst_9500']

@@ -3,7 +3,7 @@
 # ansible-playbook show_version.yaml
 #
 - name: "Show firmware version"
-  hosts: cisco_ios
+  hosts: cisco
   gather_facts: false
   tasks: 
       - name: Get version
