@@ -1,0 +1,33 @@
+---
+# Copy Cisco firmware overs SSH
+#
+# To run the playbook:
+# ansible-playbook scp_firmware.yml
+#
+- name: "Clean devices firmware"
+  hosts: cisco
+  gather_facts: false
+  #serial: 5
+
+  tasks: 
+    # ---------------------------------------------------------
+      # 4506-E STANDBY CLEANUP BLOCK
+      # ---------------------------------------------------------
+      - name: Free up space on 4506-E Standby Chassis
+        ansible.netcommon.cli_command:
+          # The /force flag prevents interactive confirmation prompts
+          command: "delete /force slavebootflash:{{ old_firmware }}"
+        # We ignore errors so the playbook doesn't crash if the file is already gone
+        ignore_errors: true
+        when: inventory_hostname in groups['catalyst_4506es']
+
+      # ---------------------------------------------------------
+      # 2960-X STACK MEMBER CLEANUP BLOCK
+      # ---------------------------------------------------------
+      - name: Free up space on 2960-X Stack Members
+        ansible.netcommon.cli_command:
+          command: "delete /force flash{{ item }}:{{ old_firmware }}"
+        ignore_errors: true
+        # Loop through the maximum possible stack members
+        loop: [2, 3, 4, 5, 6, 7, 8]
+        when: inventory_hostname in groups['catalyst_2960x']

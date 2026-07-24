@@ -80,36 +80,36 @@
         when: 
           - previous_firmware_version in device_firmware.stdout
           - inventory_hostname in groups['catalyst_9500']
+
       # ---------------------------------------------------------
       # CATALYST 4506-E and 2960-X UPGRADE BLOCK (Traditional Boot/Reload)
       # ---------------------------------------------------------
       - name: Execute 4506-E/2960-X Upgrade Process
         block:
-#          - name: Update boot system variable to new firmware
-#            ansible.netcommon.cli_config:
-#              # This cleanly enters config mode and sets the boot statement
-#              config: "boot system {{ filesystem }}:{{ firmware }}"
+          - name: Update boot system variable to new firmware
+            ansible.netcommon.cli_config:
+              # This cleanly enters config mode and sets the boot statement
+              config: "boot system {{ filesystem }}:{{ firmware }}"
 
           - name: Save configuration to NVRAM
             ansible.netcommon.cli_command:
               command: "write memory"
 
-#          - name: Reload the device to boot the new image
-#            ansible.netcommon.cli_command:
-#              command: "reload"
-#              prompt: 
-#                # Cisco's reload confirmation prompt
-#                - "Proceed with reload"
-#              answer:
-#                - "y"
-#            # The switch will sever the SSH connection immediately upon reloading
-#            ignore_errors: true
+          - name: Reload the device to boot the new image
+            ansible.netcommon.cli_command:
+              command: "reload"
+              prompt: 
+                # Cisco's reload confirmation prompt
+                - "Proceed with reload"
+              answer:
+                - "y"
+            # The switch will sever the SSH connection immediately upon reloading
+            ignore_errors: true
 
           - name: Wait for the device to reboot and resume SSH
             ansible.builtin.wait_for_connection:
               # Give the 4506-E 5 minutes (300s) to POST and load the new image before polling
-              delay: 30
-              #delay: 300
+              delay: 300
               # Allow up to 20 minutes (1200s) for it to fully return
               timeout: 1200
 

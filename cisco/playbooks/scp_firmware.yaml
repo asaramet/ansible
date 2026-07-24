@@ -47,7 +47,7 @@
           prompt: 
             - "Destination filename"
           answer:
-            - "{{ firmware }}"
+            - "\r"
         vars:
           ansible_command_timeout: 900
         when: 
@@ -73,7 +73,7 @@
           prompt: 
             - "Destination filename"
           answer:
-            - "{{ firmware }}"
+            - "\r"
         vars:
           ansible_command_timeout: 900
         ignore_errors: true
