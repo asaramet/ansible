@@ -67,13 +67,18 @@
         when: inventory_hostname in groups['catalyst_2960x']
 
       - name: Stage firmware to 2960-X Stack Members
-        ansible.netcommon.cli_command:
-          # item.item refers to the number (2, 3, etc.) from the previous loop
-          command: "copy flash:{{ firmware }} flash{{ item.item }}:{{ firmware }}"
-          prompt: 
-            - "Destination filename"
-          answer:
-            - "\r"
+#        ansible.netcommon.cli_command:
+#          # item.item refers to the number (2, 3, etc.) from the previous loop
+#          command: "copy flash:{{ firmware }} flash{{ item.item }}:{{ firmware }}"
+#          prompt: 
+#            - "Destination filename"
+#          answer:
+#            - "\r"
+
+        ansible.builtin.command: >
+          scp {{ playbook_dir }}/../software/{{ firmware }} {{ inventory_hostname }}:flash{{ item.item }}:{{ firmware }}
+
+        delegate_to: localhost
         vars:
           ansible_command_timeout: 900
         ignore_errors: true
