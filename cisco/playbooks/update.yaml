@@ -92,15 +92,47 @@
         when: 
           - previous_firmware_version in device_firmware.stdout
           - inventory_hostname in groups['catalyst_9500']
-
       # ---------------------------------------------------------
-      # CATALYST 4506-E UPGRADE BLOCK (Legacy eFSU / ISSU)
+      # CATALYST 4506-E UPGRADE BLOCK (Traditional Boot/Reload)
       # ---------------------------------------------------------
-      - name: Execute 4506-E ISSU Upgrade Process
+      - name: Execute 4506-E Upgrade Process
         block:
-          - name: Run legacy ISSU loadversion on 4500
-            debug: 
-              msg: "Insert 4500 issu tasks here"
+          - name: Update boot system variable to new firmware
+            ansible.netcommon.cli_config:
+              # This cleanly enters config mode and sets the boot statement
+              config: "boot system bootflash:{{ firmware }}"
+
+          - name: Save configuration to NVRAM
+            ansible.netcommon.cli_command:
+              command: "write memory"
+
+          - name: Reload the 4506-E to boot the new image
+            ansible.netcommon.cli_command:
+              command: "reload"
+              prompt: 
+                # Cisco's reload confirmation prompt
+                - "Proceed with reload"
+              answer:
+                - "y"
+            # The switch will sever the SSH connection immediately upon reloading
+            ignore_errors: true
+
+          - name: Wait for the 4506-E to reboot and resume SSH
+            ansible.builtin.wait_for_connection:
+              # Give the 4506-E 5 minutes (300s) to POST and load the new image before polling
+              delay: 300
+              # Allow up to 20 minutes (1200s) for it to fully return
+              timeout: 1200
+
+          - name: Verify new firmware is active
+            ansible.netcommon.cli_command:
+              command: "show version"
+            register: sh_version
+
+          - name: Display current 4506-E version
+            ansible.builtin.debug:
+              msg: "{{ sh_version.stdout_lines[0] }}"
+
         when: 
           - previous_firmware_version in device_firmware.stdout
           - inventory_hostname in groups['catalyst_4506es']

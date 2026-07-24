@@ -5,8 +5,7 @@
 # ansible-playbook scp_firmware.yml
 #
 - name: "SCP devices firmware"
-  #hosts: cisco
-  hosts: catalyst_9500
+  hosts: cisco
   gather_facts: false
   #serial: 20
 
@@ -22,7 +21,7 @@
           command: show version
         register: device_firmware
 
-      - name: Copy new firmware to Catalyst 9500 devices
+      - name: Copy new firmware to Catalyst devices
         block:
           - name: Native Linux SCP transfer (Bypassing net_put and Parser View)
             ansible.builtin.command: >
@@ -31,4 +30,4 @@
         when: 
           - file_check.failed
           - previous_firmware_version in device_firmware.stdout
-          - inventory_hostname in groups['catalyst_9500']
+          #- inventory_hostname in groups['catalyst_9500']

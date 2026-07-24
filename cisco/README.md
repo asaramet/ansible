@@ -18,27 +18,18 @@ parser view ANSIBLE_FIRMWARE
  commands exec include dir
  commands exec include write memory
 
- #commands exec include copy
- #commands exec include delete
- #commands exec include verify
-
- ! 3. Allow rebooting
- #commands exec include reload
-
- ! 4. Allow entering config mode to change the boot variable
- #commands exec include configure terminal
- #commands configure include boot system
-
- ! 5. Allow Ansible to disable terminal pagination
+ ! 3. Allow Ansible to disable terminal pagination
 commands exec include terminal length
 commands exec include terminal width
 
- ! 6. Allow upgrade commands
+ ! 4. Allow upgrade commands
  ! On the Catalyst 9500
 commands exec include all install 
 
  ! On the Catalyst 4506-E
-commands exec include issu
+commands exec include configure terminal
+commands configure include all boot
+commands exec include reload
 
  ! On the Catalyst 2960-X
 commands exec include archive
