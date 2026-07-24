@@ -15,25 +15,27 @@ parser view ANSIBLE_FIRMWARE
  commands exec include all show
 
  ! 2. Allow file transfer, verification, and NVRAM saving
- commands exec include copy
- commands exec include delete
  commands exec include dir
- commands exec include verify
  commands exec include write memory
 
+ #commands exec include copy
+ #commands exec include delete
+ #commands exec include verify
+
  ! 3. Allow rebooting
- commands exec include reload
+ #commands exec include reload
 
  ! 4. Allow entering config mode to change the boot variable
- commands exec include configure terminal
- commands configure include boot system
+ #commands exec include configure terminal
+ #commands configure include boot system
 
  ! 5. Allow Ansible to disable terminal pagination
 commands exec include terminal length
 commands exec include terminal width
+
  ! 6. Allow upgrade commands
  ! On the Catalyst 9500
- commands exec include all install 
+commands exec include all install 
 
  ! On the Catalyst 4506-E
 commands exec include issu
@@ -46,6 +48,29 @@ exit
 Now create `ansible` user with elevated privilege 15, but trapped inside the `ANSIBLE_FIRMWARE` view upon login.
 
 ```cisco-ios
+username ansible privilege 15 view ANSIBLE_FIRMWARE secret <YOUR_SECRET_PASSWORD>
+```
+
+- All together
+
+```cisco_catalyst 9500
+
+#secret <YOUR_SECRET_PASSWORD>
+
+conf term
+parser view ANSIBLE_FIRMWARE
+secret <YOUR_SECRET_PASSWORD>
+
+commands exec include dir
+commands exec include write memory
+commands exec include write
+commands exec include terminal width
+commands exec include terminal length
+commands exec include terminal
+commands exec include all show
+commands exec include all install
+exit
+
 username ansible privilege 15 view ANSIBLE_FIRMWARE secret <YOUR_SECRET_PASSWORD>
 ```
 

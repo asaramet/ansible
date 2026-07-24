@@ -12,7 +12,7 @@
 - name: "Update devices firmware"
   hosts: cisco
   gather_facts: false
-  #serial: 20
+  serial: 1
 
   tasks: 
       - name: Get current firmware version on the devices

@@ -17,12 +17,13 @@ HOSTS_GROUPS='catalyst_9500'
 for i in ${HOSTS_GROUPS}; do
 
 echo -e "\n++ Firmware version ${i} before updates --\n"
-#ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_before.logs
+ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_before.logs
 
-ansible-playbook playbooks/update.yaml -l ${i} | tee ${logs_folder}/${i}_update_.logs
+ansible-playbook playbooks/scp_firmware.yaml -l ${i} | tee ${logs_folder}/${i}_scp_firmware.logs
+ansible-playbook playbooks/update.yaml -l ${i} | tee ${logs_folder}/${i}_update.logs
 
-#sleep 15m &&
-#echo -e "\n++ Firmware version ${i} after updates --\n"
-#ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_after.logs
+sleep 15m &&
+echo -e "\n++ Firmware version ${i} after updates --\n"
+ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_after.logs
 
 done
