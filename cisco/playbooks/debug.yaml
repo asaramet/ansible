@@ -23,3 +23,22 @@
         var: firmware
 
 
+    - name: Execute 9500 ISSU Commands
+      block:
+        - name: Show upgrade command
+          ansible.builtin.debug:
+            msg: "install add file {{ filesystem }}:{{ firmware }} activate issu commit"
+      when: 
+        - inventory_hostname in groups['catalyst_9500']
+        # Only run this block if the switch is in Install Mode
+        - "'packages.conf' in version.stdout"
+
+    - name: Execute 9500 Upgrade and Convert to Install Mode
+      block:
+        - name: Show upgrade and convert command
+          ansible.builtin.debug:
+            msg: "install add file {{ filesystem }}:{{ firmware }} activate commit"
+      when: 
+        - inventory_hostname in groups['catalyst_9500']
+        # Only run this block if the switch is in Install Mode
+        - "'packages.conf' not in version.stdout"

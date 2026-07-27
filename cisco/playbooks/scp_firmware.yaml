@@ -21,6 +21,9 @@
           command: show version
         register: device_firmware
 
+      # ---------------------------------------------------------
+      # Catalyst Master file Sync
+      # ---------------------------------------------------------
       - name: Copy new firmware to Catalyst devices
         block:
           - name: Native Linux SCP transfer (Bypassing net_put and Parser View)

@@ -80,6 +80,56 @@
         when: 
           - previous_firmware_version in device_firmware.stdout
           - inventory_hostname in groups['catalyst_9500']
+          # Only run this block if the switch is in Install Mode
+          - "'packages.conf' in device_firmware.stdout"
+
+      # ---------------------------------------------------------
+      # CATALYST 9500 CONVERSION BLOCK (Bundle to Install Mode)
+      # ---------------------------------------------------------
+      - name: Execute 9500 Upgrade and Convert to Install Mode
+        block:
+          - name: Ensure configuration is saved before conversion
+            ansible.netcommon.cli_command:
+              command: "write memory"
+
+          - name: Run Install Command (Without ISSU) to unpack and convert
+            ansible.netcommon.cli_command:
+              # Notice the 'issu' keyword is removed here
+              command: "install add file {{ filesystem }}:{{ firmware }} activate commit"
+              prompt: 
+                # The switch will prompt to confirm the reload since ISSU isn't used
+                - "This operation requires a reload of the system. Do you want to proceed?"
+                - "Do you want to proceed?" # Catch-all for standard prompts
+              answer:
+                - "y"
+                - "y"
+            vars:
+              # Expanding the image takes time; give the command plenty of timeout
+              ansible_command_timeout: 1800
+            ignore_errors: true
+          
+          - name: Wait for the switch to reload and return
+            ansible.builtin.wait_for_connection:
+              # A full reload takes longer than an ISSU switchover; wait 5 minutes before polling
+              delay: 300
+              timeout: 1800
+
+          - name: Verify successful conversion to Install Mode
+            ansible.netcommon.cli_command:
+              command: "show version"
+            register: sh_version_converted
+
+          - name: Display current version and boot mode
+            ansible.builtin.debug:
+              msg: 
+                - "Version: {{ sh_version_converted.stdout_lines[0] }}"
+                - "Successfully converted to packages.conf: {{ 'packages.conf' in sh_version_converted.stdout }}"
+        
+        when: 
+          - previous_firmware_version in device_firmware.stdout
+          - inventory_hostname in groups['catalyst_9500']
+          # Only run this specific block if the switch is currently in Bundle Mode
+          - "'packages.conf' not in device_firmware.stdout"
 
       # ---------------------------------------------------------
       # CATALYST 4506-E and 2960-X UPGRADE BLOCK (Traditional Boot/Reload)
