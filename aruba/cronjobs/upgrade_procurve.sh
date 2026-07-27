@@ -12,9 +12,9 @@ source /opt/ansible/envs
 cd /opt/ansible/inventories/aruba
 ansible --version
 
-HOSTS_GROUPS='procurve_access'
+#HOSTS_GROUPS='procurve_access'
 #HOSTS_GROUPS='procurve_distri'
-#HOSTS_GROUPS='procurve_core'
+HOSTS_GROUPS='procurve_core'
 
 for i in ${HOSTS_GROUPS}; do
 

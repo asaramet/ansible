@@ -22,4 +22,46 @@
       ansible.builtin.debug:
         var: firmware
 
+    - name: Set firmware string to update
+      ansible.builtin.set_fact:
+        firmware_to_update: "{{ firmware_version | replace('_', '.') }}"
 
+    - name: "Debug Update firmware on Procurve/ArubaOS switches"
+      block:
+        - name: Firmware to assert with
+          debug:
+            msg: "{{ firmware_to_update }}"
+      when: 
+        - firmware_to_update not in version.stdout
+        - inventory_hostname in groups['procurve']
+
+
+    - name: Register flash stdout 
+      ansible.netcommon.cli_command:
+        command: "show flash"
+      register: device_images
+
+    # ---------------------------------------------------------
+    # ARUBA PARSING LOGIC
+    # ---------------------------------------------------------
+    - name: Isolate the Primary Image line
+      ansible.builtin.set_fact:
+        # Searches all lines and grabs the first one containing 'Primary Image   :'
+        primary_image_line: "{{ device_images.stdout_lines | select('search', 'Primary Image\\s*:') | first }}"
+
+    - name: Extract exact firmware version string
+      ansible.builtin.set_fact:
+        # Splits the line by whitespace and grabs the very last item (e.g., KB.16.11.0003)
+        primary_firmware_version: "{{ primary_image_line.split()[-1] }}"
+
+    - name: Verify extracted values (Optional)
+      ansible.builtin.debug:
+        msg: 
+          - "Isolated Line: {{ primary_image_line }}"
+          - "Extracted Version: {{ primary_firmware_version }}"
+
+    - name: Show what to reboot
+      ansible.builtin.debug:
+        msg: "{{ primary_firmware_version }} - {{ firmware_to_update }}"
+
+      when: primary_firmware_version not in version.stdout

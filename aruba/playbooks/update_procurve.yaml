@@ -16,47 +16,63 @@
 #    firmware: "{{ firmware_version }}.swi"
 
   tasks: 
-      - name: Save running configuration to startup configuration
-        ansible.netcommon.cli_command:
-          command: "write memory"
+    - name: Set firmware string to update
+      ansible.builtin.set_fact:
+        firmware_to_update: "{{ firmware_version | replace('_', '.') }}"
 
-      - name: Copy primary image to secondary
-        ansible.netcommon.cli_command:
-          command: "copy flash flash secondary"
-        register: copy_primary
-        until: copy_primary is succeeded
-        retries: 3
-        delay: 10
+    - name: Get version
+      ansible.netcommon.cli_command:
+        command: "show version"
+      register: version
 
-      - name: Wait until the secondary has the old primary image
-        ansible.netcommon.cli_command:
-          command: show flash
-        register: flash_result
-        until: "'Secondary' in flash_result.stdout and 'Primary' in flash_result.stdout"
-        retries: 12
-        delay: 10
+    - name: Upgrade devices
+      block:
+        - name: Save running configuration to startup configuration
+          ansible.netcommon.cli_command:
+            command: "write memory"
 
-      - name: Temporarily permit TFTP traffic
-        ansible.netcommon.cli_command:
-          command: |
-            config
-            tftp client
+        - name: Copy primary image to secondary
+          ansible.netcommon.cli_command:
+            command: "copy flash flash secondary"
+          register: copy_primary
+          until: copy_primary is succeeded
+          retries: 3
+          delay: 10
 
-      - name: Download new firmware from TFTP server
-        ansible.netcommon.cli_command:
-          command: "copy tftp flash {{ tftp_server }} software/{{ firmware }} primary"
-          prompt: "[Cc]ontinue"
-          answer: "y"
-        vars: 
-          ansible_command_timeout: 300
-        register: tftp_output
+        - name: Wait until the secondary has the old primary image
+          ansible.netcommon.cli_command:
+            command: show flash
+          register: flash_result
+          until: "'Secondary' in flash_result.stdout and 'Primary' in flash_result.stdout"
+          retries: 12
+          delay: 10
 
-      - name: Debug TFTP Output
-        ansible.builtin.debug:
-          var: tftp_output.stdout_lines
+        - name: Temporarily permit TFTP traffic
+          ansible.netcommon.cli_command:
+            command: |
+              config
+              tftp client
 
-      - name: Remove temporary TFTP permit
-        ansible.netcommon.cli_command:
-          command: |
-            config
-            ip ssh filetransfer
+        - name: Download new firmware from TFTP server
+          ansible.netcommon.cli_command:
+            command: "copy tftp flash {{ tftp_server }} software/{{ firmware }} primary"
+            prompt: "[Cc]ontinue"
+            answer: "y"
+          vars: 
+            ansible_command_timeout: 300
+          register: tftp_output
+
+        - name: Debug TFTP Output
+          ansible.builtin.debug:
+            var: tftp_output.stdout_lines
+
+        - name: Remove temporary TFTP permit
+          ansible.netcommon.cli_command:
+            command: |
+              config
+              ip ssh filetransfer
+      when: 
+        - firmware_to_update not in version.stdout
+        - inventory_hostname in groups['procurve']
+
+
