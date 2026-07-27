@@ -12,7 +12,7 @@ source /opt/ansible/envs
 cd /opt/ansible/inventories/cisco
 ansible --version
 
-HOSTS_GROUPS='catalyst_9500'
+HOSTS_GROUPS='catalyst_9500 catalyst_4506es catalyst_2960x'
 
 for i in ${HOSTS_GROUPS}; do
 
