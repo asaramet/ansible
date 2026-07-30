@@ -132,45 +132,47 @@
           - "'packages.conf' not in device_firmware.stdout"
 
       # ---------------------------------------------------------
-      # CATALYST 4506-E UPGRADE BLOCK (Traditional Boot/Reload)
+      # CATALYST 4506-E VSS UPGRADE BLOCK (Legacy eFSU)
       # ---------------------------------------------------------
       - name: Execute 4506-E
         block:
-          - name: Update boot system variable to new firmware
-            ansible.netcommon.cli_config:
-              # This cleanly enters config mode and sets the boot statement
-              config: "boot system {{ filesystem }}:{{ firmware }}"
-
-          - name: Save configuration to NVRAM
+          - name: Ensure configuration is saved before conversion
             ansible.netcommon.cli_command:
               command: "write memory"
 
-          - name: Reload the device to boot the new image
+          - name: PHASE 1 - Execute Loadversion (Prepare and Reload Standby)
             ansible.netcommon.cli_command:
-              command: "reload"
-              prompt: 
-                # Cisco's reload confirmation prompt
-                - "Proceed with reload"
-              answer:
-                - "y"
-            # The switch will sever the SSH connection immediately upon reloading
+              command: "issu loadversion {{ active_slot }} {{ filesystem }}:{{ previous_firmware }} {{ standby_slot }} slavebootflash:{{ firmware }}"
+            vars:
+              ansible_command_timeout: 1200        
+
+          - name: Pause to ensure Standby Supervisor reaches 'Standby Hot' state
+            ansible.builtin.pause:
+              minutes: 30
+
+          - name: PHASE 2 - Execute Runversion (Force VSS Switchover)
+            ansible.netcommon.cli_command:
+              command: "issu runversion {{ standby_slot }} slavebootflash:{{ firmware }}"
+            vars:
+              ansible_command_timeout: 30
             ignore_errors: true
 
-          - name: Wait for the device to reboot and resume SSH
+          - name: Wait for the new Active supervisor to take over and resume SSH
             ansible.builtin.wait_for_connection:
-              # Give the 4506-E 5 minutes (300s) to POST and load the new image before polling
-              delay: 300
-              # Allow up to 20 minutes (1200s) for it to fully return
+              delay: 60
               timeout: 1200
 
-          - name: Verify new firmware is active
+          - name: PHASE 3 - Execute Acceptversion (Stop Rollback Timer)
             ansible.netcommon.cli_command:
-              command: "show version"
-            register: sh_version
+              command: "issu acceptversion {{ standby_slot }} {{ filesystem }}:{{ firmware }}"
+            vars:
+              ansible_command_timeout: 120
 
-          - name: Display current firmware version
-            ansible.builtin.debug:
-              msg: "{{ sh_version.stdout_lines[0] }}"
+          - name: PHASE 4 - Execute Commitversion (Upgrade Final Supervisor)
+            ansible.netcommon.cli_command:
+              command: "issu commitversion {{ standby_slot }} {{ filesystem }}:{{ firmware }} {{ active_slot }} slavebootflash:{{ firmware }}"
+            vars:
+              ansible_command_timeout: 1200
 
         when: 
           - previous_firmware_version in device_firmware.stdout
