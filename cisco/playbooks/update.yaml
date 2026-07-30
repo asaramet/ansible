@@ -179,37 +179,72 @@
           - inventory_hostname in groups['catalyst_4506es']
 
       # ---------------------------------------------------------
-      # 2960-X PRE-RELOAD CLEANUP & BOOT VARIABLE BLOCK
+      # 2960-X BOOT VARIABLE and CLEANUP BLOCK
       # ---------------------------------------------------------
       - name: Execute 2960-X Upgrade Process
         block:
-#          - name: Force delete old firmware from stack flashes (Bridge Burn)
-#            ansible.netcommon.cli_command:
-#              # Using a loop to hit flash1:, flash2:, etc.
-#              command: "delete /force flash{{ item }}:{{ old_firmware }}"
-#            loop: "{{ range(1, stack_member_count | default(4) | int) | list }}"
-#            ignore_errors: true
+          - name: Check if firmware exists on 2960-X Stack Members
+            ansible.netcommon.cli_command:
+              # Loops through flash2:, flash3:, etc.
+              command: "dir flash{{ item }}:{{ firmware }}"
+            loop: "{{ range(1, (stack_size | int) + 1) }}"
 
-#          - name: Configure boot variable for all 2960-X stack members
-#            ansible.netcommon.cli_config:
-#              config: |
-#                boot system switch all flash:{{ firmware }}
+          - name: Remove old boot system variable
+            ansible.netcommon.cli_config:
+              config: |
+                no boot system
 
-#          - name: Ensure configuration is saved before reload
-#            ansible.netcommon.cli_command:
-#              command: "write memory"
+          - name: Configure new boot variable for all 2960-X stack members
+            ansible.netcommon.cli_config:
+              config: |
+                boot system switch all flash:{{ firmware }}
+
+          - name: Ensure configuration is saved before reload
+            ansible.netcommon.cli_command:
+              command: "write memory"
 
           - name: Reload the 2960-X stack
             ansible.netcommon.cli_command:
-              command: "reload"
+              command: "reload in 1"
               prompt: 
                 - "Proceed with reload"
               answer:
                 - "\r"
-            ignore_errors: true
             
           - name: Wait for the switch stack to return
             ansible.builtin.wait_for_connection:
               delay: 180
               timeout: 900
-        when: inventory_hostname in groups['catalyst_2960x']
+
+          - name: Allow stack members time to fully converge
+            ansible.builtin.pause:
+              minutes: 2
+
+          - name: Verify the new firmware is currently running
+            ansible.netcommon.cli_command:
+              command: "show version"
+            register: post_reload_version
+
+          - name: Assert that the switch has successfully booted the new firmware
+            ansible.builtin.assert:
+              that:
+                - "firmware_version in post_reload_version.stdout"
+              fail_msg: "CRITICAL: Switch did not boot the new firmware! Halting cleanup."
+              success_msg: "Verified running new firmware. Proceeding with flash cleanup."
+
+          - name: Assert that the switch didn't booted the previous firmware
+            ansible.builtin.assert:
+              that:
+                - "previous_firmware_version not in post_reload_version.stdout"
+              fail_msg: "CRITICAL: Switch booted the old firmware! Halting cleanup."
+              success_msg: "Verified running new firmware. Proceeding with flash cleanup."
+
+          - name: Delete old firmware from all 2960-X Stack Members
+            ansible.netcommon.cli_command:
+              # The /force flag bypasses the [confirm] prompt
+              command: "delete /force flash{{ item }}:{{ previous_firmware }}"
+            loop: "{{ range(1, (stack_size | int) + 1) }}"
+
+        when: 
+          - previous_firmware_version in device_firmware.stdout
+          - inventory_hostname in groups['catalyst_2960x']

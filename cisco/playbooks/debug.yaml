@@ -22,7 +22,6 @@
       ansible.builtin.debug:
         var: firmware
 
-
     - name: Execute 9500 ISSU Commands
       block:
         - name: Show upgrade command
@@ -42,3 +41,18 @@
         - inventory_hostname in groups['catalyst_9500']
         # Only run this block if the switch is in Install Mode
         - "'packages.conf' not in version.stdout"
+
+    - name: Check if firmware exists on 2960-X Stack Members
+      block:
+        - name: Collect the stacks with available firmware
+          ansible.netcommon.cli_command:
+            # Loops through flash2:, flash3:, etc.
+            command: "dir flash{{ item }}:{{ firmware }}"
+          register: file_check_2960_slaves
+          ignore_errors: true
+          loop: "{{ range(2, (stack_size | int) + 1) }}"
+
+        - name: Show collected stacks
+          debug:
+            msg: "{{ file_check_2960_slaves }}"
+      when: inventory_hostname in groups['catalyst_2960x']

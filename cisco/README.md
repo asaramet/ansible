@@ -32,6 +32,7 @@ commands exec include all issu
  ! On the Catalyst 2960-X
 commands exec include configure terminal
 commands configure include all boot
+commands configure include no boot system
 commands exec include reload
 commands exec include all copy
 commands exec include all delete
