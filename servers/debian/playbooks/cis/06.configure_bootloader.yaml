@@ -21,14 +21,14 @@
     - name: Check for superusers in GRUB config
       ansible.builtin.command: grep "^set superusers" /boot/grub/grub.cfg
       register: grub_superusers
-      ignore_errors: yes
+      ignore_errors: true
       changed_when: false
 
     - name: Check for password in GRUB config
       ansible.builtin.shell: |
         grep -E '^[[:space:]]*(password|password_pbkdf2)' /boot/grub/grub.cfg
       register: grub_password
-      ignore_errors: yes
+      ignore_errors: true
       changed_when: false
 
     - name: Set bootloader password status
