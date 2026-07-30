@@ -153,3 +153,24 @@ Host r?cs*
 ```bash
 scp -O /tftpboot/software/cisco/cat9k_iosxe.17.15.05.SPA.bin rwcs0001:bootflash:cat9k_iosxe.17.15.05.SPA.bin
 ```
+
+## Update procedure
+
+1. Copy images to the devices. Can be done during the day, it may take a while though:
+
+```bash
+ansible-playbook playbooks/scp_firmware.yaml
+    ```
+
+2. Update the devices
+
+```bash
+ansible-playbook playbooks/update.yaml
+    ```
+
+3. You can assert the updates
+
+```bash
+ansible-playbook playbooks/show_version.yaml
+ansible-playbook playbooks/assert_update.yaml 
+    ```

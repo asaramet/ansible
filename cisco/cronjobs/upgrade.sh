@@ -12,18 +12,20 @@ source /opt/ansible/envs
 cd /opt/ansible/inventories/cisco
 ansible --version
 
-HOSTS_GROUPS='catalyst_9500 catalyst_4506es catalyst_2960x'
+#HOSTS_GROUPS='catalyst_2960x catalyst_9500 catalyst_4506es'
+HOSTS_GROUPS='rhcs0001 rscs0003'
 
 for i in ${HOSTS_GROUPS}; do
 
 echo -e "\n++ Firmware version ${i} before updates --\n"
-ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_before.logs
+#ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_before.logs
 
-ansible-playbook playbooks/scp_firmware.yaml -l ${i} | tee ${logs_folder}/${i}_scp_firmware.logs
+#ansible-playbook playbooks/scp_firmware.yaml -l ${i} | tee ${logs_folder}/${i}_scp_firmware.logs
 ansible-playbook playbooks/update.yaml -l ${i} | tee ${logs_folder}/${i}_update.logs
 
 sleep 15m &&
 echo -e "\n++ Firmware version ${i} after updates --\n"
 ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_after.logs
+ansible-playbook playbooks/assert_update.yaml -l ${i} | tee ${logs_folder}/${i}_assert.logs
 
 done
