@@ -170,7 +170,7 @@
 
           - name: PHASE 4 - Execute Commitversion (Upgrade Final Supervisor)
             ansible.netcommon.cli_command:
-              command: "issu commitversion {{ standby_slot }} {{ filesystem }}:{{ firmware }} {{ active_slot }} slavebootflash:{{ firmware }}"
+              command: "issu commitversion {{ active_slot }} slavebootflash:{{ firmware }}"
             vars:
               ansible_command_timeout: 1200
 
