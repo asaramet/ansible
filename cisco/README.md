@@ -27,7 +27,15 @@ commands exec include terminal width
 commands exec include all install 
 
  ! On the Catalyst 4506-E 
-commands exec include all issu
+#commands exec include all issu
+#commands exec include all redundancy
+
+commands exec include all verify
+commands exec include configure terminal
+commands configure include no boot system
+commands exec include reload
+commands exec include all copy
+commands exec include all delete
 
  ! On the Catalyst 2960-X
 commands exec include configure terminal

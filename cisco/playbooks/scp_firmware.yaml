@@ -35,37 +35,6 @@
           - previous_firmware_version in device_firmware.stdout
 
       # ---------------------------------------------------------
-      # 4506-E VSS STANDBY FILE SYNC
-      # ---------------------------------------------------------
-      - name: Check if firmware exists on 4506-E Standby Chassis
-        ansible.netcommon.cli_command:
-          command: "dir slavebootflash:{{ firmware }}"
-        register: file_check_4506_standby
-        ignore_errors: true
-        when: inventory_hostname in groups['catalyst_4506es']
-
-#      - name: Stage firmware to 4506-E VSS Standby Chassis
-#        ansible.netcommon.cli_command:
-#          command: "copy bootflash:{{ firmware }} slavebootflash:{{ firmware }}"
-#          prompt: 
-#            - "Destination filename"
-#          answer:
-#            - "\r"
-#        vars:
-#          ansible_command_timeout: 900
-#        when: 
-#          - inventory_hostname in groups['catalyst_4506es']
-#          - file_check_4506_standby.failed
-
-      - name: Stage firmware to 4506-E VSS Standby Chassis via SCP
-        ansible.builtin.command: >
-          scp {{ playbook_dir }}/../software/{{ firmware }} {{ inventory_hostname }}:slavebootflash:{{ firmware }}
-        delegate_to: localhost
-        when: 
-          - inventory_hostname in groups['catalyst_4506es']
-          - file_check_4506_standby.failed
-
-      # ---------------------------------------------------------
       # 2960-X STACK MEMBER FILE SYNC
       # ---------------------------------------------------------
       - name: Check if firmware exists on 2960-X Stack Members
@@ -108,3 +77,73 @@
           # Only run the copy if the specific flash drive is missing the file
           # AND the flash drive actually exists (which bypasses errors on smaller stacks)
           - item.failed
+
+      # ---------------------------------------------------------
+      # 4506-E VSS STANDBY FILE SYNC
+      # ---------------------------------------------------------
+      - name: Copy and verify new firmware on 4506-E slave filesystems
+        vars:
+          md5_command_timeout: 1800
+        block:
+          - name: Verify firmware digital signature on Active Supervisor
+            ansible.netcommon.cli_command:
+              command: "verify {{ filesystem }}:{{ firmware }}"
+            vars:
+              ansible_command_timeout: 300
+            register: verify_active
+
+          - name: Assert Active firmware is not corrupted (PKI)
+            ansible.builtin.assert:
+              that:
+                - "'Digital signature successfully verified' in verify_active.stdout"
+              fail_msg: "CRITICAL: Firmware on bootflash is corrupt. Do not copy to standby!"
+
+          - name: Generate MD5 hash for Active firmware
+            ansible.netcommon.cli_command:
+              command: "verify /md5 {{ filesystem }}:{{ firmware }}"
+            vars:
+              ansible_command_timeout: "{{ md5_command_timeout }}"
+            register: md5_active
+
+          - name: Extract MD5 hash string from Active supervisor
+            ansible.builtin.set_fact:
+              # Scans the output and isolates the 32-character hex string
+              active_hash: "{{ md5_active.stdout | regex_search('([a-fA-F0-9]{32})') }}"
+
+          - name: Check if valid firmware exists on Standby (Native IOS Compare)
+            ansible.netcommon.cli_command:
+              # Passes the extracted hash directly to the switch for comparison
+              command: "verify /md5 slavebootflash:{{ firmware }} {{ active_hash }}"
+            vars:
+              ansible_command_timeout: "{{ md5_command_timeout }}"
+            register: initial_md5_standby
+            ignore_errors: true
+
+          - name: Copy firmware if it doesn't exist or MD5 mismatches
+            block:
+              - name: Stage firmware to 4506-E VSS Standby Chassis via VSL Backplane
+                ansible.netcommon.cli_command:
+                  command: "copy {{ filesystem }}:{{ firmware }} slavebootflash:{{ firmware }}"
+                  prompt: 
+                    - "Destination filename"
+                  answer:
+                    - "\r"
+                vars:
+                  ansible_command_timeout: 1800
+
+              - name: Verify MD5 hash on Standby Supervisor after copy
+                ansible.netcommon.cli_command:
+                  command: "verify /md5 slavebootflash:{{ firmware }} {{ active_hash }}"
+                vars:
+                  ansible_command_timeout: "{{ md5_command_timeout }}"
+                register: final_md5_standby
+
+              - name: Assert Standby firmware MD5 matched perfectly
+                ansible.builtin.assert:
+                  that:
+                    # Cisco outputs the word 'Verified' when the inline hash matches
+                    - "'Verified' in final_md5_standby.stdout"
+                  fail_msg: "CRITICAL: MD5 mismatch on Standby after internal copy!"
+            # Triggers copy if the native check fails or the word 'Verified' is missing
+            when: initial_md5_standby.failed or 'Verified' not in initial_md5_standby.stdout
+        when: inventory_hostname in groups['catalyst_4506es']
