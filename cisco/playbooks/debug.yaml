@@ -56,3 +56,45 @@
           debug:
             msg: "{{ file_check_2960_slaves }}"
       when: inventory_hostname in groups['catalyst_2960x']
+
+    - name: Verify new firmware on 4506-E slave filesystems
+      block:
+        - name: Verify firmware digital signature on Active Supervisor
+          ansible.netcommon.cli_command:
+            command: "verify {{ filesystem }}:{{ firmware }}"
+          vars:
+            ansible_command_timeout: 300
+          register: verify_active
+
+        - name: Assert Active firmware is not corrupted (PKI)
+          ansible.builtin.assert:
+            that:
+              - "'Digital signature successfully verified' in verify_active.stdout"
+            fail_msg: "CRITICAL: Firmware on bootflash is corrupt. Do not copy to standby!"
+
+        - name: Generate MD5 hash for Active firmware
+          ansible.netcommon.cli_command:
+            command: "verify /md5 {{ filesystem }}:{{ firmware }}"
+          vars:
+            ansible_command_timeout: 1800
+          register: md5_active
+
+        - name: Extract MD5 hash string from Active supervisor
+          ansible.builtin.set_fact:
+            # Scans the output and isolates the 32-character hex string
+            active_hash: "{{ md5_active.stdout | regex_search('([a-fA-F0-9]{32})') }}"
+
+        - name: Display the MD5 hash 
+          debug:
+            msg: "{{ active_hash }}"
+
+        - name: Check if valid firmware exists on Standby (Native IOS Compare)
+          ansible.netcommon.cli_command:
+            # Passes the extracted hash directly to the switch for comparison
+            command: "verify /md5 slavebootflash:{{ firmware }} {{ active_hash }}"
+          vars:
+            ansible_command_timeout: 1800
+          register: initial_md5_standby
+          ignore_errors: true
+
+      when: inventory_hostname in groups['catalyst_4506es']
