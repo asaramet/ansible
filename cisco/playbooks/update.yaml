@@ -208,6 +208,11 @@
               fail_msg: "CRITICAL: Switch booted the old firmware! Halting cleanup."
               success_msg: "Verified running new firmware. Proceeding with flash cleanup."
 
+          - name: Remove previous firmware from 2960-X main flash 
+            ansible.netcommon.cli_command:
+              command: "delete /force {{ filesystem }}:{{ previous_firmware }}"
+            ignore_errors: true
+
           - name: Delete old firmware from all 2960-X Stack Members
             ansible.netcommon.cli_command:
               # The /force flag bypasses the [confirm] prompt
