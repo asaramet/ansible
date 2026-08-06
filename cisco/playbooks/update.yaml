@@ -66,17 +66,32 @@
             ansible.builtin.debug:
               msg: "{{ sh_version.stdout_lines[0] }}"
 
-          - name: Auto remove old firmware from flash
-            ansible.netcommon.cli_command:
-              command: "install remove inactive"
-              prompt: 
-                # Match a safe substring without any regex special characters
-                - "remove the above files"
-              answer:
-                - "y"
-            vars:
-              ansible_command_timeout: 120
+          - name: Clean redundant firmware files from flash
+            block:
+              - name: Verify Standby Supervisor has fully joined the VSS cluster
+                ansible.netcommon.cli_command:
+                  command: "show redundancy"
+                register: redundancy_status
+                # Wait up to 10 minutes for the Standby to fully boot and sync
+                until: "'STANDBY HOT' in redundancy_status.stdout"
+                retries: 10
+                delay: 60
 
+              - name: CLEANUP - Remove previous firmware
+                block:
+                  - name: CLEANUP - Remove previous firmware
+                    ansible.netcommon.cli_command:
+                      command: "install remove inactive"
+                      prompt: 
+                        - "remove the above files"
+                      answer:
+                        - "y"
+                    vars:
+                      ansible_command_timeout: 120
+
+                when: 
+                  - "'STANDBY HOT' in redundancy_status.stdout"
+                  - "previous_firmware_version not in redundancy_status.stdout"
         when: 
           - previous_firmware_version in device_firmware.stdout
           - inventory_hostname in groups['catalyst_9500']
