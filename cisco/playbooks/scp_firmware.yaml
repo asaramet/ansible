@@ -29,7 +29,51 @@
           - name: Native Linux SCP transfer (Bypassing net_put and Parser View)
             ansible.builtin.command: >
               scp {{ playbook_dir }}/../software/{{ firmware }} {{ inventory_hostname }}:{{ filesystem }}:{{ firmware }}
+            delegate_to: localhost 
+
+          - name: Get the local file MD5 hash
+            ansible.builtin.command: >
+              md5sum {{ playbook_dir }}/../software/{{ firmware }}
             delegate_to: localhost
+            register: local_md5
+
+          - name: Isolate the local MD5 hash
+            ansible.builtin.set_fact:
+              local_md5_hash: "{{ local_md5.stdout.split()[0] }}"
+
+          - name: Execute verify command on the device (to get the md5 hash)
+            ansible.netcommon.cli_command:
+              command: "verify /md5 {{ filesystem }}:{{ firmware }}"
+            vars:
+              # Critical: Give the switch up to 5 minutes to hash the file
+              ansible_command_timeout: 300
+              ansible_connect_timeout: 300
+            register: verify_file
+
+          - name: Isolate the final verification message (filter out the dots)
+            ansible.builtin.set_fact:
+              verify_result_msg: "{{ verify_file.stdout_lines | select('search', '[a-zA-Z]') | last | trim }}"
+
+          - name: Show remote md5 verify message
+            ansible.builtin.debug:
+              var: verify_result_msg
+
+          - name: Isolate the remote MD5 message
+            ansible.builtin.set_fact:
+              remote_md5_hash: "{{ verify_result_msg | regex_search('[a-f0-9]{32}') }}"
+
+          - name: Display the extracted values for debugging
+            ansible.builtin.debug:
+              msg: 
+                - "Local Hash: {{ local_md5_hash }}"
+                - "Remote Hash: {{ remote_md5_hash }}"
+                
+          - name: Compare the local and remote MD5 hashes
+            ansible.builtin.assert:
+              that:
+                - local_md5_hash == remote_md5_hash
+              fail_msg: "MD5 mismatch! The file on the device may be corrupted."
+              success_msg: "MD5 hash matches perfectly! Firmware intact."
         when: 
           - file_check.failed
           - previous_firmware_version in device_firmware.stdout

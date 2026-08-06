@@ -22,79 +22,48 @@
       ansible.builtin.debug:
         var: firmware
 
-    - name: Execute 9500 ISSU Commands
+    - name: Verify new firmware on Catalyst devices
       block:
-        - name: Show upgrade command
-          ansible.builtin.debug:
-            msg: "install add file {{ filesystem }}:{{ firmware }} activate issu commit"
-      when: 
-        - inventory_hostname in groups['catalyst_9500']
-        # Only run this block if the switch is in Install Mode
-        - "'packages.conf' in version.stdout"
+        - name: Get the local file MD5 hash
+          ansible.builtin.command: >
+            md5sum {{ playbook_dir }}/../software/{{ firmware }}
+          delegate_to: localhost
+          register: local_md5
 
-    - name: Execute 9500 Upgrade and Convert to Install Mode
-      block:
-        - name: Show upgrade and convert command
-          ansible.builtin.debug:
-            msg: "install add file {{ filesystem }}:{{ firmware }} activate commit"
-      when: 
-        - inventory_hostname in groups['catalyst_9500']
-        # Only run this block if the switch is in Install Mode
-        - "'packages.conf' not in version.stdout"
+        - name: Isolate the local MD5 hash
+          ansible.builtin.set_fact:
+            local_md5_hash: "{{ local_md5.stdout.split()[0] }}"
 
-    - name: Check if firmware exists on 2960-X Stack Members
-      block:
-        - name: Collect the stacks with available firmware
-          ansible.netcommon.cli_command:
-            # Loops through flash2:, flash3:, etc.
-            command: "dir flash{{ item }}:{{ firmware }}"
-          register: file_check_2960_slaves
-          ignore_errors: true
-          loop: "{{ range(2, (stack_size | int) + 1) }}"
-
-        - name: Show collected stacks
-          debug:
-            msg: "{{ file_check_2960_slaves }}"
-      when: inventory_hostname in groups['catalyst_2960x']
-
-    - name: Verify new firmware on 4506-E slave filesystems
-      block:
-        - name: Verify firmware digital signature on Active Supervisor
-          ansible.netcommon.cli_command:
-            command: "verify {{ filesystem }}:{{ firmware }}"
-          vars:
-            ansible_command_timeout: 300
-          register: verify_active
-
-        - name: Assert Active firmware is not corrupted (PKI)
-          ansible.builtin.assert:
-            that:
-              - "'Digital signature successfully verified' in verify_active.stdout"
-            fail_msg: "CRITICAL: Firmware on bootflash is corrupt. Do not copy to standby!"
-
-        - name: Generate MD5 hash for Active firmware
+        - name: Execute verify command on the device (to get the md5 hash)
           ansible.netcommon.cli_command:
             command: "verify /md5 {{ filesystem }}:{{ firmware }}"
           vars:
-            ansible_command_timeout: 1800
-          register: md5_active
+            # Critical: Give the switch up to 5 minutes to hash the file
+            ansible_command_timeout: 300
+            ansible_connect_timeout: 300
+          register: verify_file
 
-        - name: Extract MD5 hash string from Active supervisor
+        - name: Isolate the final verification message (filter out the dots)
           ansible.builtin.set_fact:
-            # Scans the output and isolates the 32-character hex string
-            active_hash: "{{ md5_active.stdout | regex_search('([a-fA-F0-9]{32})') }}"
+            verify_result_msg: "{{ verify_file.stdout_lines | select('search', '[a-zA-Z]') | last | trim }}"
 
-        - name: Display the MD5 hash 
-          debug:
-            msg: "{{ active_hash }}"
+        - name: Show remote md5 verify message
+          ansible.builtin.debug:
+            var: verify_result_msg
 
-        - name: Check if valid firmware exists on Standby (Native IOS Compare)
-          ansible.netcommon.cli_command:
-            # Passes the extracted hash directly to the switch for comparison
-            command: "verify /md5 slavebootflash:{{ firmware }} {{ active_hash }}"
-          vars:
-            ansible_command_timeout: 1800
-          register: initial_md5_standby
-          ignore_errors: true
+        - name: Isolate the remote MD5 message
+          ansible.builtin.set_fact:
+            remote_md5_hash: "{{ verify_result_msg | regex_search('[a-f0-9]{32}') }}"
 
-      when: inventory_hostname in groups['catalyst_4506es']
+        - name: Display the extracted values for debugging
+          ansible.builtin.debug:
+            msg: 
+              - "Local Hash: {{ local_md5_hash }}"
+              - "Remote Hash: {{ remote_md5_hash }}"
+              
+        - name: Compare the local and remote MD5 hashes
+          ansible.builtin.assert:
+            that:
+              - local_md5_hash == remote_md5_hash
+            fail_msg: "MD5 mismatch! The file on the device may be corrupted."
+            success_msg: "MD5 hash matches perfectly! Firmware intact."

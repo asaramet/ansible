@@ -11,8 +11,9 @@ parser view ANSIBLE_FIRMWARE
  ! Assign a dummy secret required to initialize the view
  secret <YOUR_SECRET_PASSWORD>
 
- ! 1. Allow all show commands
+ ! 1. Allow all show and verify commands
  commands exec include all show
+ commands exec include all verify
 
  ! 2. Allow file transfer, verification, and NVRAM saving
  commands exec include dir
@@ -30,7 +31,6 @@ commands exec include all install
 #commands exec include all issu
 #commands exec include all redundancy
 
-commands exec include all verify
 commands exec include configure terminal
 commands configure include no boot system
 commands exec include reload
