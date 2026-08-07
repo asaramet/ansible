@@ -14,7 +14,8 @@ ansible --version
 
 #HOSTS_GROUPS='procurve_access'
 #HOSTS_GROUPS='procurve_distri'
-HOSTS_GROUPS='procurve_core'
+#HOSTS_GROUPS='procurve_core'
+HOSTS_GROUPS='wc_2930f wc_2930m wc_2930f_distri wc_2930m_distri'
 
 for i in ${HOSTS_GROUPS}; do
 

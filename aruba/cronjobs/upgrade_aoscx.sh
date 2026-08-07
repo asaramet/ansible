@@ -13,7 +13,7 @@ cd /opt/ansible/inventories/aruba
 ansible --version
 
 #HOSTS_GROUPS='aruba_6100 aruba_6300 distri_aoscx_1 distri_aoscx_2'
-HOSTS_GROUPS='aruba_6300'
+HOSTS_GROUPS='rsgw5306p'
 
 for i in ${HOSTS_GROUPS}; do
 
