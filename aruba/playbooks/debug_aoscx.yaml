@@ -35,26 +35,11 @@
         success_msg: "Primary flash contains the correct target firmware."
       when: target_fw_ver not in active_ver
 
-    - name: Reboot process
+    - name: Reboot process conditions
       when: target_fw_ver not in active_ver
       block:
-        - name: Save running configuration to startup configuration
-          ansible.netcommon.cli_command:
-            command: "write memory"
-
-        - name: Reboot the switch to apply firmware
-          ansible.netcommon.cli_command:
-            command: "boot system primary allow-non-failsafe-updates"
-            check_all: true
-            prompt:
-              - "save the current configuration"
-              - "[Cc]ontinue"
-            answer:
-              - "n"  
-              - "y"
-          ignore_errors: true
-
-        - name: Wait for switch to reconnect
-          ansible.builtin.wait_for_connection:
-            delay: 60
-            timeout: 600
+        - name: Here we go!
+          debug:
+            msg: 
+              - "{{ active_ver }}"
+              - "{{ primary_ver }}"

@@ -1,57 +1,80 @@
----
-# Update firmware on Aruba CX switches.
-#
-# To run the playbook specify the hosts group
-# ansible-playbook update_firmware.yml -l aruba_6xxx
-#
 - name: Update firmware on Aruba OS-CX Switches
   hosts: aruba_aoscx
   gather_facts: false
   serial: 20
+
   tasks: 
-      - name: Save running configuration to startup configuration
-        arubanetworks.aoscx.aoscx_command:
-          commands: 
-            - "write memory"
+    - name: Set formatted target firmware string
+      ansible.builtin.set_fact:
+        target_fw_ver: "{{ firmware_version | replace('_', '.') }}"
 
-      - name: Backup current primary image to secondary partition
-        arubanetworks.aoscx.aoscx_command:
-          commands:
-            - command: "copy primary secondary"
-              prompt: "continue"
-              answer: "y"
-        vars: 
-          ansible_command_timeout: 60
+    - name: Get flash partition images
+      arubanetworks.aoscx.aoscx_command:
+        commands:
+          - "show images"
+      register: images_output
 
-      - name: Temporarily permit TFTP traffic in the ACL
-        arubanetworks.aoscx.aoscx_config:
-          lines: |
-            access-list ip SWITCH-ACCESS
-              permit udp {{ tftp_server }} any
+    - name: Extract partition versions and boot configuration
+      vars:
+        raw_output: "{{ images_output.stdout[0] }}"
+      ansible.builtin.set_fact:
+        primary_ver: "{{ raw_output | regex_search('AOS-CX Primary Image[\\s\\S]*?Version\\s*:\\s*(\\S+)', '\\1') | default([''], true) | first }}"
+        secondary_ver: "{{ raw_output | regex_search('AOS-CX Secondary Image[\\s\\S]*?Version\\s*:\\s*(\\S+)', '\\1') | default([''], true) | first }}"
+        default_image: "{{ raw_output | regex_search('Default Image\\s*:\\s*(\\S+)', '\\1') | default(['primary'], true) | first }}"
 
-      - name: Download new firmware from TFTP server to primary partition
-        arubanetworks.aoscx.aoscx_command:
-          commands:
-            - command: "{{ update_command }}"
-              prompt: "[Cc]ontinue"
-              answer: 
-                - "y"
-                - "y"
-        vars: 
-          ansible_command_timeout: 300
-        register: tftp_output
+    - name: Execute upgrade routine
+      when: 
+        - inventory_hostname in groups['aruba_aoscx']
+        - (target_fw_ver not in primary_ver) or (primary_ver != secondary_ver) or (default_image | lower != 'primary')
+      block:
+        - name: Save running configuration to startup configuration
+          arubanetworks.aoscx.aoscx_command:
+            commands: 
+              - "write memory"
 
-      - name: Debug TFTP Output
-        ansible.builtin.debug:
-          var: tftp_output.stdout_lines
-    
-      - name: Remove temporary TFTP permit rule from the ACL
-        arubanetworks.aoscx.aoscx_config:
-          lines: |
-            access-list ip SWITCH-ACCESS
-              no {{ acl_line_number }}
+        - name: Backup current primary image to secondary partition
+          when: primary_ver != secondary_ver
+          arubanetworks.aoscx.aoscx_command:
+            commands:
+              - command: "copy primary secondary"
+                prompt: "[Cc]ontinue"
+                answer: "y"
+          vars: 
+            ansible_command_timeout: 120
 
-      - name: Set boot partition to primary
-        arubanetworks.aoscx.aoscx_command:
-          commands:
-            - "boot set-default primary"
+        - name: Download and stage firmware to Primary partition
+          when: target_fw_ver not in primary_ver
+          block:
+            - name: Temporarily permit TFTP traffic in the ACL
+              arubanetworks.aoscx.aoscx_config:
+                lines: |
+                  access-list ip SWITCH-ACCESS
+                    permit udp {{ tftp_server }} any
+
+            - name: Download new firmware from TFTP server to primary partition
+              arubanetworks.aoscx.aoscx_command:
+                commands:
+                  - command: "{{ update_command }}"
+                    prompt: "[Cc]ontinue"
+                    answer: 
+                      - "y"
+                      - "y"
+              vars: 
+                ansible_command_timeout: 300
+              register: tftp_output
+
+            - name: Debug TFTP Output
+              ansible.builtin.debug:
+                var: tftp_output.stdout_lines
+          
+            - name: Remove temporary TFTP permit rule from the ACL
+              arubanetworks.aoscx.aoscx_config:
+                lines: |
+                  access-list ip SWITCH-ACCESS
+                    no {{ acl_line_number }}
+
+        - name: Ensure boot partition is set to primary
+          when: default_image | lower != 'primary'
+          arubanetworks.aoscx.aoscx_command:
+            commands:
+              - "boot set-default primary"
