@@ -1,0 +1,32 @@
+---
+# Run commands on Aruba AOS-CX Switches
+#
+# To run the playbook:
+#   ansible-playbook commands_aoscx.yaml -l <HOSTS>
+#
+- name: Run commands on Aruba OS-CX switches
+  hosts: "{{ target_hosts | default('aruba_aoscx') }}"
+  gather_facts: false
+  serial: 20       # parallel run on several hosts at a time
+  vars:
+    ansible_command_timeout: 120
+
+  tasks:
+      - name: Disable DHCP on VLAN 1
+        arubanetworks.aoscx.aoscx_config:
+          lines: |
+            interface vlan 1
+              no ip dhcp
+
+      - name: Save running configuration to startup configuration
+        ansible.netcommon.cli_command:
+          command: "write memory"
+
+      - name: Register vlan 1 configuration
+        ansible.netcommon.cli_command:
+          command: "show running-config interface vlan 1"
+        register: vlan_1
+
+      - name: Display vlan 1 configuration
+        ansible.builtin.debug:
+          var: vlan_1
