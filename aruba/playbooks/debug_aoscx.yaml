@@ -43,3 +43,22 @@
             msg: 
               - "{{ active_ver }}"
               - "{{ primary_ver }}"
+
+    - name: Check for non-failsafe hardware updates
+      ansible.netcommon.cli_command:
+        command: "show needed-updates"
+      register: updates_check
+
+    - name: Determine the safest boot command
+      ansible.builtin.set_fact:
+        boot_command: >-
+          {% if 'Non-failsafe device updates not enabled' in updates_check.stdout %}
+          boot system primary allow-non-failsafe-updates
+          {% else %}
+          boot system primary
+          {% endif %}
+        
+    - name: Show boot command
+      when: "'Non-failsafe device updates not enabled' in updates_check.stdout"
+      ansible.builtin.debug:
+        var: boot_command

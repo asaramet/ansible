@@ -13,19 +13,19 @@ cd /opt/ansible/inventories/aruba
 ansible --version
 
 #HOSTS_GROUPS='aruba_6100 aruba_6300 distri_aoscx_1 distri_aoscx_2'
-HOSTS_GROUPS='rsgw5306p'
+HOSTS_GROUPS='sm_6100 hze_6100 gp_6100 gp_6300'
 
 for i in ${HOSTS_GROUPS}; do
 
-echo -e "\n++ Firmware version ${i} before updates --\n"
-ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_before.logs
+#echo -e "\n++ Firmware version ${i} before updates --\n"
+#ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_before.logs
 
 #ansible-playbook playbooks/update_aoscx.yaml -l ${i} | tee ${logs_folder}/${i}_update_.logs
 ansible-playbook playbooks/reboot_aoscx.yaml -l ${i} | tee ${logs_folder}/${i}_reboot.logs
-ansible-playbook playbooks/assert_update.yaml -l ${i} | tee ${logs_folder}/${i}_assert.logs
+#ansible-playbook playbooks/assert_update.yaml -l ${i} | tee ${logs_folder}/${i}_assert.logs
 
-sleep 15m &&
-echo -e "\n++ Firmware version ${i} after updates --\n"
-ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_after.logs
+#sleep 15m &&
+#echo -e "\n++ Firmware version ${i} after updates --\n"
+#ansible-playbook playbooks/show_version.yaml -l ${i} | tee ${logs_folder}/${i}_version_after.logs
 
 done

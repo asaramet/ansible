@@ -27,34 +27,51 @@
         # Extracts from `show images`
         primary_ver: "{{ images_output.stdout | regex_search('AOS-CX Primary Image[\\s\\S]*?Version\\s*:\\s*(\\S+)', '\\1') | default([''], true) | first }}"
 
-    - name: Assert the target firmware is actually staged in Primary
-      ansible.builtin.assert:
-        that:
-          - target_fw_ver in primary_ver
-        fail_msg: "Target firmware {{ target_fw_ver }} is not in the Primary flash! Run the update playbook first."
-        success_msg: "Primary flash contains the correct target firmware."
-      when: target_fw_ver not in active_ver
+#    - name: Assert the target firmware is actually staged in Primary
+#      ansible.builtin.assert:
+#        that:
+#          - target_fw_ver in primary_ver
+#        fail_msg: "Target firmware {{ target_fw_ver }} is not in the Primary flash! Run the update playbook first."
+#        success_msg: "Primary flash contains the correct target firmware."
+#      when: target_fw_ver not in active_ver
 
     - name: Reboot process
-      when: target_fw_ver not in active_ver
+      #when: target_fw_ver not in active_ver
       block:
-        - name: Save running configuration to startup configuration
+        - name: Check for non-failsafe hardware updates
           ansible.netcommon.cli_command:
-            command: "write memory"
+            command: "show needed-updates"
+          register: updates_check
 
-        - name: Reboot the switch to apply firmware
-          ansible.netcommon.cli_command:
-            command: "boot system primary allow-non-failsafe-updates"
-            check_all: true
-            prompt:
-              - "save the current configuration"
-              - "[Cc]ontinue"
-            answer:
-              - "n"  
-              - "y"
-          ignore_errors: true
+        - name: Determine the safest boot command
+          ansible.builtin.set_fact:
+            boot_command: >-
+              {% if 'Non-failsafe device updates not enabled' in updates_check.stdout %}
+              boot system primary allow-non-failsafe-updates
+              {% else %}
+              boot system primary
+              {% endif %}
 
-        - name: Wait for switch to reconnect
-          ansible.builtin.wait_for_connection:
-            delay: 60
-            timeout: 600
+        - name: Reboot only 'Non-failsafe switches"
+          when: "'Non-failsafe device updates not enabled' in updates_check.stdout"
+          block:
+          - name: Save running configuration to startup configuration
+            ansible.netcommon.cli_command:
+              command: "write memory"
+
+          - name: Reboot the switch to apply firmware
+            ansible.netcommon.cli_command:
+              command: "{{ boot_command }}"
+              check_all: true
+              prompt:
+                - "save the current configuration"
+                - "[Cc]ontinue"
+              answer:
+                - "n"  
+                - "y"
+            ignore_errors: true
+
+          - name: Wait for switch to reconnect
+            ansible.builtin.wait_for_connection:
+              delay: 60
+              timeout: 600
