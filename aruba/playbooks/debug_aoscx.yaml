@@ -1,7 +1,7 @@
 - name: Reboot Aruba OS-CX switches
   hosts: "{{ target_hosts | default('aruba_aoscx') }}"
   gather_facts: false
-  serial: 20
+  #serial: 20
   vars:
     ansible_command_timeout: 120
 

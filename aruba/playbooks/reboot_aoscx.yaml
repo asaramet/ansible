@@ -27,16 +27,16 @@
         # Extracts from `show images`
         primary_ver: "{{ images_output.stdout | regex_search('AOS-CX Primary Image[\\s\\S]*?Version\\s*:\\s*(\\S+)', '\\1') | default([''], true) | first }}"
 
-#    - name: Assert the target firmware is actually staged in Primary
-#      ansible.builtin.assert:
-#        that:
-#          - target_fw_ver in primary_ver
-#        fail_msg: "Target firmware {{ target_fw_ver }} is not in the Primary flash! Run the update playbook first."
-#        success_msg: "Primary flash contains the correct target firmware."
-#      when: target_fw_ver not in active_ver
+    - name: Assert the target firmware is actually staged in Primary
+      ansible.builtin.assert:
+        that:
+          - target_fw_ver in primary_ver
+        fail_msg: "Target firmware {{ target_fw_ver }} is not in the Primary flash! Run the update playbook first."
+        success_msg: "Primary flash contains the correct target firmware."
+      when: target_fw_ver not in active_ver
 
     - name: Reboot process
-      #when: target_fw_ver not in active_ver
+      when: target_fw_ver not in active_ver
       block:
         - name: Check for non-failsafe hardware updates
           ansible.netcommon.cli_command:
@@ -52,8 +52,8 @@
               boot system primary
               {% endif %}
 
-        - name: Reboot only 'Non-failsafe switches"
-          when: "'Non-failsafe device updates not enabled' in updates_check.stdout"
+        - name: Reboot switches
+          #when: "'Non-failsafe device updates not enabled' in updates_check.stdout"
           block:
           - name: Save running configuration to startup configuration
             ansible.netcommon.cli_command:
