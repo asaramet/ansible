@@ -7,3 +7,4 @@ host_vars/rhlx99/
 pynetbox/temp
 cronjobs/logs/
 temp/
+ai.*
