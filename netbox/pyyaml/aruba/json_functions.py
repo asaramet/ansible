@@ -769,8 +769,8 @@ if __name__ == "__main__":
         #"procurve_single",
         #"procurve-modular",
 
-        #"aruba_6100",
-        #"aruba_6300",
+        "aruba_6100",
+        "aruba_6300",
     ]
 
     from std_functions import project_dir
