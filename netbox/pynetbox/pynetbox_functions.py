@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 
 '''
-Project specific functions for pynetbox based apps
+Project specific functions for pynetbox based apps.
+
+Run it with `pytest` tool:
+
+$ pytest _get_device.py -v
 '''
 
 import pynetbox, yaml, logging, argparse
@@ -31,24 +35,31 @@ def load_yaml(file_path: Path) -> dict:
     with yaml_file.open('r') as f:
         return yaml.safe_load(f)
 
-def _get_device(nb_session: NetBoxApi, name: str) -> Devices:
+def _get_device(nb_session: NetBoxApi, name: str) -> Devices | None:
     """
     Get an existing device object from an active NetBox session
+
     Args:
         nb_session: pynetbox API session
         name: device hostname (str)
+
     Return:
-        Device object
+        Device object if found, None otherwise
     """
-    d_obj = None
+    if not name:
+        logger.warning("Empty device name provided")
+        return None
     try:
         d_obj = nb_session.dcim.devices.get(name = name)
         if not d_obj: 
             logger.warning(f"Device {name} not found in NetBox")
+        return d_obj 
+    except ValueError:
+        logger.error(f"Multiple device with the same name '{name}' found. Expected 1", exc_info = True)
+        return None
     except Exception as e:
-        logger.error(f"Error retrieving device {d_name}: {e}", exc_info = True)
-
-    return d_obj
+        logger.error(f"Error retrieving device {name}: {e}", exc_info = True)
+        return None
 
 def _extract_stack_number(device_name: str, data: dict[str, str]) -> str:
     """

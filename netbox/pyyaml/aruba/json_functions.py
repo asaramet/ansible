@@ -761,7 +761,7 @@ if __name__ == "__main__":
         #"aruba-12-ports",
         #"aruba-48-ports",
         #"hpe_8_ports",
-        "aruba_stack",
+        #"aruba_stack",
         #"aruba-stack-2920",
         #"aruba-stack-2930",
         #"aruba_modular",
@@ -781,8 +781,8 @@ if __name__ == "__main__":
 
 
         #debug_locations_json(data_folder)
-        debug_devices_json(data_folder)
-        #debug_device_interfaces_json(data_folder)
+        #debug_devices_json(data_folder)
+        debug_device_interfaces_json(data_folder)
         #debug_lags_json(data_folder)
 
         #debug_vlans_json(data_folder)
