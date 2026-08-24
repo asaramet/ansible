@@ -75,7 +75,7 @@ def recursive_section_search(text, section, value):
         # Value found inside section
         if current_section and stripped.startswith(value):
             _, val = stripped.split(' ', 1)
-            results.append((current_section, val.strip('"')))
+            results.append((current_section.split("multi-chassis")[0].strip(), val.strip('"')))
             continue
 
         # End of a section

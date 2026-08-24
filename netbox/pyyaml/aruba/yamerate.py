@@ -120,9 +120,10 @@ def main():
         "aruba_48_ports": ("switch", single),
         "aruba_8_ports": ("switch", single),
         "aruba_12_ports": ("switch", single),
-        "aruba_6100": ("switch", single),
+        "aruba_6100": (["switch", "stack"], single),
         "aruba_stack": (["switch", "stack"], single),
         "aruba_6300": (["switch", "stack"], single),
+        "aruba_8320": ("switch", single),
 
         # Modular switches
         "procurve_modular": (["switch", "modular-switch"], modular),
@@ -173,7 +174,7 @@ def debug_dicts(d_folder):
         devices_json(files, device_type_slags, ["switch"]),
         #modules_json(files),
         #lags_json(files),
-        #device_interfaces_json(files),
+        device_interfaces_json(files),
         #vlans_json(files),
         #tagged_vlans_json(files),
         #ip_addresses_json(files)
@@ -186,7 +187,7 @@ def debug_dicts(d_folder):
 
 def debug_multiple():
     data_folders = [
-        "aruba-8-ports",
+        #"aruba-8-ports",
         #"aruba-12-ports",
         #"aruba-48-ports",
         #"hpe-8-ports",
@@ -198,8 +199,9 @@ def debug_multiple():
         #"procurve-single",
         #"procurve-modular",
 
-        "aruba_6100",
-        "aruba_6300",
+        #"aruba_6100",
+        #"aruba_6300",
+        "aruba_8320"
     ]
 
     for folder in data_folders:

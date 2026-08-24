@@ -74,6 +74,8 @@ device_type_slags = {
     'JL658A_stack': 'hpe-aruba-6300m-24sfpp-4sfp56',
     'JL659A': 'hpe-aruba-6300m-48sr5-poe6-4sfp56',
     'JL659A_stack': 'hpe-aruba-6300m-48sr5-poe6-4sfp56',
+    'JL579A': 'hpe-aruba-8320-32q',
+    'JL579A_stack': 'hpe-aruba-8320-32q'
 }
 
 # --- Base functions ---
@@ -189,7 +191,7 @@ def convert_range(range_str):
 
         # Ensure the prefixes are the same
         if prefix_start != prefix_end:
-            raise ValueError("Prefixes do not match")
+            raise ValueError(f"Prefixes do not match")
 
         start = _RANGE_DIGIT_RE.search(start).group()
         end = _RANGE_DIGIT_RE.search(end).group()
@@ -1319,6 +1321,12 @@ def debug_get_untagged_vlans(data_folder):
         print(f.name, '---> ', get_untagged_vlans(f))
     print('\n')
 
+def debug_get_tagged_vlans(data_folder):
+    print("\n== Collect interfaces ranges for tagged vlans ==")
+    for f in config_files(data_folder):
+        print(f.name, '---> ', get_tagged_vlans(f))
+    print('\n')
+
 def debug_get_modules(data_folder):
     table = []
     headers = ["File Name", "Modules"]
@@ -1366,7 +1374,7 @@ if __name__ == "__main__":
     data_folders = [
         #"aruba-8-ports",
         #"aruba-12-ports",
-         "aruba-stack-2920",
+        #"aruba_stack_2920",
         #"aruba-48-ports",
         #"hpe-8-ports",
         #"hpe-24-ports",
@@ -1377,7 +1385,8 @@ if __name__ == "__main__":
         #"procurve-single",
         #"procurve-modular",
         #"aruba_6100",
-        #"aruba_6300"
+        "aruba_6300",
+        "aruba_8320"
     ]
 
     for folder in data_folders:
@@ -1395,6 +1404,7 @@ if __name__ == "__main__":
         debug_get_interface_names(configs_folder)
         debug_get_vlans(configs_folder)
         debug_get_untagged_vlans(configs_folder)
+        debug_get_tagged_vlans(configs_folder)
         debug_device_type(configs_folder)
         debug_get_modules(configs_folder)
         debug_get_location(configs_folder)

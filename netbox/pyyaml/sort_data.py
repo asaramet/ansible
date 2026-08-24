@@ -64,6 +64,7 @@ hw_folders = {
     'J9086A': 'procurve_single',
     'J9089A': 'procurve_single',
 
+    'JL579A': 'aruba_8320',
     'JL679A': 'aruba_6100',
     'JL658A': 'aruba_6300',
     'JL659A': 'aruba_6300',
@@ -71,6 +72,9 @@ hw_folders = {
     'CISCO': 'cisco'
 
 }
+
+# Vendor folders that contain switch subdirectories
+vendor_folders = ['aruba_6100', 'aruba_6300', 'aruba_8320']
 
 def move_file_and_cleanup(source_file, dest_file):
     """
@@ -108,7 +112,6 @@ def process_switch_directory(switch_dir, dest_path, results, final_dest_path=Non
         final_dest_path: Final destination for vendor folders (data folder)
     """
     # Check if this is a vendor folder containing subdirectories
-    vendor_folders = ['aruba_6100', 'aruba_6300']
 
     if switch_dir.name in vendor_folders:
         # Vendor folders go directly to their final destination, not raw
@@ -224,9 +227,6 @@ def extract_running_configs(source_path, dest_path, final_dest_path=None):
 
     # Folders prefixes for direct switch directories
     switch_prefixes = ['rs', 'rg', 'rh', 'rw']
-    # Vendor folders that contain switch subdirectories
-    vendor_folders = ['aruba_6100', 'aruba_6300']
-
     try:
         for item in source_path.iterdir():
             if not item.is_dir():
@@ -322,6 +322,7 @@ def get_switch_type(config_file):
             folder_to_type = {
                 'aruba_6100': 'JL679A',  # Aruba 6100-12G-POE4-2SFP+
                 'aruba_6300': 'JL658A',  # Aruba 6300M-24SFP+-4SFP56 (default, could also be JL659A for 48-port)
+                'aruba_8320': 'JL579A'
             }
             if parent_folder in folder_to_type:
                 return folder_to_type[parent_folder]
@@ -460,8 +461,9 @@ def debug():
     #debug_configs_dir = Path(data_folder) / 'procurve_single'
     #debug_configs_dir = Path(data_folder) / 'procurve_modular'
 
-    debug_configs_dir = Path(data_folder) / 'aruba_6100'
-    #debug_configs_dir = Path(data_folder) / 'aruba_6300'
+    #debug_configs_dir = Path(data_folder) / 'aruba_6100'
+    debug_configs_dir = Path(data_folder) / 'aruba_6300'
+    debug_configs_dir = Path(data_folder) / 'aruba_8320'
 
     config_files = get_files(debug_configs_dir)
     debug_get_switch_type(config_files)

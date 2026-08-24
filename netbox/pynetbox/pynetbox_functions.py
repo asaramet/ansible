@@ -844,6 +844,7 @@ def _main(description: str, function: callable, **kwargs) -> None:
 
         "aruba_6100.yaml",
         "aruba_6300.yaml", 
+        "aruba_8320.yaml",
         
         "cisco.yaml"
     ]
@@ -894,9 +895,10 @@ def _debug(function: callable, data_dict = None, **kwargs) -> None:
     files_yaml = [
         #"procurve_modular.yaml",
         #"procurve_single.yaml",
-        "hpe_8_ports.yaml",
+        #"hpe_8_ports.yaml",
         #"aruba_8_ports.yaml",
-        #"aruba_6100.yaml"
+        #"aruba_6100.yaml",
+        "aruba_8320.yaml"
     ]
 
     for file_name in files_yaml:
