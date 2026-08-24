@@ -691,8 +691,9 @@ def get_trunk_vlans(config_file):
                     trunk_match = re.match(r'^\s+switchport\s+trunk\s+allowed\s+vlan\s+(?:add\s+)?(.+)', line)
                     if trunk_match:
                         vlan_list = trunk_match.group(1).strip()
-                        vlans = parse_vlan_list(vlan_list)
-                        trunk_vlans[current_interface].update(vlans)
+                        if vlan_list != "none":
+                            vlans = parse_vlan_list(vlan_list)
+                            trunk_vlans[current_interface].update(vlans)
                         logger.debug(f"Found trunk VLANs on {current_interface}: {len(vlans)} VLANs")
 
         # Remove interfaces with no trunk VLANs
@@ -928,4 +929,4 @@ if __name__ == "__main__":
     from functions import _debug
 
     #_debug(ip_addresses_json, data_folder)
-    _debug(vlans_json, data_folder)
+    _debug(tagged_vlans_json, data_folder)
