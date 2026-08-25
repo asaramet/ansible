@@ -929,5 +929,5 @@ def _set_primary_ips_on_devices(
 
 
 if __name__ == '__main__':
-    from pynetbox_functions import _main
+    from pynetbox_functions import _main, _debug
     _main("Update devices IPs in NetBox", ips)

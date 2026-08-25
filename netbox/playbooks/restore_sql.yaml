@@ -1,6 +1,8 @@
 ---
 # Restore the NetBoxes Postgres database 
-#
+
+# It restores the NetBox data, which is backed up with backup_sql.yaml playbook
+
 # RUN
 # - development server
 #   ansible-playbook playbooks/restore_sql.yaml -e dump_file=netbox-2026-04-02.sql.gz
