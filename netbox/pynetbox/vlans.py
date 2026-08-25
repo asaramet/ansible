@@ -71,12 +71,13 @@ def vlans(nb_session: NetBoxApi, data: Dict[str, List[str]]) -> None:
         return
 
     logger.info(f"Creating {len(vlans_to_create)} new VLAN(s)...")
-    created = _bulk_create(nb_session.ipam.vlans, vlans_to_create, "VLAN")
-    logger.info(f"Successfully created {len(created)} VLANs")
+    logger.debug(f"VLANs to create: {vlans_to_create}")
+    #created = _bulk_create(nb_session.ipam.vlans, vlans_to_create, "VLAN")
+    #logger.info(f"Successfully created {len(created)} VLANs")
 
 if __name__ == '__main__':
     from pynetbox_functions import _main, _debug
 
-    _main("Synchronizing VLANs", vlans)
+    #_main("Synchronizing VLANs", vlans)
 
-    #_debug(vlans)
+    _debug(vlans)

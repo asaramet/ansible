@@ -792,4 +792,5 @@ if __name__ == "__main__":
     if data_path.exists():
         for file_path in sorted(data_path.iterdir()):
             if file_path.is_file():
-                _debug(get_hostname_and_stack, file_path)
+                #_debug(get_hostname_and_stack, file_path)
+                _debug(get_vlans, file_path)

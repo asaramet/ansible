@@ -893,12 +893,28 @@ def _debug(function: callable, data_dict = None, **kwargs) -> None:
     nb.http_session.verify = False # Disable SSL verification
 
     files_yaml = [
-        #"procurve_modular.yaml",
-        #"procurve_single.yaml",
-        #"hpe_8_ports.yaml",
-        #"aruba_8_ports.yaml",
-        #"aruba_6100.yaml",
-        "aruba_8320.yaml"
+        "procurve_single.yaml",
+        "procurve_modular.yaml",
+
+        "hpe_8_ports.yaml",
+        "hpe_24_ports.yaml",
+
+        "aruba_8_ports.yaml",
+        "aruba_12_ports.yaml",
+        "aruba_48_ports.yaml",
+
+        "aruba_stack.yaml",
+        "aruba_stack_2920.yaml",
+        "aruba_stack_2930.yaml",
+
+        "aruba_modular.yaml",
+        "aruba_modular_stack.yaml",
+
+        "aruba_6100.yaml",
+        "aruba_6300.yaml", 
+        "aruba_8320.yaml",
+        
+        "cisco.yaml"
     ]
 
     for file_name in files_yaml:

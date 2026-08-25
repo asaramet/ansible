@@ -677,7 +677,15 @@ def get_vlans(t_file):
 
     vlans = set(recursive_section_search(text, 'vlan', 'name '))
     vlans.add(('1', 'DEFAULT_VLAN'))
-    return vlans
+
+    # Remove empty VLANS
+    normalized_vlans = set()
+    for v_set in vlans:
+        if 'VLAN' in v_set[1]:
+            continue
+        normalized_vlans.add(v_set)
+
+    return normalized_vlans
 
 def get_untagged_vlans(t_file):
     """
@@ -1383,10 +1391,10 @@ if __name__ == "__main__":
         #"aruba-modular",
         #"aruba-modular-stack",
         #"procurve-single",
-        #"procurve-modular",
+        "procurve_modular",
         #"aruba_6100",
-        "aruba_6300",
-        "aruba_8320"
+        #"aruba_6300",
+        #"aruba_8320"
     ]
 
     for folder in data_folders:
@@ -1395,22 +1403,22 @@ if __name__ == "__main__":
         print(configs_folder)
 
         print("\n Folder: ", configs_folder)
-        debug_get_hostname(configs_folder)
-        debug_site_slug(configs_folder)
-        debug_config_files(configs_folder)
-        debug_get_os_version(configs_folder)
-        debug_site_slug(configs_folder)
-        debug_get_lags(configs_folder)
-        debug_get_interface_names(configs_folder)
+#        debug_get_hostname(configs_folder)
+#        debug_site_slug(configs_folder)
+#        debug_config_files(configs_folder)
+#        debug_get_os_version(configs_folder)
+#        debug_site_slug(configs_folder)
+#        debug_get_lags(configs_folder)
+#        debug_get_interface_names(configs_folder)
         debug_get_vlans(configs_folder)
-        debug_get_untagged_vlans(configs_folder)
-        debug_get_tagged_vlans(configs_folder)
-        debug_device_type(configs_folder)
-        debug_get_modules(configs_folder)
-        debug_get_location(configs_folder)
-        debug_floor_slug(configs_folder)
-        debug_room_slug(configs_folder)
+#        debug_get_untagged_vlans(configs_folder)
+#        debug_get_tagged_vlans(configs_folder)
+#        debug_device_type(configs_folder)
+#        debug_get_modules(configs_folder)
+#        debug_get_location(configs_folder)
+#        debug_floor_slug(configs_folder)
+#        debug_room_slug(configs_folder)
 
     print("\n=== No files functions ===")
-    debug_convert_range()
-    debug_convert_interfaces_range()
+    #debug_convert_range()
+    #debug_convert_interfaces_range()
