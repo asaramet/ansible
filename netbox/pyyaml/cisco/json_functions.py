@@ -6,7 +6,8 @@ import logging
 import re
 from pathlib import Path
 from std_functions import data_folder
-from std_functions import get_hostname_and_stack, get_device_type, get_modules, get_lags, get_vlans, get_interfaces, get_ip_addresses
+from std_functions import get_hostname_and_stack, get_device_type, get_modules, get_lags
+from std_functions import get_vlans, get_interfaces, get_ip_addresses
 from std_functions import interface_type_mapping
 
 import sys, os
@@ -843,7 +844,8 @@ def ip_addresses_json(data_folder):
                     'name': 'Vlan802',
                     'vlan': True,
                     'vlan_id': '802',
-                    'vlan_name': 'RZ-NAS-VIR'
+                    'vlan_name': 'RZ-NAS-VIR',
+                    'status': 'Active'
                 },
                 {
                     'hostname': 'rscs0003-1',
@@ -851,7 +853,8 @@ def ip_addresses_json(data_folder):
                     'name': 'Loopback0',
                     'vlan': False,
                     'vlan_id': None,
-                    'vlan_name': None
+                    'vlan_name': None,
+                    'status': 'Deprecated'
                 }
             ]
         }
@@ -919,7 +922,8 @@ def ip_addresses_json(data_folder):
                 'name': interface_name,
                 'vlan': is_vlan_interface,
                 'vlan_id': vlan_id,
-                'vlan_name': vlan_name
+                'vlan_name': vlan_name,
+                'status': "reserved"             # NB: Get device status from DB
             })
 
     logger.debug(f"Extracted {len(data['ip_addresses'])} IP addresses from {data_folder}")
@@ -928,5 +932,5 @@ def ip_addresses_json(data_folder):
 if __name__ == "__main__":
     from functions import _debug
 
-    #_debug(ip_addresses_json, data_folder)
-    _debug(tagged_vlans_json, data_folder)
+    _debug(ip_addresses_json, data_folder)
+    #_debug(tagged_vlans_json, data_folder)

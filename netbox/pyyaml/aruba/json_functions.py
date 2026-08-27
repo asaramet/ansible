@@ -598,6 +598,7 @@ def ip_addresses_json(config_files):
               - vlan_name: VLAN name
               - vlan: Boolean indicating if this is a VLAN interface
               - name: Interface name (e.g., 'vlan 10' or 'mgmt')
+              - status: IP status (e.g, 'Active', 'Deprecated')
 
     Example:
         {'ip_addresses': [
@@ -612,7 +613,7 @@ def ip_addresses_json(config_files):
     for t_file in config_files:
         hostnames = get_hostname(t_file)
         hostname = hostnames['0'] if '0' in hostnames else hostnames['1']
-        vlan_id, vlan_name, ip = get_ip_address(t_file)
+        vlan_id, vlan_name, ip, status = get_ip_address(t_file)
 
         is_vlan = False
         name = None
@@ -631,7 +632,8 @@ def ip_addresses_json(config_files):
             'vlan_id': vlan_id,
             'vlan_name': vlan_name,
             'vlan': is_vlan,
-            'name': name
+            'name': name,
+            'status': status
         })
 
     return data
@@ -785,11 +787,11 @@ if __name__ == "__main__":
         #debug_device_interfaces_json(data_folder)
         #debug_lags_json(data_folder)
 
-        debug_vlans_json(data_folder)
+        #debug_vlans_json(data_folder)
         #debug_untagged_vlans(data_folder)
         #debug_tagged_vlans_json(data_folder)
 
 
-        #debug_ip_addresses_json(data_folder)
+        debug_ip_addresses_json(data_folder)
 
         #debug_modules_json(data_folder)

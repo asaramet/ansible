@@ -116,6 +116,19 @@ def extract_ip_from_aruba_vlan(text):
         return vlan_id, f'{ip}/{prefix}'
     return None
 
+
+inactive_devices = serial_numbers(inactive_only = True)
+def get_device_status(text):
+
+    for line in text:
+        if line.startswith('hostname'): 
+            hostname = line.split()[1].strip().strip('"')
+            break
+
+    if hostname in inactive_devices or f"{hostname}-1" in inactive_devices:
+        return "deprecated"
+    return "active"
+
 def get_ip_address(t_file):
     with open(t_file, "r") as f:
         text = f.readlines()
@@ -124,7 +137,7 @@ def get_ip_address(t_file):
     mgmt_ip = extract_ip_from_mgmt(text)
     if mgmt_ip:
         # Return 'mgmt' as a special marker for vlan_id to indicate management interface
-        return 'mgmt', None, mgmt_ip
+        return 'mgmt', None, mgmt_ip, get_device_status(text)
 
     # Try AOS_CX VLAN interfaces
     vlan_info = extract_ip_from_aoscx_vlan(text)
@@ -134,7 +147,7 @@ def get_ip_address(t_file):
     vlan_id, ip = vlan_info
     vlan_name = get_vlans_names(t_file).get(vlan_id, "UNKNOWN")
 
-    return vlan_id, vlan_name, ip
+    return vlan_id, vlan_name, ip, get_device_status(text)
 
 def get_device_role(t_file, hostname):
     role_code = hostname[2:4]
@@ -147,7 +160,7 @@ def get_device_role(t_file, hostname):
     if hostname[-1] == "s":
         return "distribution-layer-switch"
 
-    vlan_id, _, _ =  get_ip_address(t_file)
+    vlan_id, _, _, _ =  get_ip_address(t_file)
 
     if vlan_id in ["102", "202", "302"]:
         return "bueroswitch"
@@ -191,4 +204,38 @@ if __name__ == "__main__":
     #_debug(serial_numbers_yaml)
     #_debug(serial_numbers, 'inventory_number')
     #_debug(serial_numbers, 'inventory_number')
-    _debug(serial_numbers, inactive_only = True)
+    #_debug(serial_numbers, inactive_only = True)
+    #_debug(serial_numbers, inactive_only = True)
+
+    data_folders = [
+#        "procurve_single",
+#        "procurve_modular",
+
+#        "hpe_8_ports",
+#        "hpe_24_ports",
+
+#        "aruba_8_ports",
+#        "aruba_12_ports",
+#        "aruba_48_ports",
+
+#        "aruba_stack",
+#        "aruba_stack_2920",
+#        "aruba_stack_2930",
+
+#        "aruba_modular",
+#        "aruba_modular_stack",
+
+        "aruba_6100",
+        "aruba_6300", 
+#        "aruba_8320"
+    ]
+
+
+    data_dir = project_dir.joinpath("data")
+
+    for data_folder in data_folders:
+        folder = data_dir.joinpath(data_folder)
+        for f in folder.iterdir(): 
+            if f.is_file():
+                print(f)
+                _debug(get_ip_address, f)

@@ -857,7 +857,7 @@ def _main(description: str, function: callable, **kwargs) -> None:
         # Call the passed function, with additional arguments
         function(nb, data, **kwargs)
 
-def _debug(function: callable, data_dict = None, **kwargs) -> None:
+def _debug(function: callable, data_dict = None, data_list = None, **kwargs) -> None:
     """
     Debug NetBox API function with custom session
     Args:
@@ -923,5 +923,8 @@ def _debug(function: callable, data_dict = None, **kwargs) -> None:
 
         if data_dict:
             data = data.get(data_dict, [])
+
+        if data_list:
+            data = data_list
 
         logger.debug(function(nb, data, **kwargs))

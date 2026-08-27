@@ -524,6 +524,7 @@ def _process_existing_ip(
     """
     ip_address = spec['address']
     hostname = spec['hostname']
+    status = spec['status']
     update_payload = {'id': existing_ip.id}
     needs_update = False
     
@@ -686,8 +687,8 @@ def _build_audit_trail(existing_description: str, old_device_info: dict) -> str:
         f"status: {old_device_info['status']}) until {current_date}"
     )
     
-    if existing_description:
-        return f"{existing_description}\n{audit_note}"
+#    if existing_description:
+#        return f"{existing_description}\n{audit_note}"
     return audit_note
 
 
@@ -723,6 +724,7 @@ def _process_ip_addresses(
         ip_address = spec['address']
         hostname = spec['hostname']
         interface_name = spec['interface_name']
+        status = spec['status']
         
         # Get interface
         interface = interface_map.get((hostname, interface_name))
@@ -930,4 +932,6 @@ def _set_primary_ips_on_devices(
 
 if __name__ == '__main__':
     from pynetbox_functions import _main, _debug
-    _main("Update devices IPs in NetBox", ips)
+    #_main("Update devices IPs in NetBox", ips)
+    #_debug(ips)
+    _debug(_get_existing_ip_addresses, data_list = ['192.168.106.42', '134.108.95.13'])
