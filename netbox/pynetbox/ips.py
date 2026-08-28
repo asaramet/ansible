@@ -7,10 +7,12 @@ Handles creation of VLAN interfaces and IP address assignment for switches
 '''
 
 import logging
-from typing import Optional, Tuple, Union
+import concurrent.futures
+from typing import Optional, Tuple, Union, Any
 
 from pynetbox.core.api import Api as NetBoxApi
 from pynetbox.core.endpoint import Endpoint
+
 
 # Import helper functions from pynetbox_functions
 from pynetbox_functions import (
@@ -18,12 +20,13 @@ from pynetbox_functions import (
     _resolve_or_create,
     _bulk_create,
     _bulk_update,
+    _delete_netbox_obj,
     _extract_identifier,
-    _extract_error_detail
+    _extract_error_detail,
+    _fetch_netbox_objects
 )
 
 logger = logging.getLogger(__name__)
-
 
 def ips(nb_session: NetBoxApi, data: dict) -> bool:
     """
@@ -252,6 +255,7 @@ def _prepare_interface_and_ip_data(
         ip_address = entry.get('ip')
         interface_name = entry.get('name')
         vlan_id = entry.get('vlan_id')
+        status = entry.get('status')
         
         if not hostname or not ip_address or not interface_name:
             logger.warning(f"Skipping incomplete entry: {entry}")
@@ -279,7 +283,7 @@ def _prepare_interface_and_ip_data(
             'interface_name': interface_name,
             'tenant': tenant_id,
             'role': role_id,
-            'status': 'active',
+            'status': status,
             'vlan_id': vlan_id,
         }
         ip_specs.append(ip_spec)
@@ -611,7 +615,6 @@ def _create_new_ip(spec: dict, interface: object) -> dict:
     
     return payload
 
-
 def _compare_ip_attributes(
     existing_ip: object,
     spec: dict,
@@ -619,54 +622,51 @@ def _compare_ip_attributes(
 ) -> bool:
     """
     Compare IP attributes and add updates to payload if needed.
-    
-    Args:
-        existing_ip: Existing IP object from NetBox
-        spec: Specification dict with desired values
-        update_payload: dict to add updates to
-    
-    Returns:
-        True if any updates were added
     """
     needs_update = False
     
-    # Check tenant
-    if spec['tenant']:
-        current_tenant = existing_ip.tenant
-        if current_tenant:
-            current_value = current_tenant.id if hasattr(current_tenant, 'id') else str(current_tenant)
-        else:
-            current_value = None
+    # --- 1. TENANT (Relational Field) ---
+    # If spec['tenant'] is a string name/slug, this will STILL FAIL when sent to the API.
+    if 'tenant' in spec and spec['tenant']:
+        current_tenant_id = existing_ip.tenant.id if existing_ip.tenant else None
         
-        if current_value != spec['tenant']:
-            update_payload['tenant'] = spec['tenant']
-            needs_update = True
-    
-    # Check role
-    if spec['role']:
-        current_role = existing_ip.role
-        if current_role:
-            if hasattr(current_role, 'id'):
-                current_value = current_role.id
-            elif hasattr(current_role, 'value'):
-                current_value = current_role.value
-            else:
-                current_value = str(current_role)
-        else:
-            current_value = None
+        # Coerce to int for a safe comparison, assuming spec['tenant'] is numeric
+        try:
+            target_tenant_id = int(spec['tenant'])
+            if current_tenant_id != target_tenant_id:
+                update_payload['tenant'] = target_tenant_id
+                needs_update = True
+        except ValueError:
+            logger.error(f"Tenant in spec must be an integer ID, got: {spec['tenant']}")
+            
+    # --- 2. ROLE (Choice Field) ---
+    if 'role' in spec and spec['role']:
+        current_role = existing_ip.role.value if existing_ip.role else None
         
-        if current_value != spec['role']:
-            update_payload['role'] = spec['role']
+        # Force both to lowercase strings for safe comparison
+        target_role = str(spec['role']).lower()
+        current_role_str = str(current_role).lower() if current_role else None
+        
+        if current_role_str != target_role:
+            update_payload['role'] = target_role
             needs_update = True
-    
-    # Check status
-    current_status = existing_ip.status.value if hasattr(existing_ip.status, 'value') else str(existing_ip.status)
-    if current_status != spec['status']:
-        update_payload['status'] = spec['status']
-        needs_update = True
+            
+    # --- 3. STATUS (Choice Field) ---
+    if 'status' in spec and spec['status']:
+        current_status = existing_ip.status.value if existing_ip.status else None
+        
+        target_status = str(spec['status']).lower()
+        current_status_str = str(current_status).lower() if current_status else None
+        
+        if current_status_str != target_status:
+            logger.info(
+                f"{spec['address']} needs to update status: "
+                f"{current_status_str} to {target_status}"
+            )
+            update_payload['status'] = target_status
+            needs_update = True
     
     return needs_update
-
 
 def _build_audit_trail(existing_description: str, old_device_info: dict) -> str:
     """
@@ -691,123 +691,160 @@ def _build_audit_trail(existing_description: str, old_device_info: dict) -> str:
 #        return f"{existing_description}\n{audit_note}"
     return audit_note
 
+from collections import defaultdict
+from typing import Tuple, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 def _process_ip_addresses(
-    nb_session: NetBoxApi,
+    nb_session: Any,
     ip_specs: list[dict],
     interface_map: dict[Tuple[str, str], object]
 ) -> bool:
     """
-    Process IP addresses: create if missing, assign to interfaces, handle updates.
-    
-    Args:
-        nb_session: pynetbox API session
-        ip_specs: list of IP address specifications
-        interface_map: dictionary mapping (hostname, interface_name) to interface object
-    
-    Returns:
-        True if successful, False if errors occurred
+    Process IP addresses: clean up conflicts, create if missing, handle updates.
     """
     logger.info("Processing IP addresses...")
     
-    # Collect all IP addresses to check
-    ip_addresses_to_check = [spec['address'] for spec in ip_specs]
-    
-    # Query existing IP addresses
+    # 1. Group specs by IP address to find duplicates in the source YAML/dict
+    specs_by_ip = defaultdict(list)
+    for spec in ip_specs:
+        specs_by_ip[spec['address']].append(spec)
+
+    filtered_specs = []
+    ips_to_hard_reset = set()
+
+    # 2. Identify conflicts (same IP, one active, one deprecated)
+    for ip, specs in specs_by_ip.items():
+        if len(specs) > 1:
+            statuses = [str(s.get('status', '')).lower() for s in specs]
+            if 'deprecated' in statuses and 'active' in statuses:
+                logger.info(f"Conflict found for {ip}: moving from deprecated device to active. Flagging for hard reset.")
+                ips_to_hard_reset.add(ip)
+                # Keep ONLY the active spec(s) going forward do not try to create the deprecated one
+                filtered_specs.extend([s for s in specs if str(s.get('status', '')).lower() != 'deprecated'])
+            else:
+                filtered_specs.extend(specs)
+        else:
+            filtered_specs.extend(specs)
+            
+    # Replace the original list with the cleaned up list
+    ip_specs = filtered_specs
+
+    # 3. Query existing IP addresses
+    ip_addresses_to_check = list(set(spec['address'] for spec in ip_specs))
     existing_ips = _get_existing_ip_addresses(nb_session, ip_addresses_to_check)
     
-    # Separate into create and update lists
+    # 4. Perform the hard reset (Delete the old IPs)
+    ips_to_delete = []
+    for ip in ips_to_hard_reset:
+        if ip in existing_ips:
+            ips_to_delete.append(existing_ips[ip])
+            # REMOVE it from the dictionary so the script thinks it doesn't exist 
+            # and routes it to the ips_to_create list below!
+            del existing_ips[ip]
+            
+    if ips_to_delete:
+        logger.info(f"Deleting {len(ips_to_delete)} conflicting IPs from NetBox before recreation...")
+        for ip_obj in ips_to_delete:
+            delete_success = _delete_netbox_obj(ip_obj)
+
+            # Check the return function
+            if not delete_success:
+                logger.error(
+                    f"Failed to delete conflicting IP {ip_obj.address}. "
+                    "Aborting to prevent duplicate IP creation errors."
+                )
+                # Stop the function, not to recreate an IP that still exists
+                return False
+
+    # 5. Separate into create and update lists
     ips_to_create = []
     ips_to_update = []
+    processed_ips = set()
     
     for spec in ip_specs:
         ip_address = spec['address']
         hostname = spec['hostname']
         interface_name = spec['interface_name']
-        status = spec['status']
         
-        # Get interface
-        interface = interface_map.get((hostname, interface_name))
-        if not interface:
-            logger.warning(
-                f"Interface '{interface_name}' on '{hostname}' not found, "
-                f"skipping IP {ip_address}"
-            )
+        # Guardrail: Prevent duplicate entries in the bulk payloads
+        if ip_address in processed_ips:
+            logger.warning(f"Duplicate active IP {ip_address} found in specs. Skipping second instance.")
             continue
         
-        # Check if IP exists
+        interface = interface_map.get((hostname, interface_name))
+        if not interface:
+            logger.warning(f"Interface '{interface_name}' on '{hostname}' not found, skipping IP {ip_address}")
+            continue
+        
         existing_ip = existing_ips.get(ip_address)
         
         if existing_ip:
-            # Process existing IP
-            update_payload = _process_existing_ip(
-                nb_session,
-                existing_ip,
-                spec,
-                interface,
-                interface_map
-            )
+            update_payload = _process_existing_ip(nb_session, existing_ip, spec, interface, interface_map)
             if update_payload:
                 ips_to_update.append(update_payload)
         else:
-            # Create new IP
             create_payload = _create_new_ip(spec, interface)
             ips_to_create.append(create_payload)
+            
+        processed_ips.add(ip_address)
     
-    # Execute bulk operations
+    # 6. Execute bulk operations
     success = True
     
     if ips_to_create:
         logger.info(f"Creating {len(ips_to_create)} new IP addresses")
         created = _bulk_create(nb_session.ipam.ip_addresses, ips_to_create, "IP address")
         if len(created) < len(ips_to_create):
-            logger.warning(f"Only created {len(created)}/{len(ips_to_create)} IP addresses")
             success = False
-    else:
-        logger.info("No new IP addresses to create")
-    
+            
     if ips_to_update:
         logger.info(f"Updating {len(ips_to_update)} existing IP addresses")
         updated = _bulk_update(nb_session.ipam.ip_addresses, ips_to_update, "IP address")
         if len(updated) < len(ips_to_update):
-            logger.warning(f"Only updated {len(updated)}/{len(ips_to_update)} IP addresses")
             success = False
-    else:
-        logger.info("No IP addresses need updates")
-    
+            
     return success
 
-
 def _get_existing_ip_addresses(
-    nb_session: NetBoxApi,
-    ip_addresses: list[str]
-) -> dict[str, object]:
+    nb_session: Any,
+    ip_addresses: List[str]
+) -> Dict[str, Any]:
     """
-    Get existing IP addresses from NetBox.
-    
-    Args:
-        nb_session: pynetbox API session
-        ip_addresses: list of IP addresses to query (with CIDR)
-    
-    Returns:
-        dictionary mapping IP address to IP object
+    Get existing IP addresses from NetBox concurrently using a generic fetcher.
     """
     existing_ips = {}
     
+    unique_ips = list(set(ip_addresses))
+    chunk_size = 50 
+    
+    chunks = [
+        unique_ips[i:i + chunk_size] 
+        for i in range(0, len(unique_ips), chunk_size)
+    ]
+    
     try:
-        # Query all IP addresses at once
-        # NetBox requires addresses to be queried individually or in batches
-        # We'll chunk them for efficiency
-        chunk_size = 100
-        
-        for i in range(0, len(ip_addresses), chunk_size):
-            chunk = ip_addresses[i:i + chunk_size]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             
-            # Query using the 'address' filter
-            results = nb_session.ipam.ip_addresses.filter(address=chunk)
+            # submit() takes the function first, followed by the arguments to pass to it
+            future_to_chunk = {
+                executor.submit(
+                    _fetch_netbox_objects, 
+                    nb_session.ipam.ip_addresses,  # The endpoint
+                    'address',                     # The filter_field
+                    chunk                          # The chunk
+                ): chunk 
+                for chunk in chunks
+            }
             
-            for ip_obj in results:
-                existing_ips[str(ip_obj.address)] = ip_obj
+            for future in concurrent.futures.as_completed(future_to_chunk):
+                results = future.result()
+                
+                # We no longer need to check for None because _fetch_netbox_objects guarantees a list
+                for ip_obj in results:
+                    existing_ips[str(ip_obj.address)] = ip_obj
         
         logger.debug(f"Found {len(existing_ips)} existing IP addresses")
         
@@ -815,7 +852,6 @@ def _get_existing_ip_addresses(
         logger.error(f"Error querying existing IP addresses: {e}", exc_info=True)
     
     return existing_ips
-
 
 def _set_primary_ips_on_devices(
     nb_session: NetBoxApi,
@@ -932,6 +968,6 @@ def _set_primary_ips_on_devices(
 
 if __name__ == '__main__':
     from pynetbox_functions import _main, _debug
-    #_main("Update devices IPs in NetBox", ips)
+    _main("Update devices IPs in NetBox", ips)
     #_debug(ips)
-    _debug(_get_existing_ip_addresses, data_list = ['192.168.106.42', '134.108.95.13'])
+    #_debug(_get_existing_ip_addresses, data_list = ['192.168.106.42', '134.108.95.13'])

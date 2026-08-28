@@ -788,6 +788,25 @@ def _resolve_or_create(
         )
         return None
 
+def _fetch_netbox_objects(endpoint: Any, filter_field: str, chunk: List[str]) -> List[Any]:
+    """
+    Queries a NetBox endpoint for a chunk of items using a specific filter field.
+    
+    Args:
+        endpoint: The pynetbox endpoint (e.g., nb_session.ipam.ip_addresses)
+        filter_field: The filter parameter name (e.g., 'address', 'name', 'mac_address')
+        chunk: The list of values to filter by
+        
+    Returns:
+        List of matching NetBox objects.
+    """
+    # pynetbox filter dynamically accepts kwargs like address=['1.1.1.1', '2.2.2.2']
+    kwargs = {filter_field: chunk}
+    results = endpoint.filter(**kwargs)
+    
+    # Ensure we always return a list (pynetbox sometimes returns None for empty results)
+    return list(results) if results else []
+
 def _main(description: str, function: callable, **kwargs) -> None:
     """
     Initialize NetBox API with custom session
@@ -893,28 +912,28 @@ def _debug(function: callable, data_dict = None, data_list = None, **kwargs) -> 
     nb.http_session.verify = False # Disable SSL verification
 
     files_yaml = [
-        "procurve_single.yaml",
-        "procurve_modular.yaml",
+#        "procurve_single.yaml",
+#        "procurve_modular.yaml",
 
-        "hpe_8_ports.yaml",
-        "hpe_24_ports.yaml",
+#        "hpe_8_ports.yaml",
+#        "hpe_24_ports.yaml",
 
-        "aruba_8_ports.yaml",
-        "aruba_12_ports.yaml",
-        "aruba_48_ports.yaml",
+#        "aruba_8_ports.yaml",
+#        "aruba_12_ports.yaml",
+#        "aruba_48_ports.yaml",
 
-        "aruba_stack.yaml",
-        "aruba_stack_2920.yaml",
-        "aruba_stack_2930.yaml",
+#        "aruba_stack.yaml",
+#        "aruba_stack_2920.yaml",
+#        "aruba_stack_2930.yaml",
 
-        "aruba_modular.yaml",
-        "aruba_modular_stack.yaml",
+#        "aruba_modular.yaml",
+#        "aruba_modular_stack.yaml",
 
         "aruba_6100.yaml",
-        "aruba_6300.yaml", 
-        "aruba_8320.yaml",
+#        "aruba_6300.yaml", 
+#        "aruba_8320.yaml",
         
-        "cisco.yaml"
+#        "cisco.yaml"
     ]
 
     for file_name in files_yaml:
