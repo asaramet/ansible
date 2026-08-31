@@ -1,0 +1,45 @@
+- name: Add rules to SWITCH-ACCESS ACL (AOS-CX)
+  hosts: aruba_aoscx
+  gather_facts: false
+  collections:
+    - arubanetworks.aoscx
+  vars:
+    ansible_connection: network_cli
+  vars_files:
+    - "{{ playbook_dir }}/../host_vars/aruba/vault"
+  tasks:
+    - name: Add NTP ACLs
+      aoscx_command:
+        commands:
+          - configure terminal
+          - access-list ip SWITCH-ACCESS
+          - 200 permit udp 134.108.34.114 any eq ntp
+          - 210 permit udp 134.108.34.66 any eq ntp
+          - exit
+          - ntp disable
+          - ntp dhcp-disable
+          - ntp enable
+          - write memory
+
+- name: Debug
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/../host_vars/aruba/vault"
+  tasks:
+    - name: Sent commands
+      debug:
+        msg: >
+          {{
+            [
+              'configure terminal',
+              'access-list ip SWITCH-ACCESS',
+              '200 permit udp 134.108.34.114 any eq ntp',
+              '210 permit udp 134.108.34.66 any eq ntp',
+              'exit',
+              'ntp disable',
+              'ntp dhcp-disable',
+              'ntp enable',
+              'write memory'
+            ]
+          }}

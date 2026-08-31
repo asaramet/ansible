@@ -45,6 +45,12 @@
         - name: Download and stage firmware to Primary partition
           when: target_fw_ver not in primary_ver
           block:
+            - name: Remove TFTP permit rule from the ACL if it exists
+              arubanetworks.aoscx.aoscx_config:
+                lines: |
+                  access-list ip SWITCH-ACCESS
+                    no {{ acl_line_number }}
+
             - name: Temporarily permit TFTP traffic in the ACL
               arubanetworks.aoscx.aoscx_config:
                 lines: |
