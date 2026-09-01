@@ -66,7 +66,7 @@
                       - "y"
                       - "y"
               vars: 
-                ansible_command_timeout: 300
+                ansible_command_timeout: 900
               register: tftp_output
 
             - name: Debug TFTP Output

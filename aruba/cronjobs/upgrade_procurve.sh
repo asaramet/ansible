@@ -12,8 +12,9 @@ source /opt/ansible/envs
 cd /opt/ansible/inventories/aruba
 ansible --version
 
-HOSTS_GROUPS='procurve_access procurve_distri procurve_core'
+#HOSTS_GROUPS='procurve_access procurve_distri procurve_core'
 #HOSTS_GROUPS='wc_2930f wc_2930m wc_2930f_distri wc_2930m_distri'
+HOSTS_GROUPS='kb_3810m kb_5406rzl_2'
 
 for i in ${HOSTS_GROUPS}; do
 
