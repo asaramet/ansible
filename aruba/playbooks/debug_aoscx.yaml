@@ -62,3 +62,7 @@
       when: "'Non-failsafe device updates not enabled' in updates_check.stdout"
       ansible.builtin.debug:
         var: boot_command
+
+    - name: Show update command
+      ansible.builtin.debug:
+        var: update_command
