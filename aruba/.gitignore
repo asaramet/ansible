@@ -1,3 +1,4 @@
 */__pycache__/
 hosts.ini
 cronjobs/logs/
+src/

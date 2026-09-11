@@ -33,6 +33,14 @@ from psycopg import OperationalError
 from psycopg.rows import dict_row
 from typing import List, Dict, Optional, Any, Tuple
 
+# -- Defaut Paths ---
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_PROJECT_DIR = _SCRIPT_DIR.parent
+_NETBOX_DIR = _PROJECT_DIR / ".." / "netbox"
+
+# STD strings
+DEFAULT_VAULT_FILE = str(_NETBOX_DIR / "sql_scripts" / "vault")
+DEFAULT_VAULT_PASS_FILE = str(_NETBOX_DIR / "src" / "keys" / "vault_pass_netbox")
 
 class DeviceSpecifications:
     """Helper class for device_specs database operations with secure password handling."""
@@ -42,8 +50,8 @@ class DeviceSpecifications:
                  user: str = 'netzadmin',
                  password: Optional[str] = None,
                  password_from: str = 'env',
-                 vault_file: Optional[str] = None,
-                 vault_password_file: str = '~/.ssh/vault_pass_netbox',
+                 vault_file: Optional[str] = DEFAULT_VAULT_FILE,
+                 vault_password_file: str = DEFAULT_VAULT_PASS_FILE,
                  config_file: Optional[str] = None):
         
         retrieved_password = self._get_password(
