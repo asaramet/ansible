@@ -17,6 +17,20 @@
     backup_to_99: &backup_to_99 true
     local_backup_folder: &local_backup_folder "{{ inventory_dir }}/data/db_dumps"
 
+  tasks:
+    - name: Register local dumps older than 30 days
+      find:
+        paths: "{{ local_backup_folder }}"
+        patterns: "netbox-*.sql.gz"
+        age: 90d
+      register: old_dumps
+
+    - name: Delete old dump files
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_dumps.files }}"
+
 - name: Backup media
   hosts: "{{ 'hs_netbox' if production | default(true) else 'local' }}"
   gather_facts: false
@@ -78,7 +92,7 @@
         dest: "{{ local_backup_folder }}/"
         flat: true
 
-    - name: Register dumps older than 30 days
+    - name: Register remote dumps older than 30 days
       find:
         paths: "{{ dump_folder }}"
         patterns: "netbox-*.sql.gz"
@@ -110,7 +124,7 @@
         - "localdata.tgz"
       when: backup_to_99
 
-    - name: Register dumps older than 30 days
+    - name: Register 99 dumps older than 30 days
       find:
         paths: "{{ backup_folder }}"
         patterns: "netbox-*.sql.gz"
