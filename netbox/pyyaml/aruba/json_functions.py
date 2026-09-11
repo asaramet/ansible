@@ -769,10 +769,10 @@ if __name__ == "__main__":
         #"aruba_modular",
         #"aruba-modular-stack",
         #"procurve_single",
-        "procurve_modular",
+        #"procurve_modular",
 
         #"aruba_6100",
-        #"aruba_6300",
+        "aruba_6300",
     ]
 
     from std_functions import project_dir
@@ -783,7 +783,7 @@ if __name__ == "__main__":
 
 
         #debug_locations_json(data_folder)
-        #debug_devices_json(data_folder)
+        debug_devices_json(data_folder)
         #debug_device_interfaces_json(data_folder)
         #debug_lags_json(data_folder)
 
@@ -792,6 +792,6 @@ if __name__ == "__main__":
         #debug_tagged_vlans_json(data_folder)
 
 
-        debug_ip_addresses_json(data_folder)
+        #debug_ip_addresses_json(data_folder)
 
         #debug_modules_json(data_folder)

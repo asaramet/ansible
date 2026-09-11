@@ -7,6 +7,7 @@ playbooks
 hosts.ini
 ansible.cfg
 cronjobs
+devices_specs
 "
 
 rsync -uav --delete-excluded ${sync_objs} ${remote_srv}

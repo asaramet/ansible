@@ -147,7 +147,8 @@ def main():
 def debug_single():
     """Debug single switch processing with stdout output."""
     #data_folder = project_dir / "data" / "aruba-12-ports"
-    data_folder = project_dir / "data" / "hpe_8_ports"
+    #data_folder = project_dir / "data" / "hpe_8_ports"
+    data_folder = project_dir / "data" / "aruba_6300"
 
     print('---Debugging ', data_folder)
     single(data_folder, sys.stdout, ["switch"])
@@ -200,7 +201,7 @@ def debug_multiple():
         #"procurve-modular",
 
         #"aruba_6100",
-        #"aruba_6300",
+        "aruba_6300",
         "aruba_8320"
     ]
 
