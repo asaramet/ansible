@@ -788,7 +788,7 @@ def _resolve_or_create(
         )
         return None
 
-def _fetch_netbox_objects(endpoint: Any, filter_field: str, chunk: List[str]) -> List[Any]:
+def _fetch_netbox_objects(endpoint: any, filter_field: str, chunk: list[str]) -> list[any]:
     """
     Queries a NetBox endpoint for a chunk of items using a specific filter field.
     

@@ -8,7 +8,7 @@ Handles creation of VLAN interfaces and IP address assignment for switches
 
 import logging
 import concurrent.futures
-from typing import Optional, Tuple, Union, Any
+from typing import Optional, Tuple, Union, Any, List, Dict
 
 from pynetbox.core.api import Api as NetBoxApi
 from pynetbox.core.endpoint import Endpoint
@@ -28,7 +28,7 @@ from pynetbox_functions import (
 
 logger = logging.getLogger(__name__)
 
-def ips(nb_session: NetBoxApi, data: dict) -> bool:
+def ips(nb_session: NetBoxApi, data: Dict) -> bool:
     """
     Update switch IPs on a NetBox server from YAML data.
     
@@ -228,11 +228,11 @@ def _resolve_ip_role(nb_session: NetBoxApi, role_name: str) -> Optional:
 
 def _prepare_interface_and_ip_data(
     nb_session: NetBoxApi,
-    ip_data_list: list[dict],
-    device_cache: dict[str, object],
+    ip_data_list: List[Dict],
+    device_cache: Dict[str, object],
     tenant_id: Optional[int],
     role_id: Optional[Union[int, str]]
-) -> Tuple[list[dict], list[dict]]:
+) -> Tuple[List[Dict], List[Dict]]:
     """
     Prepare interface specifications and IP specifications from YAML data.
     
@@ -294,9 +294,9 @@ def _prepare_interface_and_ip_data(
 
 def _ensure_vlan_interfaces(
     nb_session: NetBoxApi,
-    interface_specs: list[dict],
-    device_cache: dict[str, object]
-) -> dict[Tuple[str, str], object]:
+    interface_specs: List[Dict],
+    device_cache: Dict[str, object]
+) -> Dict[Tuple[str, str], object]:
     """
     Ensure VLAN interfaces exist, creating them if necessary.
     
@@ -360,8 +360,8 @@ def _ensure_vlan_interfaces(
 
 def _create_interfaces(
     nb_session: NetBoxApi,
-    interface_specs: list[dict]
-) -> list[object]:
+    interface_specs: List[Dict]
+) -> List[object]:
     """
     Create interfaces in bulk.
     
@@ -394,7 +394,7 @@ def _should_reassign_ip(
     current_interface_id: int,
     target_interface_id: int,
     target_device_name: str
-) -> Tuple[bool, Optional[str], Optional[dict]]:
+) -> Tuple[bool, Optional[str], Optional[Dict]]:
     """
     Determine if an IP should be reassigned based on device statuses.
     
@@ -509,10 +509,10 @@ def _clear_primary_ip_if_needed(device_obj: object, ip_id: int) -> bool:
 def _process_existing_ip(
     nb_session: NetBoxApi,
     existing_ip: object,
-    spec: dict,
+    spec: Dict,
     interface: object,
-    interface_map: dict
-) -> Optional[dict]:
+    interface_map: Dict
+) -> Optional[Dict]:
     """
     Process an existing IP address and determine if it needs updating.
     
@@ -590,7 +590,7 @@ def _process_existing_ip(
         return None
 
 
-def _create_new_ip(spec: dict, interface: object) -> dict:
+def _create_new_ip(spec: Dict, interface: object) -> Dict:
     """
     Create payload for a new IP address.
     
@@ -617,8 +617,8 @@ def _create_new_ip(spec: dict, interface: object) -> dict:
 
 def _compare_ip_attributes(
     existing_ip: object,
-    spec: dict,
-    update_payload: dict
+    spec: Dict,
+    update_payload: Dict
 ) -> bool:
     """
     Compare IP attributes and add updates to payload if needed.
@@ -668,7 +668,7 @@ def _compare_ip_attributes(
     
     return needs_update
 
-def _build_audit_trail(existing_description: str, old_device_info: dict) -> str:
+def _build_audit_trail(existing_description: str, old_device_info: Dict) -> str:
     """
     Build audit trail for IP reassignment.
     
@@ -699,8 +699,8 @@ logger = logging.getLogger(__name__)
 
 def _process_ip_addresses(
     nb_session: Any,
-    ip_specs: list[dict],
-    interface_map: dict[Tuple[str, str], object]
+    ip_specs: List[Dict],
+    interface_map: Dict[Tuple[str, str], object]
 ) -> bool:
     """
     Process IP addresses: clean up conflicts, create if missing, handle updates.
@@ -855,8 +855,8 @@ def _get_existing_ip_addresses(
 
 def _set_primary_ips_on_devices(
     nb_session: NetBoxApi,
-    ip_data_list: list[dict],
-    device_cache: dict[str, object]
+    ip_data_list: List[Dict],
+    device_cache: Dict[str, object]
 ) -> None:
     """
     Set primary_ip4 on devices based on IP assignments.
