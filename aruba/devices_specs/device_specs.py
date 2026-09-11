@@ -298,3 +298,42 @@ class DeviceSpecifications:
         except Exception as e:
             self.conn.rollback()
             raise RuntimeError(f"Failed to process device '{hostname}': {e}")
+
+    def delete_device(self, hostname: Optional[str] = None, device_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        """
+        Delete a device from the database by either its hostname or ID.
+
+        Args:
+            hostname: The hostname of the device to delete.
+            device_id: The ID of the device to delete.
+
+        Returns:
+            The deleted device record as a dictionary, or None if no record was found.
+            
+        Raises:
+            ValueError: If neither or both arguments are provided.
+        """
+        if not (hostname or device_id) or (hostname and device_id):
+            raise ValueError("You must provide exactly one of 'hostname' or 'device_id'.")
+
+        if not self.conn or self.conn.closed:
+            raise ConnectionError("Database connection is closed. Use the class within a 'with' block.")
+        
+        try:
+            with self.conn.cursor() as cur:
+                if hostname:
+                    query = "DELETE FROM device_specs WHERE hostname = %s RETURNING *;"
+                    cur.execute(query, (hostname,))
+                else:
+                    query = "DELETE FROM device_specs WHERE id = %s RETURNING *;"
+                    cur.execute(query, (device_id,))
+                
+                deleted_device = cur.fetchone()
+                
+            # Write operations require a commit!
+            self.conn.commit()
+            return deleted_device
+            
+        except Exception as e:
+            self.conn.rollback()
+            raise RuntimeError(f"Failed to delete device: {e}")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Interact with 'devices' table in the postgres database, over CLI
+Interact with 'device_specs' table in the postgres database, over CLI
 
 Usage:
 
@@ -172,6 +172,45 @@ def add_device_cmd(
                 fg=typer.colors.BLUE
             )
             
+    except Exception as e:
+        typer.secho(f"✗ Database Error: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+@app.command("delete")
+def delete_device_cmd(
+    hostname: Optional[str] = typer.Option(None, "--hostname", help="Hostname of the device to delete"),
+    device_id: Optional[int] = typer.Option(None, "--id", help="Database ID of the device to delete")
+):
+    """Delete a device from the inventory by hostname or ID."""
+    
+    # 1. Validate CLI inputs
+    if not (hostname or device_id) or (hostname and device_id):
+        typer.secho("✗ Error: You must provide EXACTLY ONE of --hostname or --id", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+        
+    db_handler = get_db()
+    
+    try:
+        with db_handler as db:
+            # 2. Call the class method
+            deleted_device = db.delete_device(hostname=hostname, device_id=device_id)
+            
+        # 3. Provide user feedback
+        if deleted_device:
+            typer.secho(
+                f"✓ Successfully deleted device '{deleted_device['hostname']}' (ID: {deleted_device['id']})", 
+                fg=typer.colors.GREEN
+            )
+        else:
+            identifier = f"hostname '{hostname}'" if hostname else f"ID {device_id}"
+            typer.secho(
+                f"ℹ No device found matching {identifier}. Nothing was deleted.", 
+                fg=typer.colors.YELLOW
+            )
+            
+    except ValueError as e:
+        typer.secho(f"✗ Input Error: {e}", fg=typer.colors.YELLOW, err=True)
+        raise typer.Exit(code=1)
     except Exception as e:
         typer.secho(f"✗ Database Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
