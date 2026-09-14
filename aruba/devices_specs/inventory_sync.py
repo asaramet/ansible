@@ -9,10 +9,6 @@ from typing import List, Dict, Union, Any
 
 from device_specs import DeviceSpecifications
 
-HOST = "192.168.122.140"
-#HOST = "netbox-bb"
-
-
 def read_yaml(yaml_file: Union[str, Path]) -> List[Dict[str, Any]]:
     """
     Reads a YAML file containing a list of devices and their types.
@@ -67,10 +63,7 @@ def sync_devices_from_yaml(yaml_path: Union[str, Path]):
         return
 
     # 2. Initialize database connection handler
-    db_handler = DeviceSpecifications(
-        host=HOST,
-        password_from='vault'
-    )
+    db_handler = DeviceSpecifications()
 
     # Track exactly what happened for a summary report
     stats = {"inserted": 0, "updated": 0, "ignored": 0, "errors": 0}

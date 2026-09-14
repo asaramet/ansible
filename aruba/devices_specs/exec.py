@@ -29,11 +29,6 @@ from device_specs import DeviceSpecifications
 script_dir = Path(__file__).resolve().parent
 project_dir = script_dir.parent
 netbox_dir = project_dir / ".." / "netbox"
-vault_file = netbox_dir / "sql_scripts" / "vault"
-vault_password_file = netbox_dir / "src" / "keys" / "vault_pass_netbox"
-
-host = "192.168.122.140"
-#host = "netbox-bb"
 
 # UI Instances
 console = Console()
@@ -45,12 +40,7 @@ def get_db() -> DeviceSpecifications:
     Exits the CLI gracefully if configuration fails.
     """
     try:
-        return DeviceSpecifications(
-            host=host,
-            password_from='vault',
-            vault_file=vault_file,
-            vault_password_file=vault_password_file
-        )
+        return DeviceSpecifications()
     except Exception as e:
         typer.secho(f"✗ Configuration Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
@@ -64,7 +54,7 @@ def initialize_table():
         # Use the 'with' context manager to safely open and close the connection
         with db_handler as db:
             db.initialize_schema()
-            typer.secho(f"✓ Connected to database on {host} and schema initialized.", fg=typer.colors.GREEN)
+            typer.secho(f"✓ Connected to database and schema initialized.", fg=typer.colors.GREEN)
 
             # Check how many devices currently exist
             devices = db.get_all_devices()

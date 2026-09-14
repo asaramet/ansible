@@ -42,14 +42,17 @@ _NETBOX_DIR = _PROJECT_DIR / ".." / "netbox"
 DEFAULT_VAULT_FILE = str(_NETBOX_DIR / "sql_scripts" / "vault")
 DEFAULT_VAULT_PASS_FILE = str(_NETBOX_DIR / "src" / "keys" / "vault_pass_netbox")
 
+HOST = "192.168.122.140"
+#HOST = "netbox-bb"
+
 class DeviceSpecifications:
     """Helper class for device_specs database operations with secure password handling."""
 
-    def __init__(self, host: str = 'localhost', port: int = 5432,
+    def __init__(self, host: str = HOST, port: int = 5432,
                  dbname: str = 'network_inventory',
                  user: str = 'netzadmin',
                  password: Optional[str] = None,
-                 password_from: str = 'env',
+                 password_from: str = 'vault',
                  vault_file: Optional[str] = DEFAULT_VAULT_FILE,
                  vault_password_file: str = DEFAULT_VAULT_PASS_FILE,
                  config_file: Optional[str] = None):
@@ -345,3 +348,31 @@ class DeviceSpecifications:
         except Exception as e:
             self.conn.rollback()
             raise RuntimeError(f"Failed to delete device: {e}")
+
+    def get_device_type(self, hostname: str) -> Optional[str]:
+        """
+        Retrieve the type of a specific device by its hostname.
+
+        Args:
+            hostname: The exact hostname of the device.
+
+        Returns:
+            The device type as a string, or None if the device does not exist 
+            or has no type defined.
+        """
+        if not self.conn or self.conn.closed:
+            raise ConnectionError("Database connection is closed. Use the class within a 'with' block.")
+        
+        query = "SELECT type FROM device_specs WHERE hostname = %s LIMIT 1;"
+        
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(query, (hostname,))
+                result = cur.fetchone()
+                
+            if result:
+                return result['type']
+            return None
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to fetch type for device '{hostname}': {e}")
