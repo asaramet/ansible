@@ -2,7 +2,7 @@
 
 # Sort collected running configs filles according to the switch type
 
-import re
+import re, sys
 
 from pathlib import Path
 from tabulate import tabulate
@@ -14,6 +14,10 @@ project_dir = pyyaml_dir.parent
 data_folder = project_dir.joinpath('data')
 raw_folder = data_folder.joinpath('raw')
 temp_folder = raw_folder.joinpath('temp')
+
+_DEVICES_SPECS_FOLDER = project_dir.parent / "aruba" / "devices_specs"
+sys.path.insert(0, str(_DEVICES_SPECS_FOLDER))
+from device_specs import DeviceSpecifications
 
 hw_folders = {
     'JL258A': 'aruba_8_ports',
@@ -317,15 +321,24 @@ def get_switch_type(config_file):
         # Pattern 4: For OS-CX switches without type info, infer from folder name
         # Check if this is an OS-CX config by looking for ArubaOS-CX in version
         if 'ArubaOS-CX' in content or 'AOS-CX' in content:
-            parent_folder = config_file.parent.name
-            # Map folder names to default device types
-            folder_to_type = {
-                'aruba_6100': 'JL679A',  # Aruba 6100-12G-POE4-2SFP+
-                'aruba_6300': 'JL658A',  # Aruba 6300M-24SFP+-4SFP56 (default, could also be JL659A for 48-port)
-                'aruba_8320': 'JL579A'
-            }
-            if parent_folder in folder_to_type:
-                return folder_to_type[parent_folder]
+            # Get type from the database
+            hostname = config_file.name
+            with DeviceSpecifications() as db:
+                device_type = db.get_device_type(hostname)
+                
+            if device_type:
+                return device_type
+            else:
+                # Old decommissioned devices
+                parent_folder = config_file.parent.name
+                # Map folder names to default device types
+                folder_to_type = {
+                    'aruba_6100': 'JL679A',  # Aruba 6100-12G-POE4-2SFP+
+                    'aruba_6300': 'JL658A',  # Aruba 6300M-24SFP+-4SFP56 (default, could also be JL659A for 48-port)
+                    'aruba_8320': 'JL579A'
+                }
+                if parent_folder in folder_to_type:
+                    return folder_to_type[parent_folder]
 
         return None
 
@@ -463,7 +476,7 @@ def debug():
 
     #debug_configs_dir = Path(data_folder) / 'aruba_6100'
     debug_configs_dir = Path(data_folder) / 'aruba_6300'
-    debug_configs_dir = Path(data_folder) / 'aruba_8320'
+    #debug_configs_dir = Path(data_folder) / 'aruba_8320'
 
     config_files = get_files(debug_configs_dir)
     debug_get_switch_type(config_files)
@@ -515,6 +528,6 @@ def main():
     print("=" * 60)
 
 if __name__ == "__main__":
-    main()
-    #debug()
+    #main()
+    debug()
 
