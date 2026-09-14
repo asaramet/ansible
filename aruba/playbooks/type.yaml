@@ -1,0 +1,59 @@
+---
+- name: Get device type
+  hosts: aruba_aoscx
+  #hosts: sm_6100_stack
+  gather_facts: false
+  tasks:
+
+    - name: Register show system output
+      ansible.netcommon.cli_command:
+        command: "show system"
+      register: system
+
+    - name: Extract device model from output
+      ansible.builtin.set_fact:
+        # Searches for "Product Name", ignores the spaces/colon, and captures the first block of text without spaces
+        device_model: "{{ system.stdout | regex_search('Product Name\\s+:\\s+([^\\s]+)', '\\1') | first }}"
+
+#    - name: Create dictionary of all hosts and their device models
+#      ansible.builtin.set_fact:
+#        device_map: "{{ dict(ansible_play_hosts | zip(ansible_play_hosts | map('extract', hostvars, 'device_model'))) }}"
+#      run_once: true
+
+#    - name: Show the final key-value dictionary
+#      ansible.builtin.debug:
+#        var: device_map
+#      run_once: true
+
+#    - name: Export device_map to YAML file
+#      ansible.builtin.copy:
+#        content: "{{ device_map | to_nice_yaml }}"
+#        dest: "../src/devices.yaml"
+#      delegate_to: localhost
+#      run_once: true
+
+    - name: Create list of key-value pairs for device models
+      ansible.builtin.set_fact:
+        # Parse the JSON string back into a proper Ansible list object
+        device_list: "{{ _raw_list | from_json }}"
+      vars:
+        # Build the list and output it as a strictly formatted JSON string
+        _raw_list: >-
+          {% set _list = [] %}
+          {% for host in ansible_play_hosts %}
+          {%   set _ = _list.append({host: hostvars[host]['device_model']}) %}
+          {% endfor %}
+          {{ _list | to_json }}
+      run_once: true
+
+    - name: Show the final list
+      ansible.builtin.debug:
+        var: device_list
+      run_once: true
+
+    - name: Export device_list to YAML file
+      ansible.builtin.copy:
+        content: "{{ device_list | to_nice_yaml }}"
+        dest: "../src/devices.yaml"
+      delegate_to: localhost
+      run_once: true
