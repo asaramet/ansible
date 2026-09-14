@@ -22,7 +22,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
-from typing import Optional, List, Dict 
+from typing import Optional, List, Dict, Any
 
 from device_specs import DeviceSpecifications
 

@@ -42,8 +42,8 @@ _NETBOX_DIR = _PROJECT_DIR / ".." / "netbox"
 DEFAULT_VAULT_FILE = str(_NETBOX_DIR / "sql_scripts" / "vault")
 DEFAULT_VAULT_PASS_FILE = str(_NETBOX_DIR / "src" / "keys" / "vault_pass_netbox")
 
-HOST = "192.168.122.140"
-#HOST = "netbox-bb"
+#HOST = "192.168.122.140"
+HOST = "netbox-bb"
 
 class DeviceSpecifications:
     """Helper class for device_specs database operations with secure password handling."""
