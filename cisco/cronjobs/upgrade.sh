@@ -13,7 +13,7 @@ cd /opt/ansible/inventories/cisco
 ansible --version
 
 #HOSTS_GROUPS='catalyst_2960x catalyst_9500 catalyst_4506es'
-HOSTS_GROUPS='rhcs0001 rscs0003'
+HOSTS_GROUPS='catalyst_9500'
 
 for i in ${HOSTS_GROUPS}; do
 
