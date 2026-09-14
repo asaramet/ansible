@@ -10,3 +10,5 @@ ansible --version
 echo -e "\n=== Collect Aruba OS-CX 'runnig-config' to rhlx99:/tftpboot if updated ===\n"
 ansible-playbook playbooks/backup_config.yaml
 ansible-playbook playbooks/type.yaml
+
+python3 devices_specs/inventory_sync.py

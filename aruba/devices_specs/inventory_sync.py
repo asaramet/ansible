@@ -106,5 +106,6 @@ def sync_devices_from_yaml(yaml_path: Union[str, Path]):
 
 # If you want to test it by running this file directly:
 if __name__ == "__main__":
-    yaml_file_path = "../src/devices.yaml"
+    from device_specs import _PROJECT_DIR
+    yaml_file_path = _PROJECT_DIR / "src" / "devices.yaml"
     sync_devices_from_yaml(yaml_file_path)
