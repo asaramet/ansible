@@ -14,6 +14,7 @@ import logging
 from pynetbox.core.api import Api as NetBoxApi
 
 #from add_locations import add_locations
+from clean import clean
 from switches import switches
 from modules import module_bays, modules
 from vlans import vlans
@@ -32,6 +33,9 @@ def update(nb_session: NetBoxApi, data: dict[str, list[str]]) -> None:
         nb_session: pynetbox API session
         data: Data dictionary containing lists
     """
+    logger.info("-- Clear switches data --")
+    clean(nb_session, data)
+
     #logger.info("-- Add missing locations --")
     #add_locations(nb_session, data)
 

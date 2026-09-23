@@ -22,49 +22,62 @@ from pynetbox.core.api import Api as NetBoxApi
 
 from pynetbox_functions import (
     _delete_netbox_obj,
-    _cache_devices,
-    _cache_device_types
+    _cache_devices
 )
 
 # Get logger
 logger = logging.getLogger(__name__)
 
-def _check_device_type(existing_device_types: dict[str, str], device_dict: dict, existing_device: object) -> Optional[str]:
+def _check_device_type(nb_session:NetBoxApi, device_dict: dict, existing_device: object) -> Optional[str]:
     """
-    Check if the required device type is the same as the device in Netbox.
+    Check if the required device type is the same as the device in the NetBox.
 
     Args:
-        - existing_device_types - a dictionary of existing device types in the form
-            - {device_slug: device_model}
         - device_dict: device data that has to be added to NetBox
         - existing_device: existing device object on the platform, with the same hostname
 
     Returns:
         Existing device name if it has to be modified or None if not.
     """
-
-    # TODO: Check device type
-    # Get the NetBox device type model 
-    netbox_device_type_model = existing_device.device_type.model
-
-    # Get the requested device type slug
-    requested_device_type_slug = device_dict.get('device_type')
-
-    # Compare models
-    requested_device_type_model = existing_device_types[requested_device_type_slug]
-    if netbox_device_type_model == requested_device_type_model:
+    # Asset the device type
+    if existing_device.device_type.slug == device_dict.get('device_type'):
         return None
 
     hostname = existing_device.name
     logger.info(f"Found conflicting device type {hostname}")
     logger.info("Checking for interfaces...")
 
-    # TODO: Check number of interfaces
+    # 1. Fetch expected interface count for this specific device type on the fly
+    templates = nb_session.dcim.interface_templates.filter(device_type_id=existing_device.device_type.id)
+    expected_interface_count = len(list(templates)) if templates else 0
 
-        # TODO: If correct number update device hostname to its SN and decommission it
+    # 2. Get the actual interfaces currently on the device
+    all_actual_interfaces = list(nb_session.dcim.interfaces.filter(device_id=existing_device.id))
 
-        # TODO: If not delete the existing device
-    
+    # 3. Filter out VLANs/Virtual interfaces
+    physical_interfaces = [
+        iface for iface in all_actual_interfaces 
+        if getattr(iface.type, 'value', '') != 'virtual'
+    ]
+    actual_interface_count = len(physical_interfaces)
+
+    logger.info(
+        f"Interface count: Expected {expected_interface_count} (template), " 
+        f"Found {actual_interface_count} (physical).")
+
+    # 4. Compare and execute logic
+    if actual_interface_count == expected_interface_count:
+        # Update device hostname to its SN and decommission it
+        new_name = existing_device.serial if existing_device.serial else f"{hostname}-decom"
+        logger.info(f"Interface counts match. Renaming {hostname} to {new_name} and setting status to 'decommissioning'.")
+        
+        existing_device.name = new_name
+        existing_device.status = 'decommissioning'
+        existing_device.save()
+    else:
+        logger.info(f"Interface count mismatch. Deleting {hostname}.")
+        _delete_netbox_obj(existing_device)
+
     return existing_device.name
 
 def clean(nb_session: NetBoxApi, data: dict) -> list[str]:
@@ -88,10 +101,6 @@ def clean(nb_session: NetBoxApi, data: dict) -> list[str]:
     existing_devices = _cache_devices(nb_session, device_names)
     logger.debug(f"Found {len(existing_devices)} existing devices in cache")
 
-    logger.debug(f"Caching existing device types...")
-    existing_device_types = _cache_device_types(nb_session)
-    logger.debug(f"Found {len(existing_device_types)} device types in cache")
-
     # Variables
     wrong_type_devices = []
 
@@ -105,21 +114,21 @@ def clean(nb_session: NetBoxApi, data: dict) -> list[str]:
         # Check if device exists and has issues
         existing_device = existing_devices.get(device_name)
         if existing_device:
-            device_type_resolve = _check_device_type(existing_device_types, device_dict, existing_device)
+            device_type_resolve = _check_device_type(nb_session, device_dict, existing_device)
 
             if device_type_resolve:
                 wrong_type_devices.append(device_name)
 
-    logger.debug(f"Removed: {wrong_type_devices}")
+    logger.info(f"Found conflicting devices: {wrong_type_devices}")
     logger.info(
         f"Operations complete:\n" 
-        f" \u2713 Removed {len(wrong_type_devices)} devices"
+        f" \u2713 Updated {len(wrong_type_devices)} conflicting devices"
     )           
     return wrong_type_devices
 
 if __name__ == '__main__':
     from pynetbox_functions import _main
-    #_main("Clean redundant devices on a NetBox server", clean)
+    _main("Clean redundant devices on a NetBox server", clean)
 
-    from pynetbox_functions import _debug
-    _debug(clean)
+    #from pynetbox_functions import _debug
+    #_debug(clean)
