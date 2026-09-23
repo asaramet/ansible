@@ -617,5 +617,5 @@ if __name__ == '__main__':
 
     #from pynetbox_functions import _debug
     #_debug(switches)
-    #_debug(_categorize_switches, "devices")
+    #_debug(_categorize_switches, "devices")u 
 

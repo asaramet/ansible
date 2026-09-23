@@ -105,6 +105,23 @@ def _cache_devices(nb_session: NetBoxApi, device_names: list[str]) -> dict[str, 
 
     return {device.name: device for device in devices}
 
+def _cache_device_types(nb_session: NetBoxApi) -> dict[str, str]:
+    """
+    Get all device types available on the NetBox platform in a bulk
+    and return them as cached dictionary
+
+    Args:
+        nb_session: pynetbox API session
+    Return:
+        list of device types objects in the form of:
+            slug: model
+    """
+    # .all() fetches all records from the endpoint, automatically handling pagination
+    device_types = nb_session.dcim.device_types.all()
+
+    # Return a dictionary mapped by the device type slug: model 
+    return {dt.slug: dt.model for dt in device_types}
+
 def _bulk_create(endpoint: Endpoint, payloads: list[dict], kind: str) -> list:
     """
     Bulk create objects on a NetBox platform
