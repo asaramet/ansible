@@ -114,13 +114,45 @@ def _cache_device_types(nb_session: NetBoxApi) -> dict[str, str]:
         nb_session: pynetbox API session
     Return:
         list of device types objects in the form of:
-            slug: model
+            model: slug
     """
     # .all() fetches all records from the endpoint, automatically handling pagination
     device_types = nb_session.dcim.device_types.all()
 
     # Return a dictionary mapped by the device type slug: model 
-    return {dt.slug: dt.model for dt in device_types}
+    return {dt.model: dt.slug for dt in device_types}
+
+def _cache_switches_types(nb_session: NetBoxApi) -> dict[str, str]:
+    """
+    Get the device types from the NetBox server and add it to the network_inventory database/
+
+    Args:
+        nb_session: pynetbox API session
+        
+    Returns:
+        List of modified device objects
+    """
+    # Cache data before loops
+    logger.info(f"Caching NetBox network devices...")
+
+    devices = nb_session.dcim.devices.all()
+    platform_devices = {device.name: str(device.device_type) for device in devices 
+        if device.name[:2] in ['rs', 'rh', 'rg', 'CN']}
+
+    logger.info(f"Found {len(platform_devices)} devices in cache")
+    logger.debug(f"NetBox network devices: {platform_devices}")
+
+    logger.info(f"Caching NetBox device types...")
+    d_types = _cache_device_types(nb_session)
+    logger.info(f"Found {len(d_types)} device types in cache")
+    logger.debug(f"Device types: {d_types}")
+
+    # Map device hostname to device type slugs
+    update_devices = {}
+    for hostname, model in platform_devices.items():
+        update_devices[hostname] = d_types[model]
+
+    return update_devices
 
 def _bulk_create(endpoint: Endpoint, payloads: list[dict], kind: str) -> list:
     """
@@ -833,7 +865,7 @@ def _main(description: str, function: callable, **kwargs) -> None:
             nb_session: pynetbox API session
             data: Data dictionary
     """
-    import argparse
+    import argparse, inspect
     from nb import development, production
 
     # Disable warnings about self-signed certificates
@@ -859,6 +891,17 @@ def _main(description: str, function: callable, **kwargs) -> None:
         nb = production
 
     nb.http_session.verify = False # Disable SSL verification
+
+    # Check function signature
+    sig = inspect.signature(function)
+
+    # Count parameters (ignoring **kwargs if they exist)
+    params = [p for p in sig.parameters.values() if p.kind != inspect.Parameter.VAR_KEYWORD]
+    
+    if len(params) == 1:
+        # Function only expects nb_session; execute and exit early
+        logger.debug(function(nb, **kwargs))
+        return
 
     files_yaml = [
         "procurve_single.yaml",
@@ -901,7 +944,7 @@ def _debug(function: callable, data_dict = None, data_list = None, **kwargs) -> 
             nb_session: pynetbox API session as argument.
         data_dict: Data dictionary, if needed to isolate
     """
-    import argparse
+    import argparse, inspect
     from nb import development, production
 
     # Set DEBUG logging output
@@ -927,6 +970,18 @@ def _debug(function: callable, data_dict = None, data_list = None, **kwargs) -> 
         nb = production
 
     nb.http_session.verify = False # Disable SSL verification
+
+
+    # Check function signature
+    sig = inspect.signature(function)
+
+    # Count parameters (ignoring **kwargs if they exist)
+    params = [p for p in sig.parameters.values() if p.kind != inspect.Parameter.VAR_KEYWORD]
+    
+    if len(params) == 1:
+        # Function only expects nb_session; execute and exit early
+        logger.debug(function(nb, **kwargs))
+        return
 
     files_yaml = [
 #        "procurve_single.yaml",

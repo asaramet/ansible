@@ -51,6 +51,7 @@ def devices_table(devices: List[Dist], title: str = "Network Inventory Devices")
     table.add_column("Hostname", style = "green", no_wrap = True)
     table.add_column("Serial Number", style = "magenta")
     table.add_column("Inventory Number", style = "magenta")
+    table.add_column("Device Type", style = "green")
     table.add_column("Active", style = "yellow", justify = "center")
     table.add_column("Created At", style = "blue")
     table.add_column("Updated At", style = "blue")
@@ -62,6 +63,7 @@ def devices_table(devices: List[Dist], title: str = "Network Inventory Devices")
             device['hostname'],
             device['serial_number'] or "-",
             device['inventory_number'] or "-",
+            device['type'] or "-",
             "\u2713" if device['active'] else "\u2717",
             device['created_at'].strftime("%Y-%m-%d %H:%M") if device['created_at'] else "-",
             device['updated_at'].strftime("%Y-%m-%d %H:%M") if device['updated_at'] else "-"

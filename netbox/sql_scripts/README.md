@@ -30,11 +30,13 @@ A comprehensive suite of tools for managing network device inventory, synchroniz
 The foundation of the system. Provides the `NetworkInventory` class for secure PostgreSQL database operations.
 
 **Features:**
+
 - Secure password handling (vault, env, config)
 - CRUD operations for devices table
 - Search and filtering capabilities
 
 **Usage:**
+
 ```python
 from network_inventory import NetworkInventory
 
@@ -64,6 +66,7 @@ all_devices = inventory.get_all_devices()
 Provides common utilities and pre-configured objects used across the project.
 
 **Key Functions:**
+
 - `initialize_inventory()` - Initialize database connection
 - `get_inventory_connection()` - Get a new inventory connection
 - `get_devices_numbers()` - Get devices as {hostname: number} dict
@@ -74,9 +77,11 @@ Provides common utilities and pre-configured objects used across the project.
 ### 3. **pynetbox/** - NetBox Integration
 
 #### **nb.py**
+
 Pre-configured NetBox API sessions for development and production servers.
 
 **Usage:**
+
 ```python
 from nb import development, production
 
@@ -85,9 +90,11 @@ nb.http_session.verify = False  # Disable SSL verification
 ```
 
 #### **pynetbox_functions.py**
+
 Advanced NetBox utility functions for bulk operations.
 
 **Key Functions:**
+
 - `_cache_devices()` - Cache devices by hostname in bulk
 - `_bulk_create()` - Bulk create objects with chunking
 - `_bulk_update()` - Bulk update objects with chunking
@@ -101,6 +108,7 @@ Advanced NetBox utility functions for bulk operations.
 Automates device management in the PostgreSQL database from YAML files.
 
 **Commands:**
+
 ```bash
 # Add devices from serial numbers YAML
 python auto_db.py serials
@@ -125,6 +133,7 @@ python auto_db.py debug
 ```
 
 **Features:**
+
 - Auto-detection of serial vs inventory numbers
 - Conflict resolution (renames devices with different serials)
 - Duplicate merging
@@ -137,6 +146,7 @@ python auto_db.py debug
 Rich CLI interface for managing devices in the database.
 
 **Commands:**
+
 ```bash
 # List all devices
 python devices_db.py list
@@ -164,6 +174,7 @@ python devices_db.py duplicates [--serial] [--hostname]
 ```
 
 **Features:**
+
 - Rich table output with colors
 - Filtering by active status
 - Pattern searching
@@ -176,6 +187,7 @@ python devices_db.py duplicates [--serial] [--hostname]
 Handles database backup and restore operations using `pg_dump` and `pg_restore`.
 
 **Commands:**
+
 ```bash
 # Create backup (auto-named with date)
 python backup_database.py backup
@@ -197,6 +209,7 @@ python backup_database.py cleanup --days 30
 ```
 
 **Features:**
+
 - Automatic backup naming with dates
 - Backup directory management
 - Compression support
@@ -209,6 +222,7 @@ python backup_database.py cleanup --days 30
 **The newest addition:** Synchronizes device data from NetBox to PostgreSQL database.
 
 **Commands:**
+
 ```bash
 # Test synchronization (dry run)
 python netbox_to_db_sync.py sync --dry-run --verbose
@@ -224,6 +238,7 @@ python netbox_to_db_sync.py compare --show-matches
 ```
 
 **Features:**
+
 - Bulk extraction with minimal HTTP requests
 - Smart device matching (hostname + serial + inventory)
 - Conflict resolution (renames devices with different serials)
@@ -231,6 +246,7 @@ python netbox_to_db_sync.py compare --show-matches
 - Automatic filtering (capital letter hostnames, None values)
 
 **Matching Priority:**
+
 1. Exact: hostname + serial + inventory
 2. Serial: hostname + serial
 3. Inventory: hostname + inventory
@@ -260,6 +276,7 @@ Create an API token in NetBox with read access to devices, then add it to your v
 ### Database Credentials
 
 Configure database credentials in one of these ways:
+
 1. **Vault (recommended)**: Add to `group_vars/localhost/vault`
 2. **Environment**: `export DB_PASSWORD='your_password'`
 3. **Config file**: Create a YAML config file
@@ -268,7 +285,7 @@ Configure database credentials in one of these ways:
 
 ## 📊 Data Flow
 
-```
+```flow_chart
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │   NetBox        │────▶│ netbox_to_db_   │────▶│   PostgreSQL    │
 │   Platform      │     │   sync.py       │     │   Database      │
@@ -375,21 +392,25 @@ router1: [SPE123456, HB-001234, active]
 
 ### Common Issues
 
-**"Cannot reach host"**
+#### "Cannot reach host"
+
 - Check NetBox server URL in `nb.py`
 - Verify network connectivity
 - Check SSL verification settings
 
-**"Connection refused" (PostgreSQL)**
+#### Connection refused" (PostgreSQL)
+
 - Verify database is running
 - Check host/port in `network_inventory.py`
 - Verify credentials
 
-**"AttributeError" on device fields**
+#### "AttributeError" on device fields
+
 - Some NetBox fields may be None
 - Use `hasattr()` or `getattr()` with defaults
 
-**Slow performance**
+#### Slow performance
+
 - Use bulk operations (`_bulk_create`, `_bulk_update`)
 - Avoid N+1 queries
 - Use `--active-only` flag to reduce data
@@ -411,7 +432,7 @@ Internal use only. Do not distribute outside the organization.
 ## 🎯 Quick Reference Table
 
 | Task | Command |
-|------|---------|
+| ------ | --------- |
 | Sync NetBox → DB | `python netbox_to_db_sync.py sync` |
 | Dry run sync | `python netbox_to_db_sync.py sync --dry-run` |
 | List devices | `python devices_db.py list` |
@@ -421,3 +442,84 @@ Internal use only. Do not distribute outside the organization.
 | Restore DB | `python backup_database.py restore` |
 | Check duplicates | `python devices_db.py duplicates` |
 | Merge duplicates | `python auto_db.py merge` |
+
+## Update database schema remotely
+
+To connect to your remote database from your local terminal, use the following `psql` command. Replace `<server_IP>` with the actual IP address of your server.
+
+```bash
+psql -h <server_IP> -U netzadmin -d network_inventory
+```
+
+When you press Enter, `psql` will prompt you to input the password for the `netzadmin` user.
+
+### Database operations
+
+Once connected to your remote database via psql, use PostgreSQL's built-in meta-commands to inspect the current structure before making any modifications.
+
+#### Viewing the Schema
+
+Type these commands directly into the psql prompt:
+
+`\dn`: List all schemas in the current database (e.g., public).
+
+`\dt`: List all tables in the current search path.
+
+`\dt schema_name.*`: List all tables within a specific schema.
+
+`\d table_name`: View the exact structure of a specific table, including columns, data types, collations, nullable status, and default values. It also displays indexes and foreign key constraints.
+
+`\d+ table_name`: Provide the same structural breakdown but includes additional details like storage characteristics, stats target, and any descriptions/comments.
+
+#### Updating the schema
+
+When you are ready to modify the table, use the `ALTER TABLE` statement. Here are the most common operations you will likely need:
+
+- Add a new column
+
+    ```sql
+    ALTER TABLE table_name ADD COLUMN new_column_name data_type;
+    ```
+
+- Change a column's data type
+
+    ```sql
+    ALTER TABLE table_name ALTER COLUMN column_name TYPE new_data_type USING column_name::new_data_type;
+    ```
+
+    The `USING` clause is often required if PostgreSQL cannot automatically cast the existing data to the new type.
+
+- Rename a column
+
+    ```sql
+    ALTER TABLE table_name RENAME COLUMN old_name TO new_name;
+    ```
+
+- Drop a column
+
+    ```sql
+    ALTER TABLE table_name DROP COLUMN column_name;
+    ```
+
+If your schema update is complex, consider wrapping your `ALTER TABLE` statements in a transaction (`BEGIN; ... COMMIT;`). This allows you to safely type `ROLLBACK;` if a structural change causes an unexpected issue.
+
+#### Fix table owner
+
+Since you noted that postgres is a password-less service user on the Linux system, you will need to leverage local peer authentication on the server itself to make the change.
+
+Login to server as `root` or power user, and run:
+
+```bash
+sudo -u postgres psql -d network_inventory -c "ALTER TABLE devices OWNER TO netzadmin;"
+```
+
+#### Add a type column
+
+```sql
+\dt
+\d devices
+
+ALTER TABLE devices ADD COLUMN type character varying(255);
+
+\d devices
+```

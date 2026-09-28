@@ -17,7 +17,7 @@ pynetbox_folder = os.path.join(main_folder, "pynetbox")
 sys.path.insert(0, pynetbox_folder)
 
 # Import existing functions from pynetbox_functions
-from pynetbox_functions import _cache_devices
+from pynetbox_functions import _cache_devices, _cache_switches_types
 from pynetbox.core.api import Api as NetBoxApi
 from pynetbox.models.dcim import Devices
 from pynetbox.core.response import Record
@@ -522,6 +522,81 @@ def synchronize_devices(nb_devices: Dict[str, Dict[str, Any]],
     
     return stats
 
+def synchronize_device_types(nb_device_types: Dict[str, str], 
+                       db_devices_by_hostname: Dict[str, List[Dict[str, Any]]],
+                       inventory: NetworkInventory,
+                       dry_run: bool = False) -> Dict[str, Any]:
+    """
+    Synchronize devices from NetBox to PostgreSQL database.
+    
+    For each device in NetBox:
+    - Check if it exists in PostgreSQL
+    - If exists and data differs, update PostgreSQL
+    - If exists but serial/inventory differ significantly, handle conflict
+    - If doesn't exist, add to PostgreSQL
+    
+    Args:
+        nb_devices: Dictionary of devices from NetBox
+        db_devices_by_hostname: Dictionary of PostgreSQL devices by hostname
+        inventory: NetworkInventory instance
+        dry_run: If True, only report changes without making them
+        
+    Returns:
+        Dictionary with synchronization statistics
+    """
+    stats = {
+        'total_netbox': len(nb_device_types),
+        'total_db': sum(len(devices) for devices in db_devices_by_hostname.values()),
+        'added': 0,
+        'updated': 0,
+        'conflicts_resolved': 0,
+        'skipped': 0,
+        'errors': 0,
+        'details': []
+    }
+    
+    for hostname, d_type in nb_device_types.items():
+        try:
+            logger.debug(f"Processing device: {hostname}")
+            
+            db_devices = db_devices_by_hostname.get(hostname, [])
+            
+            if not db_devices:
+                # Device doesn't exist in database
+                # Add device
+                if dry_run:
+                    stats['details'].append({
+                        'hostname': hostname,
+                        'action': 'add',
+                        'type': d_type
+                    })
+                    logger.info(f"[DRY RUN] Would add: {hostname} (type = {d_type})")
+                else:
+                    device_id = inventory.add_device(
+                        hostname=hostname,
+                        type=d_type
+                    )
+                    stats['added'] += 1
+                    stats['details'].append({
+                        'hostname': hostname,
+                        'action': 'add',
+                        'device_id': device_id,
+                        'type': d_type
+                    })
+                    logger.info(f"Added device: {hostname} (ID: {device_id}), type: {d_type}")
+            else:
+                logger.info(f"Do SOMETHING with {hostname}: {d_type}")
+        except Exception as e:
+            stats['errors'] += 1
+            stats['details'].append({
+                'hostname': hostname,
+                'action': 'error',
+                'error': str(e)
+            })
+            logger.error(f"Error processing device {hostname}: {e}", exc_info=True)
+    
+    return stats
+
 
 def get_netbox_session(server: str = "development") -> NetBoxApi:
     """
@@ -783,6 +858,80 @@ def compare(
         typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
+@app.command()
+def types(
+    server: str = "development",
+    db_host: str = host,
+    dry_run: bool = False,
+    verbose: bool = False
+):
+    """
+    Synchronize device types from NetBox to PostgreSQL database.
+    
+    Args:
+        server: NetBox server to connect to (development or production)
+        db_host: PostgreSQL database host
+        active_only: If True, only sync active devices from NetBox (default: False to sync all devices including offline/decommissioning)
+        dry_run: If True, only show what would be changed
+        verbose: Enable verbose logging
+    """
+    log_level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(level=log_level, 
+                       format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    typer.echo("Starting NetBox to PostgreSQL device types synchronization...")
+
+    try:
+        typer.echo(f"Connecting to NetBox server: {server}")
+        nb_session = get_netbox_session(server)
+        
+        typer.echo("Extracting device types from NetBox...")
+        nb_device_types = _cache_switches_types(nb_session)
+        typer.echo(f"Found {len(nb_device_types)} devices in NetBox")
+        
+        typer.echo(f"Connecting to PostgreSQL database on {db_host}")
+        inventory = get_inventory_connection(db_host, vault_file, vault_password_file)
+        
+        typer.echo("Extracting devices from PostgreSQL...")
+        db_devices_by_hostname = get_postgresql_devices(inventory, active_only=False)
+        total_db_devices = sum(len(devices) for devices in db_devices_by_hostname.values())
+        typer.echo(f"Found {total_db_devices} devices in PostgreSQL database")
+        
+        typer.echo("Starting synchronization...")
+        stats = synchronize_device_types(
+            nb_device_types, 
+            db_devices_by_hostname, 
+            inventory,
+            dry_run=dry_run
+        )
+        
+        typer.echo("\n" + "="*60)
+        typer.echo("SYNCHRONIZATION SUMMARY")
+        typer.echo("="*60)
+        
+        mode = "DRY RUN - " if dry_run else ""
+        typer.echo(f"Mode: {mode}")
+        typer.echo(f"NetBox devices:     {stats['total_netbox']}")
+        typer.echo(f"PostgreSQL devices: {stats['total_db']}")
+        typer.echo(f"Added:               {stats['added']}")
+        typer.echo(f"Updated:             {stats['updated']}")
+        typer.echo(f"Conflicts resolved:  {stats['conflicts_resolved']}")
+        typer.echo(f"Skipped:             {stats['skipped']}")
+        typer.echo(f"Errors:              {stats['errors']}")
+        
+        if dry_run and (stats['added'] > 0 or stats['updated'] > 0 or stats['conflicts_resolved'] > 0):
+            typer.echo("\nRun without --dry-run to apply these changes")
+        
+        typer.echo("="*60)
+        
+        if stats['errors'] > 0:
+            raise typer.Exit(code=1)
+        
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
+        if verbose:
+            logger.exception("Full error details:")
+        raise typer.Exit(code=1)
 
 # Public functions for programmatic use
 def create_device_dict_from_netbox(nb_session: NetBoxApi, 
