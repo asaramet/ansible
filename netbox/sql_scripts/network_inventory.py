@@ -353,8 +353,8 @@ class NetworkInventory:
                 return [dict(row) for row in cur.fetchall()]
 
     def add_device(self, hostname: str, serial_number: Optional[str] = None,
-                   inventory_number: Optional[str] = None,
-                   active: bool = True) -> int:
+                   inventory_number: Optional[str] = None, 
+                   active: bool = True, device_type: Optional[str] = None) -> int:
         """
         Add a new device to inventory
 
@@ -377,14 +377,14 @@ class NetworkInventory:
         inventory_number = inventory_number if inventory_number and inventory_number.strip() else None
 
         query = """
-            INSERT INTO devices (hostname, serial_number, inventory_number, active)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO devices (hostname, serial_number, inventory_number, active, type)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING id;
         """
 
         with self._get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(query, (hostname, serial_number, inventory_number, active))
+                cur.execute(query, (hostname, serial_number, inventory_number, active, device_type))
                 device_id = cur.fetchone()[0]
                 conn.commit()
                 print(f"\u2713 Added device: {hostname} (ID: {device_id})")
@@ -396,7 +396,7 @@ class NetworkInventory:
 
         Args:
             device_id: Device ID to update
-            **kwargs: Fields to update (hostname, serial_number, inventory_number, active)
+            **kwargs: Fields to update (hostname, serial_number, inventory_number, active, type)
 
         Returns:
             True if device was updated, False if not found
@@ -405,7 +405,7 @@ class NetworkInventory:
             Empty strings ('') for serial_number and inventory_number are
             automatically converted to NULL for consistency.
         """
-        allowed_fields = ['hostname', 'serial_number', 'inventory_number', 'active']
+        allowed_fields = ['hostname', 'serial_number', 'inventory_number', 'active', 'type']
         updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
 
         if not updates:
