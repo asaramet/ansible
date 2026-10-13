@@ -276,3 +276,7 @@ ansible-playbook playbooks/backup_sql.yaml
 ansible-playbook playbooks/update_server.yaml -e production=true
 ansible-playbook playbooks/install.yaml -e production=true
 ```
+
+```bash
+rm -rfv pip_packages data/db_dumps
+```
