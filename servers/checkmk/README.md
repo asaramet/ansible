@@ -179,3 +179,44 @@ systemctl start omd-monitoring
 ```
 
 - If getting wired warning, try to reboot the VM.
+
+## Update checkmk
+
+Update the server
+
+```bash
+apt update
+apt full-upgrade
+apt autoremove
+apt clean
+reboot
+```
+
+Download the new community image from `https://checkmk.com/download`.
+
+You'll get a `wget` command like
+
+```bash
+wget https://download.checkmk.com/checkmk/2.4.0p37/check-mk-raw-2.4.0p37_0.trixie_amd64.deb
+```
+
+Copy the image to the server
+
+```bash
+scp check-mk-raw-2.4.0p37_0.trixie_amd64.deb root@checkmk:/root/
+```
+
+On the server install it:
+
+```bash
+apt install ./check-mk-raw-2.4.0p37_0.trixie_amd64.deb
+
+omd version
+```
+
+Update omd:
+
+```bash
+omd su monitoring
+omd update
+```
