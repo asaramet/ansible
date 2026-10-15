@@ -279,4 +279,5 @@ ansible-playbook playbooks/install.yaml -e production=true
 
 ```bash
 rm -rfv pip_packages data/db_dumps
+rm -fv src/releases/*.{tar.gz,txt}
 ```
