@@ -103,6 +103,19 @@ We will be using Exim4 as a Relay Mail via External Mail Server.
 
 You're essentially setting up Exim4 as a smart relay, which accepts local mail (e.g., from Checkmk, cron, etc.) and forwards it to a real SMTP server (e.g., your organization's mail server or a service like Gmail, Office365, etc.).
 
+0. Configure server hostname
+
+    ```bash
+    hostnamectl set-hostname checkmk.hs-esslingen.de
+    hostname -f
+    ```
+
+    Edit `/etc/hosts/` and add the DNS query:
+
+    ```txt
+    192.168.111.196 checkmk.hs-esslingen.de checkmk
+    ```
+
 1. Install Exim4 (if not already):
 
     ```bash
@@ -120,7 +133,7 @@ You're essentially setting up Exim4 as a smart relay, which accepts local mail (
 
     - Choose: `mail sent by smarthost; no local mail`
     - System mail name: e.g., `checkmk.hs-esslingen.de`
-    - IPs to listen on: `127.0.0.1 ; ::1`
+    - IPs to listen on: `127.0.0.1`
     - Other destinations: leave blank or `localhost.localdomain`
     - Visible domain name for local users: `checkmk.hs-esslingen.de`
     - Mail server configuration. IP address or host name of the outgoing smarthost `mail.hs-esslingen.de`
@@ -132,11 +145,63 @@ Now checkmk will send mails to the specific users.
 To verify if relay is working send a mail to a known user with:
 
 ```bash
-echo -e "Subject: Test Mail\n\nHello from Ansible!" | sendmail -v knownUser@hs-esslingen.de
+echo -e "Subject: Test Mail\n\nHello from CheckMK!" | sendmail -v knownUser@hs-esslingen.de
+```
+
+or
+
+```bash
+printf "From: root@checkmk.hs-esslingen.de\nTo: netzadmins@hs-esslingen.de\nSubject: FQDN Test after hostname update\n\nTesting outbound mail delivery from checkmk.hs-esslingen.de after updating the FQDN.\n" | sendmail -v netzadmins@hs-esslingen.de
 ```
 
 To configure Notifications on host or also services go to:
 `Setup -> Notifications` and edit `Global notification rules`.
+
+### Clean Exim 4 Configs
+
+- Here is the correct config file with IPv6 disabled at `/etc/exim4/update-exim4.conf.conf`
+
+```txt
+dc_eximconfig_configtype='satellite'
+dc_other_hostnames='localhost.localdomain'
+dc_local_interfaces='127.0.0.1'
+dc_readhost='checkmk.hs-esslingen.de'
+dc_relay_domains=''
+dc_minimaldns='false'
+dc_relay_nets=''
+dc_smarthost='mail.hs-esslingen.de'
+CFILEMODE='644'
+dc_use_split_config='false'
+dc_hide_mailname='true'
+dc_mailname_in_oh='true'
+dc_localdelivery='mail_spool'
+disable_ipv6='true'
+```
+
+- Restart the service
+
+```bash
+systemctl status exim4
+systemctl stop exim4
+systemctl start exim4
+systemctl status exim4
+```
+
+- Clear the paniclog
+
+```bash
+truncate -s 0 /var/log/exim4/paniclog
+systemctl restart exim4
+```
+
+- Redirect root mail to a real admin address
+
+Edit `/etc/aliases` so local alerts go to a deliverable team mailbox instead of looping back to `checkmk.hs-esslingen.de`
+
+```txt
+root: netzteam@hs-esslingen.de
+newaliases
+```
 
 ## Auto restart OMD Site with systemd
 
