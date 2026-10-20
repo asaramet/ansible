@@ -1,0 +1,287 @@
+# Checkmk
+
+## Install with Ansible
+
+Update the version that has to be downloaded and the sha256 checksum in `playbooks/install.yaml`.
+
+[Download Site](https://checkmk.com/download)
+
+```bash
+ansible-playbook playbooks/install.yaml
+```
+
+This will install checkmk on `checkmk` server.
+
+## Create a Checkmk monitoring site on the server
+
+As `root`:
+
+```bash
+omd create monitoring
+omd start monitoring
+```
+
+This will create a monitoring site, will start it and create an admin user with the id - `cmkadmin` and a self generated password.
+
+Change the password:
+
+```bash
+# Enter omd command line mode
+omd su monitoring
+
+# Change the password
+OMD[monitoring]:~$ cmk-passwd cmkadmin
+hG...8753
+```
+
+## Extra cmds
+
+- OMD status
+
+```bash
+omd status
+```
+
+- Scan the whole network
+
+```bash
+nmap -T5 -sn 192.168.105.0-255
+```
+
+## SNMP connection
+
+On the the switch SNMP should be enabled and the server allowed:
+
+```aruba_os
+config
+
+ip authorized-managers <checkmk server ip> 255.255.255.255 access manager access-method snmp
+
+snmp enable
+snmp-server community "<SNMP V2 PUBLIC COMMUNITY NAME>" operator
+```
+
+On the server ICMP and UDP ports 161 and 162 have to be opened. Take care in the ACLs UDP 161,162 from the server to the switch has to be allowed and all UDP traffic from the switch to the server too.
+
+Check snmp responces on the server over SNMP version 2c:
+
+```bash
+apt install snmp
+snmpwalk -v2c -c <SNMP V2 PUBLIC COMMUNITY NAME> <HOSTNAME OR IP> 1.3.6.1.2.1.1
+snmpwalk -v3 -a MD5 -u <SNMP V3 USERNAME> -l authNoPriv -A <PASSPHRASE> <HOSTNAME OR IP> 1.3.6.1.2.1.1
+```
+
+## Redirect FQDN
+
+Redirect FQDN so when you point in the browser `https://<checkmd fqdn>` it will point to `https://<checmd_fqdn>/monitoring`
+
+```bash
+# Update the main apache2 conf
+vim /etc/apache2/apache2.conf
+
+# Add the following line
+RedirectMatch ^/$ /monitoring/
+```
+
+## Deploy a Server Certificate
+
+- Create a `server.csr` and `server.key` with
+
+```bash
+cd /opt/certs/harica
+openssl req -new -newkey rsa:2048bits -sha512 -nodes -keyout server.key -out server.csr
+```
+
+- Create a valid server certificate on [Harica CertManager](https://cm.harica.gr/).
+
+- Download it to `src/certs`
+- Run Ansible playbook `deploy_cert.yaml`
+
+## Configure Mail server
+
+We will be using Exim4 as a Relay Mail via External Mail Server.
+
+You're essentially setting up Exim4 as a smart relay, which accepts local mail (e.g., from Checkmk, cron, etc.) and forwards it to a real SMTP server (e.g., your organization's mail server or a service like Gmail, Office365, etc.).
+
+0. Configure server hostname
+
+    ```bash
+    hostnamectl set-hostname <checkmk fqdn>
+    hostname -f
+    ```
+
+    Edit `/etc/hosts/` and add the DNS query:
+
+    ```txt
+    <checkmk server ip> <checkmk fqdn> checkmk
+    ```
+
+1. Install Exim4 (if not already):
+
+    ```bash
+    apt update
+    apt install exim4
+    ```
+
+2. Run the configuration wizard
+
+    ```bash
+    dpkg-reconfigure exim4-config
+    ```
+
+3. During the wizard:
+
+    - Choose: `mail sent by smarthost; no local mail`
+    - System mail name: e.g., `<checkmd fqdn>`
+    - IPs to listen on: `127.0.0.1`
+    - Other destinations: leave blank or `localhost.localdomain`
+    - Visible domain name for local users: `<checkmd fqdn>`
+    - Mail server configuration. IP address or host name of the outgoing smarthost `<mail server fqdn>`
+    - Keep number of DNS-queries minimal: `No`
+    - Split configuration into small files? `No`
+
+Now checkmk will send mails to the specific users.
+
+To verify if relay is working send a mail to a known user with:
+
+```bash
+echo -e "Subject: Test Mail\n\nHello from CheckMK!" | sendmail -v <admin email address>
+```
+
+or
+
+```bash
+printf "From: root@<checkmd fqdn>\nTo: <admin email address>\nSubject: FQDN Test after hostname update\n\nTesting outbound mail delivery from CheckMK server after updating the FQDN.\n" | sendmail -v <admin email address>
+```
+
+To configure Notifications on host or also services go to:
+`Setup -> Notifications` and edit `Global notification rules`.
+
+### Clean Exim 4 Configs
+
+- Here is the correct config file with IPv6 disabled at `/etc/exim4/update-exim4.conf.conf`
+
+```txt
+dc_eximconfig_configtype='satellite'
+dc_other_hostnames='localhost.localdomain'
+dc_local_interfaces='127.0.0.1'
+dc_readhost='<checkmd fqdn>'
+dc_relay_domains=''
+dc_minimaldns='false'
+dc_relay_nets=''
+dc_smarthost='<mail server fqdn>'
+CFILEMODE='644'
+dc_use_split_config='false'
+dc_hide_mailname='true'
+dc_mailname_in_oh='true'
+dc_localdelivery='mail_spool'
+disable_ipv6='true'
+```
+
+- Restart the service
+
+```bash
+systemctl status exim4
+systemctl stop exim4
+systemctl start exim4
+systemctl status exim4
+```
+
+- Clear the paniclog
+
+```bash
+truncate -s 0 /var/log/exim4/paniclog
+systemctl restart exim4
+```
+
+- Redirect root mail to a real admin address
+
+Edit `/etc/aliases` so local alerts go to a deliverable team mailbox instead of looping back to `<checkmd fqdn>`
+
+```txt
+root: <admin team email address>
+newaliases
+```
+
+## Auto restart OMD Site with systemd
+
+Automatically restart the OMD site if it fails by wrapping it in a `systemd` service. This allows automatic recovery, and integration with `journalctl`, `systemctl`, and other monitoring tools.
+
+- Update the `systemd` service unit for the OMD site, with the line `Restart=on-failure`.
+
+```bash
+vim /etc/systemd/system/omd.service
+```
+
+Add the following, line `Restart=on-failure` in `Service` section:
+
+```ini
+[Unit]
+Description=Checkmk Monitoring
+Documentation=https://docs.checkmk.com/latest/en/
+Wants=network-online.target
+After=syslog.target time-sync.target network.target network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/omd start
+ExecStop=/usr/bin/omd stop
+ExecReload=/usr/bin/omd reload
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.targe
+```
+
+- Reload `systemd` and enable the service
+
+```bash
+systemctl daemon-reexec
+systemctl daemon-reload
+systemctl enable omd-monitoring
+systemctl start omd-monitoring
+```
+
+- If getting wired warning, try to reboot the VM.
+
+## Update checkmk
+
+Update the server
+
+```bash
+apt update
+apt full-upgrade
+apt autoremove
+apt clean
+reboot
+```
+
+Download the new community image from `https://checkmk.com/download`.
+
+You'll get a `wget` command like
+
+```bash
+wget https://download.checkmk.com/checkmk/2.4.0p37/check-mk-raw-2.4.0p37_0.trixie_amd64.deb
+```
+
+Copy the image to the server
+
+```bash
+scp check-mk-raw-2.4.0p37_0.trixie_amd64.deb root@checkmk:/root/
+```
+
+On the server install it:
+
+```bash
+apt install ./check-mk-raw-2.4.0p37_0.trixie_amd64.deb
+
+omd version
+```
+
+Update omd:
+
+```bash
+omd su monitoring
+omd update
+```
