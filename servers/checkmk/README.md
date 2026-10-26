@@ -283,5 +283,12 @@ Update omd:
 
 ```bash
 omd su monitoring
+
+omd status
+
+omd stop
 omd update
+omd version
+omd start
+omd status
 ```
