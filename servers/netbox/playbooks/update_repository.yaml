@@ -50,6 +50,7 @@
           netbox-reorder-rack
           netbox-topology-views
           netbox-inventory
+          mkdocs-material
         insertafter: EOF
 
     - name: Remove existing virtual environment folder
